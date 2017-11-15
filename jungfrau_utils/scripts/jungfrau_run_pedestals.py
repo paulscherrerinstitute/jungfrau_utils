@@ -6,9 +6,9 @@ from detector_integration_api import DetectorIntegrationClient
 
 
 def reset_bits(client):
+    client.set_detector_value("clearbit", "0x5d 0")
     client.set_detector_value("clearbit", "0x5d 12")
     client.set_detector_value("clearbit", "0x5d 13")
-    client.set_detector_value("clearbit", "0x5d 0")
 
 
 def main():
@@ -32,7 +32,7 @@ def main():
 
     writer_config = {"output_file": args.directory + "/" + args.filename, "process_uid": args.uid, "dataset_name": "jungfrau/data"}
     print(writer_config)
-    detector_config = {"period": 0.01, "exptime": 0.001, "frames": 30000}
+    detector_config = {"period": 0.01, "exptime": 0.00001, "frames": 30000}
     backend_config = {"n_frames": 30000}
 
     client.reset()
@@ -49,7 +49,7 @@ def main():
     sleep(100)
     client.stop()
     client.reset()
-    reset_bits()
+    reset_bits(client)
     print("Done")
 
 if __name__ == "__main__":
