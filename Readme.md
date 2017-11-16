@@ -11,14 +11,14 @@
 `jungfrau_utils` is provided on the Alvra, Bernina beamlines already in a conda environment. To get into the environment, execute e.g.:
 
 ```
-/sf/bernina/jungfrau/bin/jungfrau_env.sh
+source /sf/bernina/jungfrau/bin/jungfrau_env.sh
 ```
 
 
 Then, to open an IPython shell already configured for the Jungfrau detector at the beamline:
 
 ```
-/sf/bernina/jungfrau/bin/jungfrau_console.sh
+jungfrau_console.sh
 ```
 
 
