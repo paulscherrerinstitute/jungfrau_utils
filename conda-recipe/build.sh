@@ -1,2 +1,3 @@
 $PYTHON setup.py install # Python command to install the script
-cp your_bash_script.sh $PREFIX/bin/destination_script_name.sh
+echo $PREFIX
+cp jungfrau_utils/scripts/jungfrau_console.sh $PREFIX/bin/jungfrau_console.sh

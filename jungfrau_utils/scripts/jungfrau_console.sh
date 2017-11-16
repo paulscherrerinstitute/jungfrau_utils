@@ -15,4 +15,4 @@ source activate /sf/${dest}/jungfrau/envs/jungfrau_client
 
 echo Starting Interactive Python session
 export QT_XKB_CONFIG_ROOT=/sf/${dest}/jungfrau/envs/jungfrau_client/lib
-ipython -i -c "from detector_integration_api import DetectorIntegrationClient; api_address = 'http://sf-daq-1:10000'; client = DetectorIntegrationClient(api_address); print('\nJungfrau Integration API on %s' % api_address);import h5py;import numpy as np;import matplotlib.pyplot as plt;print('Imported matplotlib (as plt), h5py, numpy (as np)');print('Jungfrau client available as client. Try: client.get_status()\n')"
+ipython -i -c "from detector_integration_api import DetectorIntegrationClient; api_address = 'http://sf-daq-1:10000'; client = DetectorIntegrationClient(api_address); print('\nJungfrau Integration API on %s' % api_address);import h5py;import numpy as np;import matplotlib.pyplot as plt;import dask.array as da;print('Imported matplotlib (as plt), h5py, numpy (as np), dask.array (as da)');print('Jungfrau client available as client. Try: client.get_status()\n')"
