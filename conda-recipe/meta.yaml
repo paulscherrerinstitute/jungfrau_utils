@@ -11,6 +11,8 @@ requirements:
     run:
         - python
         - pyzmq
+        - h5py
+        - numpy
 
 build:
   number: 1

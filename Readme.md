@@ -8,13 +8,19 @@
 
 # Usage
 
-`jungfrau_utils` is provided on the Alvra, Bernina beamlines already in a conda environment. To start it, execute e.g.:
+`jungfrau_utils` is provided on the Alvra, Bernina beamlines already in a conda environment. To get into the environment, execute e.g.:
+
+```
+/sf/bernina/jungfrau/bin/jungfrau_env.sh
+```
+
+
+Then, to open an IPython shell already configured for the Jungfrau detector at the beamline:
 
 ```
 /sf/bernina/jungfrau/bin/jungfrau_console.sh
 ```
 
-This will open an IPython shell already configured for the Jungfrau detector at the beamline.
 
 **Example:** starting a data acquisition with a Jungfrau 1.5M at Bernina
 ```
