@@ -24,12 +24,13 @@ jungfrau_console.sh
 
 **Example:** starting a data acquisition with a Jungfrau 1.5M at Bernina
 ```
-In [1]: writer_config = {"output_file": "/sf/bernina/data/raw/p16582/test.h5", "process_uid": 16582, "process_gid": 16582, "dataset_nam
-   ...: e": "jungfrau/data"}
+In [1]: writer_config = {"output_file": "/sf/bernina/data/raw/p16582/test.h5", "process_uid": 16582, "process_gid": 16582, "dataset_name": "jungfrau/data"}
 
-In [2]: detector_config = {"period": 1, "exptime": 0.01, "frames": 1000}
+In [2]: detector_config = {"exptime": 0.0001, "cycles": 1000}
 
-In [3]: backend_config = {"n_frames": 1000}
+In [3]: backend_config = {"n_frames": 1000, "gain_corrections_filename": "/sf/bernina/data/res/p16582/gains.h5", "gain_corrections_dataset": "gains", "pede_corrections_filename": "/sf/bernina/data/res/p16582/pedestal_20171115_1100_res_merge.h5", "pede_corrections_dataset": 
+   ...: "gains", "activate_corrections_preview": True}
+
 
 In [4]: client.reset()
 
