@@ -19,6 +19,10 @@ def main():
     parser.add_argument("--filename", default="pedestal_%s.h5" % date_string, help="Output file name")
     parser.add_argument("--directory", default="/gpfs/sf-data/bernina/raw/p16582", help="Output directory")
     parser.add_argument("--uid", default=16582, help="User ID which needs to own the file", type=int)
+    parser.add_argument("--period", default=0.01, help="Period (default is 10Hz - 0.01)", type=float)
+    parser.add_argument("--exptime", default=0.000010, help="Integration time (default 0.000010 - 10us)", type=float)
+    parser.add_argument("--numberFrames", default=10000, help="Integration time (default 10000)", type=int)
+    parser.add_argument("--trigger", default=1, help="run with the triggeri, PERIOD will be ignored in this case(default - 1(yes))", type=int)
     args = parser.parse_args()
 
     api_address = args.api
@@ -32,21 +36,27 @@ def main():
 
     writer_config = {"output_file": args.directory + "/" + args.filename, "process_uid": args.uid, "dataset_name": "jungfrau/data"}
     print(writer_config)
-    detector_config = {"period": 0.01, "exptime": 0.00001, "frames": 30000}
-    backend_config = {"n_frames": 30000}
+    if args.trigger == 0:
+        detector_config = {"period": args.period, "exptime": args.exptime, "frames": args.numberFrames}
+    else:
+        detector_config = {"period": args.period, "exptime": args.exptime, "frames": 1, 'cycles': args.numberFrames, "timing": "trigger" }
+    backend_config = {"n_frames": args.numberFrames}
 
     client.reset()
     client.set_config(writer_config=writer_config, backend_config=backend_config, detector_config=detector_config)
+    client.get_config()
+
+    sleepTime = args.numberFrames*args.period/3
 
     client.start()
     print("Taking data at G0")
-    sleep(100)
+    sleep(sleepTime)
     client.set_detector_value("setbit", "0x5d 12")
     print("Taking data at G1")
-    sleep(100)
+    sleep(sleepTime)
     client.set_detector_value("setbit", "0x5d 13")
     print("Taking data at G2")
-    sleep(100)
+    sleep(sleepTime)
     client.stop()
     client.reset()
     reset_bits(client)
