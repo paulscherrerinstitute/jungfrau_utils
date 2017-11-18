@@ -34,7 +34,7 @@ def main():
     reset_bits(client)
     
 
-    writer_config = {"output_file": args.directory + "/" + args.filename, "process_uid": args.uid, "dataset_name": "jungfrau/data"}
+    writer_config = {"output_file": args.directory + "/" + args.filename, "process_uid": args.uid, "dataset_name": "jungfrau/data", "disable_processing": False}
     print(writer_config)
     if args.trigger == 0:
         detector_config = {"period": args.period, "exptime": args.exptime, "frames": args.numberFrames}
