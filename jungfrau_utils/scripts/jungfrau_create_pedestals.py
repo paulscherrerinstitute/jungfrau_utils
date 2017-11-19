@@ -83,7 +83,7 @@ if args.N != -1:
         print("You requested to show frame number {}, but valid number for this pedestal run a 0-{}".format(frameToShow,numberOfFrames))
         exit()
 
-pixelMask = np.zeros((sh_y,sh_x))
+pixelMask = np.zeros((sh_y,sh_x),dtype=np.int)
 
 adcValuesN  = [ np.zeros((sh_y,sh_x)), np.zeros((sh_y,sh_x)), np.zeros((sh_y,sh_x)), np.zeros((sh_y,sh_x))]
 adcValuesNN = [ np.zeros((sh_y,sh_x)), np.zeros((sh_y,sh_x)), np.zeros((sh_y,sh_x)), np.zeros((sh_y,sh_x))]
@@ -138,16 +138,16 @@ for n in range(analyzeFrames):
             gainCheck = gainData[tY][tX]
 
  
-    pixelMask[gainData != trueGain] += 2^trueGain
+    pixelMask[gainData != trueGain] |= (1<<trueGain)
 
     nMgain[trueGain] += 1
  
-    adcValuesN[trueGain]  += frameData 
-    adcValuesNN[trueGain] += frameData*frameData
-
     if nMgain[trueGain] > averagePedestalFrames:
         adcValuesN[trueGain]  -= adcValuesN[trueGain]/averagePedestalFrames
         adcValuesNN[trueGain] -= adcValuesNN[trueGain]/averagePedestalFrames
+
+    adcValuesN[trueGain]  += frameData 
+    adcValuesNN[trueGain] += frameData*frameData
 
 
 if args.v >= 1:
@@ -164,7 +164,7 @@ for gain in range(4):
     variance = mean2 - mean*mean
     stdDeviation = np.sqrt(variance)
     if args.v >= 3:
-        print("gain {} values results (pixel (1,2) : {} {}".format(gain, mean[1][2], stdDeviation[1][2]))
+        print("gain {} values results (pixel ({},{}) : {} {}".format(gain, tY, tX, mean[tY][tX], stdDeviation[tY][tX]))
     if gain != 2:
         g = gain if gain != 3 else 2
         dset = outFile.create_dataset('gain'+str(g), data=mean)
