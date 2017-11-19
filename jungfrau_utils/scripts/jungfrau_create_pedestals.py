@@ -185,6 +185,30 @@ def main():
     if args.v >= 1:
         print("Number of good pixels: {} from {} in total ({} bad pixels)".format(np.sum(pixelMask==0),sh_x*sh_y, (sh_x*sh_y-np.sum(pixelMask==0))))
 
+gains=[None, None, None]
+gainsRMS = [None, None, None]
+
+for gain in range(4):
+    numberFramesAverage = max(1, min(averagePedestalFrames, nMgain[gain]))
+    mean  = adcValuesN[gain] / numberFramesAverage
+    mean2 = adcValuesNN[gain] / numberFramesAverage
+    variance = mean2 - mean*mean
+    stdDeviation = np.sqrt(variance)
+    if args.v >= 3:
+        print("gain {} values results (pixel ({},{}) : {} {}".format(gain, tY, tX, mean[tY][tX], stdDeviation[tY][tX]))
+    if gain != 2:
+        g = gain if gain != 3 else 2
+        dset = outFile.create_dataset('gain'+str(g), data=mean)
+        dset = outFile.create_dataset('gain'+str(g)+'_rms', data=stdDeviation)
+        gains[g] = mean
+        gainsRMS[g] = stdDeviation
+
+dset = outFile.create_dataset('gains', data=gains)
+dset = outFile.create_dataset('gainsRMS', data=gains)
+
+outFile.close()
+
+
 
 if __name__ == "__main__":
     main()

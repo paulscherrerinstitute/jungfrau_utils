@@ -6,9 +6,13 @@ from detector_integration_api import DetectorIntegrationClient
 
 
 def reset_bits(client):
-    client.set_detector_value("clearbit", "0x5d 0")
-    client.set_detector_value("clearbit", "0x5d 12")
-    client.set_detector_value("clearbit", "0x5d 13")
+    sleep(1)
+    print(client.set_detector_value("clearbit", "0x5d 0"))
+    sleep(1)
+    print(client.set_detector_value("clearbit", "0x5d 12"))
+    sleep(1)
+    print(client.set_detector_value("clearbit", "0x5d 13"))
+    sleep(1)
 
 
 def main():
@@ -22,7 +26,7 @@ def main():
     parser.add_argument("--period", default=0.01, help="Period (default is 10Hz - 0.01)", type=float)
     parser.add_argument("--exptime", default=0.000010, help="Integration time (default 0.000010 - 10us)", type=float)
     parser.add_argument("--numberFrames", default=10000, help="Integration time (default 10000)", type=int)
-    parser.add_argument("--trigger", default=1, help="run with the triggeri, PERIOD will be ignored in this case(default - 1(yes))", type=int)
+    parser.add_argument("--trigger", default=1, help="run with the trigger, PERIOD will be ignored in this case(default - 1(yes))", type=int)
     args = parser.parse_args()
 
     api_address = args.api
@@ -44,17 +48,17 @@ def main():
 
     client.reset()
     client.set_config(writer_config=writer_config, backend_config=backend_config, detector_config=detector_config)
-    client.get_config()
+    print(client.get_config())
 
     sleepTime = args.numberFrames*args.period/3
 
     client.start()
     print("Taking data at G0")
     sleep(sleepTime)
-    client.set_detector_value("setbit", "0x5d 12")
+    print(client.set_detector_value("setbit", "0x5d 12"))
     print("Taking data at G1")
     sleep(sleepTime)
-    client.set_detector_value("setbit", "0x5d 13")
+    print(client.set_detector_value("setbit", "0x5d 13"))
     print("Taking data at G2")
     sleep(sleepTime)
     client.stop()
