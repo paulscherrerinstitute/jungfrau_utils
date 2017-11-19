@@ -1,11 +1,21 @@
 #!/usr/bin/env python
 
+pixelMaskReasons = ['gain0', 'gain1', 'gain_bad', 'gain2', 'NA', 'NA', 'NA', 'NA', 'NA', 'NA']
+def printReasons(mask):
+    reason=""
+    for i in range(len(pixelMaskReasons)):
+        if mask >> i & 1:
+            reason += pixelMaskReasons[i]
+            reason += " "
+    return reason
+
 import argparse
 import sys
 import os
 import numpy as np
 import matplotlib.pyplot as plt
 import h5py
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-f", default="pedestal_res.h5", help="file with the pixel mask")
@@ -24,5 +34,5 @@ pixelMask = f["pixelMask"]
 for y in range(sh_y):
     for x in range(sh_x):
         if pixelMask[y][x] != 0:
-            print("Bad pixel (y,x) ({} {}) : {}, {} ".format(y,x,pixelMask[y][x], [ (int(pixelMask[y][x]) >> i & 1) for i in range(10)]))
+            print("Bad pixel (y,x) ({} {}) : {} ".format( y, x, printReasons(pixelMask[y][x])))
 
