@@ -57,6 +57,23 @@ client.get_status()
 client.reset()
 ```
 
+## Restart services
+
+There are 4 services running on `sf-daq-1`:
+* `detector_integration_api` : controls detector, backend and writer
+* `detector_backend`: controls the data acquisition
+* `writer`: writes data
+* `detector_visualization`: controls the live visualization
+* 
+
+These services can be restarted from `sf-daq-1` with the user `dbe` with:
+```
+sudo systemctl stop <SERVICE_NAME>
+sudo systemctl start <SERVICE_NAME>
+```
+where `<SERVICE_NAME>` is one of the above.
+
+
 
 # Installation
 
