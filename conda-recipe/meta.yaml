@@ -1,6 +1,6 @@
 package:
     name: jungfrau_utils
-    version: 0.0.1
+    version: 0.0.2
 source:
     path: ..
 
@@ -19,6 +19,8 @@ build:
   entry_points:
     - jungfrau_convert_gainmaps = jungfrau_utils.scripts.jungfrau_convert_gainmaps:main
     - jungfrau_run_pedestals = jungfrau_utils.scripts.jungfrau_run_pedestals:main
+    - jungfrau_print_pixelmask = jungfrau_utils.scripts.jungfrau_print_pixelmask:main
+    - jungfrau_create_pedestals = jungfrau_utils.scripts.jungfrau_create_pedestals:main
 
 #about:
 #    home: https://github.com/datastreaming/mflow
