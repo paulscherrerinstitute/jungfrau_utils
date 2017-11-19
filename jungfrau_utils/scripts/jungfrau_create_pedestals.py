@@ -157,6 +157,9 @@ fileNameIn = os.path.splitext(os.path.basename(args.f))[0]
 outFile = h5py.File(args.o + "/" + fileNameIn + "_res.h5", "w")
 dset = outFile.create_dataset('pixelMask', data=pixelMask)
 
+gains=[None, None, None]
+gainsRMS = [None, None, None]
+
 for gain in range(4):
     numberFramesAverage = max(1, min(averagePedestalFrames, nMgain[gain]))
     mean  = adcValuesN[gain] / numberFramesAverage
@@ -169,13 +172,13 @@ for gain in range(4):
         g = gain if gain != 3 else 2
         dset = outFile.create_dataset('gain'+str(g), data=mean)
         dset = outFile.create_dataset('gain'+str(g)+'_rms', data=stdDeviation)
+        gains[g] = mean
+        gainsRMS[g] = stdDeviation
+
+dset = outFile.create_dataset('gains', data=gains)
+dset = outFile.create_dataset('gainsRMS', data=gains)
 
 outFile.close()
-
-outFile = h5py.File(args.o + "/" + fileNameIn + "_res.h5", "r")
-outFileMerge = h5py.File(args.o + "/" + fileNameIn + "_res_merge.h5", "w")
-dset = outFileMerge.create_dataset('gains', data=[outFile["gain0"],outFile["gain1"],outFile["gain2"]])
-outFileMerge.close()
 
 if args.showPixelMask > 0:
     plt.imshow(pixelMask, vmax=1.0, vmin=0.0, origin='lower')
