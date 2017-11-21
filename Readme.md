@@ -40,6 +40,41 @@ In [6]: client.start()
 
 ```
 
+## Commissioning 2017-11-19
+
+```
+backend_config = {"n_frames": 100000, "pede_corrections_filename": "/sf/bernina/data/res/p16582/pedestal_20171119_1027_res.h5", "pede_corrections_dataset": "gains", "gain_corrections_filename": "/sf/bernina/data/res/p16582/gains.h5", "gain_corrections_dataset": "gains", "activate_corrections_preview": True, "pede_mask_dataset": "pixel_mask"}
+detector_config = {"exptime": 0.0001, "cycles":20000, "timing": "trigger", "frames": 1} 
+
+client.reset()
+writer_config = {'dataset_name': 'jungfrau/data','output_file': '/gpfs/sf-data/bernina/raw/p16582/Bi11_pp_delayXXPP_tests.h5','process_gid': 16582,   'process_uid': 16582, "disable_processing": False};
+client.set_config(writer_config=writer_config,backend_config=backend_config, detector_config=detector_config); 
+client.start()
+
+client.get_status()
+
+## only if it is {'state': 'ok', 'status': 'IntegrationStatus.DETECTOR_STOPPED'}
+client.reset()
+```
+
+## Restart services
+
+There are 4 services running on `sf-daq-1`:
+* `detector_integration_api` : controls detector, backend and writer
+* `detector_backend`: controls the data acquisition
+* `writer`: writes data
+* `detector_visualization`: controls the live visualization
+* 
+
+These services can be restarted from `sf-daq-1` with the user `dbe` with:
+```
+sudo systemctl stop <SERVICE_NAME>
+sudo systemctl start <SERVICE_NAME>
+```
+where `<SERVICE_NAME>` is one of the above.
+
+
+
 # Installation
 
 The package is provided with a conda recipe, and uploaded on Anaconda Cloud. The easiest way to install is:
