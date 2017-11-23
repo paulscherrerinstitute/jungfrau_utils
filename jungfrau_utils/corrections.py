@@ -31,6 +31,7 @@ def apply_gain_pede_np(image, G=None, P=None, pixel_mask=None):
     res = np.divide(data - p, g)
     return res
 
+
 try:
     from numba import jit
 
@@ -73,7 +74,8 @@ try:
 
 except:
     print("[INFO][corrections] Numba not available, reverting to Numpy")
-
+    print(sys.exc_info())
+    
 
 def apply_gain_pede(image, G=None, P=None, pixel_mask=None, inverse_gain=False):
     r"""Apply gain corrections to Jungfrau image. Gain and Pedestal corrections are
