@@ -28,7 +28,7 @@ def main():
         print("File {} not found, exit".format(args.f))
         exit()
 
-    f = h5py.File(args.f,"r")
+    f = h5py.File(args.f, "r")
 
     pixelMask = f["pixelMask"]
 
@@ -37,7 +37,7 @@ def main():
     for y in range(sh_y):
         for x in range(sh_x):
             if pixelMask[y][x] != 0:
-                print("Bad pixel (y,x) ({} {}) : {} ".format( y, x, printReasons(pixelMask[y][x])))
+                print("Bad pixel (y,x) ({} {}) : {} ".format(y, x, printReasons(pixelMask[y][x])))
 
 if __name__ == "__main__":
     main()

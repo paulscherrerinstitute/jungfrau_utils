@@ -4,9 +4,7 @@ import argparse
 import os
 from datetime import datetime
 
-# a = np.fromfile("gainMaps_M022.bin", np.double) 
-
-
+# a = np.fromfile("gainMaps_M022.bin", np.double)
 
 
 def main():
@@ -16,7 +14,8 @@ Utility to read binary Jungfrau gain maps from PSI Detectors Group and save them
     The name of the dataset used for saving the maps is "gains".
 
 """)
-    parser.add_argument("files", metavar="file", type=str, help="Binary file as provided by the Detectors Group, usually one per module. Order matters! The first file provided is the bottom-left module.", nargs="+")
+    parser.add_argument("files", metavar="file", type=str,
+                        help="Binary file as provided by the Detectors Group, usually one per module. Order matters! The first file provided is the bottom-left module.", nargs="+")
     parser.add_argument("--outfile", type=str, help="NAme for the hdf5 outputg", default="gains.h5")
     parser.add_argument("--attributes", type=str, help="Additional attributes to be added to the destination dataset, in the form key=value,key=value,...", default="")
     parser.add_argument("--shape", type=list, help="Dimension of the final image, in modules. For example, a 1.5 Jungfrau with three modules one on top of each other is [3,1].", default=[-1, -1])
@@ -28,7 +27,7 @@ Utility to read binary Jungfrau gain maps from PSI Detectors Group and save them
 
     dst_name = "gains"
     module_shape = (3, 512, 1024)
-    
+
     n_modules = len(args.files)
     if args.shape == [-1, -1]:
         args.shape = [n_modules, 1]
@@ -56,6 +55,6 @@ Utility to read binary Jungfrau gain maps from PSI Detectors Group and save them
         print("\t G%d = %.2f +- %.2f" % (i, dst[i].mean(), dst[i].std()))
     f.close()
 
-    
+
 if __name__ == "__main__":
     main()

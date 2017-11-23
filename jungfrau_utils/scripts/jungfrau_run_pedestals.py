@@ -36,21 +36,20 @@ def main():
 
     print("Resetting gain bits on Jungfrau")
     reset_bits(client)
-    
 
     writer_config = {"output_file": args.directory + "/" + args.filename, "process_uid": args.uid, "dataset_name": "jungfrau/data", "disable_processing": False}
     print(writer_config)
     if args.trigger == 0:
         detector_config = {"period": args.period, "exptime": args.exptime, "frames": args.numberFrames}
     else:
-        detector_config = {"period": args.period, "exptime": args.exptime, "frames": 1, 'cycles': args.numberFrames, "timing": "trigger" }
+        detector_config = {"period": args.period, "exptime": args.exptime, "frames": 1, 'cycles': args.numberFrames, "timing": "trigger"}
     backend_config = {"n_frames": args.numberFrames}
 
     client.reset()
     client.set_config(writer_config=writer_config, backend_config=backend_config, detector_config=detector_config)
     print(client.get_config())
 
-    sleepTime = args.numberFrames*args.period/3
+    sleepTime = args.numberFrames * args.period / 3
 
     client.start()
     print("Taking data at G0")

@@ -18,7 +18,7 @@ def apply_gain_pede_np(image, G=None, P=None, pixel_mask=None):
     m2 = gain_mask != 1
     m3 = gain_mask < 2
     if G is not None:
-        g = ma.array(G[0], mask=m1, dtype=np.float32).filled(0) +  ma.array(G[1], mask=m2, dtype=np.float32).filled(0) + ma.array(G[2], mask=m3, dtype=np.float32).filled(0)
+        g = ma.array(G[0], mask=m1, dtype=np.float32).filled(0) + ma.array(G[1], mask=m2, dtype=np.float32).filled(0) + ma.array(G[2], mask=m3, dtype=np.float32).filled(0)
     else:
         g = np.ones(data.shape, dtype=np.float32)
     if P is not None:
@@ -43,7 +43,7 @@ try:
                     res[i][j] = 0
                     continue
                 gm = gain_mask[i][j]
-                #if i==0 and j==0:
+                # if i==0 and j==0:
                 #    print(gm, image[i][j], P[gm][i][j], G[gm][i][j])
                 if gm == 3:
                     gm = 2
@@ -54,7 +54,7 @@ try:
         return res
 
     def apply_gain_pede_numba(image, G=None, P=None, pixel_mask=None, inverse_gain=False):
-        
+
         mask = int('0b' + 14 * '1', 2)
         mask2 = int('0b' + 2 * '1', 2)
         gain_mask = np.bitwise_and(np.right_shift(image, 14), mask2)
@@ -77,7 +77,7 @@ except:
 
 def apply_gain_pede(image, G=None, P=None, pixel_mask=None, inverse_gain=False):
     r"""Apply gain corrections to Jungfrau image. Gain and Pedestal corrections are
-    to be provided as a 3D array of shape (3, image.shape[0], image.shape[1]). 
+    to be provided as a 3D array of shape (3, image.shape[0], image.shape[1]).
     The formula for the correction is: (image - P) / G
 
     If Numba is available, a Numba-optimized routine is used: otherwise, a Numpy based one.
@@ -122,26 +122,26 @@ def test():
     data = np.random.randint(0, 60000, size=[1500, 1000], dtype=np.uint16)
     pede = 60000 * np.random.random(size=[3, 1500, 1000])
     gain = 100 * np.random.random(size=[3, 1500, 1000])
-    gain[gain>1] = 3
+    gain[gain > 1] = 3
 
     t_i = time()
     res1 = apply_gain_pede_np(data, gain, pede)
     print("NP", time() - t_i)
     t_i = time()
-    res2 = apply_gain_pede_numba(data, gain, pede)    
+    res2 = apply_gain_pede_numba(data, gain, pede)
     print("Numba", time() - t_i)
     t_i = time()
-    res2 = apply_gain_pede_numba(data, gain, pede)    
+    res2 = apply_gain_pede_numba(data, gain, pede)
     print("Numba", time() - t_i)
     t_i = time()
     gain2 = 1. / gain
-    res2 = apply_gain_pede(data, gain2, pede, inverse_gain=True)    
+    res2 = apply_gain_pede(data, gain2, pede, inverse_gain=True)
     print("Numba inverse", time() - t_i)
     t_i = time()
-    res2 = apply_gain_pede(data, gain2, pede, inverse_gain=True)    
+    res2 = apply_gain_pede(data, gain2, pede, inverse_gain=True)
     print("Numba inverse", time() - t_i)
-    #print((res1 - res2 < 0.01).all())
-    #print(res1[0:2, 0:2], res2[0:2, 0:2])
+    # print((res1 - res2 < 0.01).all())
+    # print(res1[0:2, 0:2], res2[0:2, 0:2])
 
 
 if __name__ == "__main__":

@@ -5,18 +5,20 @@ import numpy as np
 import matplotlib.pyplot as plt
 import h5py
 
+
 def h5_printname(name):
     print("  {}".format(name))
 
+
 def forcedGainValue(i, n0, n1, n2):
-    if i <= n0-1:
+    if i <= n0 - 1:
         return 0
-    if i <= (n0+n1)-1:
+    if i <= (n0 + n1) - 1:
         return 1
-    if i <= (n0+n1+n2)-1:
+    if i <= (n0 + n1 + n2) - 1:
         return 3
     return 2
-      
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -41,53 +43,54 @@ def main():
         exit()
 
     overwriteGain = False
-    if (args.numberGain0+args.numberGain1+args.numberGain2) > 0:
-        if args.v >=1 :
-            print("Treat this run as taken with {} frames in gain0, then {} frames in gain1 and {} frames in gain2".format(args.numberGain0,args.numberGain1,args.numberGain2))
+    if (args.numberGain0 + args.numberGain1 + args.numberGain2) > 0:
+        if args.v >= 1:
+            print("Treat this run as taken with {} frames in gain0, then {} frames in gain1 and {} frames in gain2".format(args.numberGain0, args.numberGain1, args.numberGain2))
         overwriteGain = True
 
-    f = h5py.File(args.f,"r")
+    f = h5py.File(args.f, "r")
 
     numberOfFrames = len(f["jungfrau/data"])
-    (sh_y,sh_x) = f["jungfrau/data"][0].shape
+    (sh_y, sh_x) = f["jungfrau/data"][0].shape
     nModules = (sh_x * sh_y) // (1024 * 512)
-    if (nModules*1024*512) != (sh_x * sh_y):
-        print("Something very strange in the data, Jungfrau consists of (1024x512) modules, while data has {}x{}".format(sh_x,sh_y))
+    if (nModules * 1024 * 512) != (sh_x * sh_y):
+        print("Something very strange in the data, Jungfrau consists of (1024x512) modules, while data has {}x{}".format(sh_x, sh_y))
         exit()
 
     (tX, tY) = (args.tX, args.tY)
-    if tX < 0 or tX > (sh_x-1):
+    if tX < 0 or tX > (sh_x - 1):
         tX = 0
-    if tY < 0 or tY > (sh_y-1):
-        tY = 0  
+    if tY < 0 or tY > (sh_y - 1):
+        tY = 0
 
     if args.v >= 4:
-        print("test pixel is (xy): {}x{}".format(tX,tY))
+        print("test pixel is (xy): {}x{}".format(tX, tY))
 
     if args.v >= 2:
-        print("In pedestal file {} there are {} frames".format(args.f, numberOfFrames+1))
+        print("In pedestal file {} there are {} frames".format(args.f, numberOfFrames + 1))
     if args.v >= 3:
-        print("Following groups are available:")   
+        print("Following groups are available:")
         f.visit(h5_printname)
-        print("    data has the following shape: {}, type: {}, {} modules".format(f["jungfrau/data"][0].shape,f["jungfrau/data"][0].dtype, nModules))
+        print("    data has the following shape: {}, type: {}, {} modules".format(f["jungfrau/data"][0].shape, f["jungfrau/data"][0].dtype, nModules))
 
     if args.N != -1:
         frameToShow = args.N
         if frameToShow <= numberOfFrames and frameToShow >= 0:
             print("Show frame number {}".format(frameToShow))
-            frameData = np.bitwise_and(f["jungfrau/data"][frameToShow],0b0011111111111111)
-            gainData  = np.bitwise_and(f["jungfrau/data"][frameToShow],0b1100000000000000) >> 14
-            print("Number of channels in gain0 : {}; gain1 : {}; gain2 : {}; undefined gain : {}".format(np.sum(gainData==0),np.sum(gainData==1),np.sum(gainData==3),np.sum(gainData==2)))
-            plt.imshow(frameData, vmax=25000,origin='lower');                 
-            plt.colorbar(); plt.show()
+            frameData = np.bitwise_and(f["jungfrau/data"][frameToShow], 0b0011111111111111)
+            gainData = np.bitwise_and(f["jungfrau/data"][frameToShow], 0b1100000000000000) >> 14
+            print("Number of channels in gain0 : {}; gain1 : {}; gain2 : {}; undefined gain : {}".format(np.sum(gainData == 0), np.sum(gainData == 1), np.sum(gainData == 3), np.sum(gainData == 2)))
+            plt.imshow(frameData, vmax=25000, origin='lower')
+            plt.colorbar()
+            plt.show()
         else:
-            print("You requested to show frame number {}, but valid number for this pedestal run a 0-{}".format(frameToShow,numberOfFrames))
+            print("You requested to show frame number {}, but valid number for this pedestal run a 0-{}".format(frameToShow, numberOfFrames))
             exit()
 
-    pixelMask = np.zeros((sh_y,sh_x),dtype=np.int)
+    pixelMask = np.zeros((sh_y, sh_x), dtype=np.int)
 
-    adcValuesN  = [ np.zeros((sh_y,sh_x)), np.zeros((sh_y,sh_x)), np.zeros((sh_y,sh_x)), np.zeros((sh_y,sh_x))]
-    adcValuesNN = [ np.zeros((sh_y,sh_x)), np.zeros((sh_y,sh_x)), np.zeros((sh_y,sh_x)), np.zeros((sh_y,sh_x))]
+    adcValuesN = [np.zeros((sh_y, sh_x)), np.zeros((sh_y, sh_x)), np.zeros((sh_y, sh_x)), np.zeros((sh_y, sh_x))]
+    adcValuesNN = [np.zeros((sh_y, sh_x)), np.zeros((sh_y, sh_x)), np.zeros((sh_y, sh_x)), np.zeros((sh_y, sh_x))]
 
     averagePedestalFrames = args.pedestalFrames
 
@@ -108,12 +111,12 @@ def main():
 
         daq_rec = f["jungfrau/daq_rec"][n]
 
-        frameData = (np.bitwise_and(f["jungfrau/data"][n],0b0011111111111111)).astype(np.float64) # without cast can't use easily self multiplication
-        gainData  = np.bitwise_and(f["jungfrau/data"][n],0b1100000000000000) >> 14
+        frameData = (np.bitwise_and(f["jungfrau/data"][n], 0b0011111111111111)).astype(np.float64)  # without cast can't use easily self multiplication
+        gainData = np.bitwise_and(f["jungfrau/data"][n], 0b1100000000000000) >> 14
         trueGain = forcedGainValue(n, args.numberGain0, args.numberGain1, args.numberGain2) if overwriteGain else ((daq_rec & 0b11000000000000) >> 12)
 
         gainGoodAllModules = True
-        if args.gainModule > 0: 
+        if args.gainModule > 0:
             daq_recs = f["jungfrau/daq_recs"][n]
             for i in range(len(daq_recs)):
                 if trueGain != ((daq_recs[i] & 0b11000000000000) >> 12):
@@ -127,52 +130,50 @@ def main():
         if args.v >= 1:
             if gainData[tY][tX] != trueGain:
                 if not printFalseGain:
-                    print("Gain wrong for channel ({}x{}) should be {}, but {}. Frame {}. {} {}".format( tX, tY, trueGain, gainData[tY][tX], n, trueGain, daq_rec))
+                    print("Gain wrong for channel ({}x{}) should be {}, but {}. Frame {}. {} {}".format(tX, tY, trueGain, gainData[tY][tX], n, trueGain, daq_rec))
                     printFalseGain = True
             else:
                 if gainCheck != -1 and printFalseGain:
-                    print("Gain was wrong for channel ({}x{}) in previous frames, but now correct : {}. Frame {}.".format( tX, tY, gainData[tY, tX], n))
+                    print("Gain was wrong for channel ({}x{}) in previous frames, but now correct : {}. Frame {}.".format(tX, tY, gainData[tY, tX], n))
                 printFalseGain = False
 
             if gainData[tY][tX] != gainCheck:
-                print("Gain changed for ({}x{}) channel {} -> {}, frame number {}, match: {}".format( tX, tY, gainCheck, gainData[tY][tX], n, gainData[tY][tX]==trueGain))
+                print("Gain changed for ({}x{}) channel {} -> {}, frame number {}, match: {}".format(tX, tY, gainCheck, gainData[tY][tX], n, gainData[tY][tX] == trueGain))
                 gainCheck = gainData[tY][tX]
 
-
-        pixelMask[gainData != trueGain] |= (1<<trueGain)
+        pixelMask[gainData != trueGain] |= (1 << trueGain)
 
         nMgain[trueGain] += 1
 
         if nMgain[trueGain] > averagePedestalFrames:
-            adcValuesN[trueGain]  -= adcValuesN[trueGain]/averagePedestalFrames
-            adcValuesNN[trueGain] -= adcValuesNN[trueGain]/averagePedestalFrames
+            adcValuesN[trueGain] -= adcValuesN[trueGain] / averagePedestalFrames
+            adcValuesNN[trueGain] -= adcValuesNN[trueGain] / averagePedestalFrames
 
-        adcValuesN[trueGain]  += frameData 
-        adcValuesNN[trueGain] += frameData*frameData
-
+        adcValuesN[trueGain] += frameData
+        adcValuesNN[trueGain] += frameData * frameData
 
     if args.v >= 1:
-        print("{} frames analyzed, {} good frames, {} frames without gain mismatch. Gain frames distribution (0,1,2,3) : ({})".format(analyzeFrames,nGoodFrames,nGoodFramesGain,nMgain))
+        print("{} frames analyzed, {} good frames, {} frames without gain mismatch. Gain frames distribution (0,1,2,3) : ({})".format(analyzeFrames, nGoodFrames, nGoodFramesGain, nMgain))
 
     fileNameIn = os.path.splitext(os.path.basename(args.f))[0]
     outFile = h5py.File(args.o + "/" + fileNameIn + "_res.h5", "w")
     dset = outFile.create_dataset('pixelMask', data=pixelMask)
 
-    gains=[None, None, None]
+    gains = [None, None, None]
     gainsRMS = [None, None, None]
 
     for gain in range(4):
         numberFramesAverage = max(1, min(averagePedestalFrames, nMgain[gain]))
-        mean  = adcValuesN[gain] / numberFramesAverage
+        mean = adcValuesN[gain] / numberFramesAverage
         mean2 = adcValuesNN[gain] / numberFramesAverage
-        variance = mean2 - mean*mean
+        variance = mean2 - mean * mean
         stdDeviation = np.sqrt(variance)
         if args.v >= 3:
             print("gain {} values results (pixel ({},{}) : {} {}".format(gain, tY, tX, mean[tY][tX], stdDeviation[tY][tX]))
         if gain != 2:
             g = gain if gain != 3 else 2
-            dset = outFile.create_dataset('gain'+str(g), data=mean)
-            dset = outFile.create_dataset('gain'+str(g)+'_rms', data=stdDeviation)
+            dset = outFile.create_dataset('gain' + str(g), data=mean)
+            dset = outFile.create_dataset('gain' + str(g) + '_rms', data=stdDeviation)
             gains[g] = mean
             gainsRMS[g] = stdDeviation
 
@@ -186,7 +187,7 @@ def main():
         plt.show()
 
     if args.v >= 1:
-        print("Number of good pixels: {} from {} in total ({} bad pixels)".format(np.sum(pixelMask==0),sh_x*sh_y, (sh_x*sh_y-np.sum(pixelMask==0))))
+        print("Number of good pixels: {} from {} in total ({} bad pixels)".format(np.sum(pixelMask == 0), sh_x * sh_y, (sh_x * sh_y - np.sum(pixelMask == 0))))
 
 
 if __name__ == "__main__":
