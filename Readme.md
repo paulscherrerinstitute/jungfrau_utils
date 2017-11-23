@@ -57,6 +57,22 @@ client.get_status()
 client.reset()
 ```
 
+## Correct data on file
+
+One utility `jungfrau_utils` provides is a pede and gain subtraction routine. Eg.:
+
+```
+In [2]: import jungfrau_utils as ju
+In [3]: f = h5py.File("/gpfs/sf-data/bernina/raw/p16582/AgBeNH_dtz60_run3.h5")
+In [4]: fp = h5py.File("/sf/bernina/data/res/p16582/pedestal_20171119_0829_res_merge.h5")
+In [5]: fg = h5py.File("/sf/bernina/data/res/p16582/gains.h5")
+In [6]: images = f["jungfrau/data"]
+In [7]: G = fg["gains"][:]
+In [8]: P = fp["gains"][:]
+In [9]: corrected_image = ju.apply_gain_pede(images[2], G, P, pixel_mask=None)
+
+```
+
 ## Restart services
 
 There are 4 services running on `sf-daq-1`:
