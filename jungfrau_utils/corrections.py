@@ -35,7 +35,7 @@ def apply_gain_pede_np(image, G=None, P=None, pixel_mask=None):
 try:
     from numba import jit
 
-    @jit(nopython=True, nogil=True, cache=True)
+    @jit(nopython=True, nogil=True, cache=False)
     def apply_gain_pede_corrections_numba(m, n, image, G, P, mask, mask2, pede_mask, gain_mask, inverse_gain=False):
         res = np.empty((m, n), dtype=np.float32)
         for i in range(m):
