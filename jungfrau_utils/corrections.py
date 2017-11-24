@@ -74,7 +74,7 @@ try:
 
 except:
     print("[INFO][corrections] Numba not available, reverting to Numpy")
-    print(sys.exc_info())
+    #print(sys.exc_info())
     
 
 def apply_gain_pede(image, G=None, P=None, pixel_mask=None, inverse_gain=False):
