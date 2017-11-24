@@ -31,12 +31,14 @@ In [2]: detector_config = {"timing": "trigger", "exptime": 0.0001, "cycles": 100
 In [3]: backend_config = {"n_frames": 1000, "gain_corrections_filename": "/sf/bernina/data/res/p16582/gains.h5", "gain_corrections_dataset": "gains", "pede_corrections_filename": "/sf/bernina/data/res/p16582/pedestal_20171115_1100_res_merge.h5", "pede_corrections_dataset": 
    ...: "gains", "activate_corrections_preview": True}
 
+In [4]:bsread_config = {'output_file': '/sf/bernina/data/raw/p16582/test_bsread.h5', 'process_uid': 16582, 'process_gid': 16582, 'channels': ['SAROP21-CVME-PBPS2:Lnk9Ch7-BG-DATA',
+    ...:   'SAROP21-CVME-PBPS2:Lnk9Ch7-BG-DATA-CALIBRATED']}
 
-In [4]: client.reset()
+In [5]: client.reset()
 
-In [5]: client.set_config(writer_config=writer_config, backend_config=backend_config, detector_config=detector_config)
+In [6]: client.set_config(writer_config=writer_config, backend_config=backend_config, detector_config=detector_config)
 
-In [6]: client.start()
+In [7]: client.start()
 
 ```
 
