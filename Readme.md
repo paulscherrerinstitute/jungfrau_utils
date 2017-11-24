@@ -36,7 +36,7 @@ In [4]:bsread_config = {'output_file': '/sf/bernina/data/raw/p16582/test_bsread.
 
 In [5]: client.reset()
 
-In [6]: client.set_config(writer_config=writer_config, backend_config=backend_config, detector_config=detector_config)
+In [6]: client.set_config(writer_config=writer_config, backend_config=backend_config, detector_config=detector_config, bsread_config=bsread_config)
 
 In [7]: client.start()
 
