@@ -6,6 +6,10 @@
 * a set of scripts for calibrations (running a pedestal run, converting gain maps, ...)
 * some examples (soon)
 
+For more information about the Detector Integration Api please visit:
+
+* https://github.com/datastreaming/detector_integration_api
+
 # Usage
 
 `jungfrau_utils` is provided on the Alvra, Bernina beamlines already in a conda environment. To get into the environment, execute e.g.:
