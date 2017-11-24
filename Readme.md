@@ -67,7 +67,7 @@ client.reset()
 
 ```
 # This records a pedestal run
-python jungfrau_run_pedestals.py --numberFrames 3000 --period 0.05
+jungfrau_run_pedestals --numberFrames 3000 --period 0.05
 
 # This analyses and creates a pedestal correction file, in this case /sf/bernina/data/res/p16582/pedestal_20171124_1646_res.h5
 jungfrau_create_pedestals -f /sf/bernina/data/raw/p16582/pedestal_20171124_1646.h5 -v 3 -o /sf/bernina/data/res/p16582/
