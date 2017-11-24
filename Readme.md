@@ -46,6 +46,8 @@ In [7]: client.start()
 
 ```
 
+You can load a default list with `ju.load_default_channel_list()`
+
 ## Commissioning 2017-11-19
 
 ```
