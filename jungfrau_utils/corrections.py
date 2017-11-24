@@ -107,17 +107,44 @@ def apply_gain_pede(image, G=None, P=None, pixel_mask=None, inverse_gain=False):
     Performances for correcting a random image as of 2017-11-23, shape [1500, 1000]
 
     Numpy
-    60 ms ± 72.7 µs per loop (mean ± std. dev. of 7 runs, 10 loops each)
+    60 ms +- 72.7 us per loop (mean +- std. dev. of 7 runs, 10 loops each)
 
     Numba
-    6.23 ms ± 7.22 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
+    6.23 ms +- 7.22 us per loop (mean +- std. dev. of 7 runs, 100 loops each)
 
     Numba plus inverse
-    6.15 ms ± 42.2 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
+    6.15 ms +- 42.2 us per loop (mean +- std. dev. of 7 runs, 100 loops each)
     """
     if is_numba:
         return apply_gain_pede_numba(image, G=G, P=P, pixel_mask=pixel_mask, inverse_gain=inverse_gain)
     return apply_gain_pede_np(image, G=G, P=P, pixel_mask=pixel_mask, inverse_gain=inverse_gain)
+
+
+def get_gain_data(image):
+    r"""Return the Jungfrau gain map and data using as an input the 16 bit encoded raw data.
+    RAW data is composed by the two MSB (most significant bits) encoding the gain, and 14
+    bits containing the actual data counts. Possible gain levels are: 00, 01, 11.
+
+    Parameters
+    ----------
+    image : array_like
+        2D array to be corrected
+
+    Returns
+    -------
+    gain_map : NDArray
+        Array containing the gain levels of each pixel
+    data : NDArray
+        Array containing the data
+
+    """
+    mask = int('0b' + 14 * '1', 2)
+    mask2 = int('0b' + 2 * '1', 2)
+
+    gain_map = np.bitwise_and(np.right_shift(image, 14), mask2)
+    data = np.bitwise_and(image, mask)
+
+    return gain_map, data
 
 
 def test():
@@ -132,17 +159,20 @@ def test():
     t_i = time()
     res2 = apply_gain_pede_numba(data, gain, pede)
     print("Numba", time() - t_i)
-    t_i = time()
-    res2 = apply_gain_pede_numba(data, gain, pede)
-    print("Numba", time() - t_i)
-    t_i = time()
-    gain2 = 1. / gain
-    res2 = apply_gain_pede(data, gain2, pede, inverse_gain=True)
-    print("Numba inverse", time() - t_i)
-    t_i = time()
-    res2 = apply_gain_pede(data, gain2, pede, inverse_gain=True)
-    print("Numba inverse", time() - t_i)
-    # print((res1 - res2 < 0.01).all())
+    #t_i = time()
+    #res2 = apply_gain_pede_numba(data, gain, pede)
+    #print("Numba", time() - t_i)
+    #t_i = time()
+    #gain2 = 1. / gain
+    #res2 = apply_gain_pede(data, gain2, pede, inverse_gain=True)
+    #print("Numba inverse", time() - t_i)
+    #t_i = time()
+    #res2 = apply_gain_pede(data, gain2, pede, inverse_gain=True)
+    #print("Numba inverse", time() - t_i)
+    #print(res1 - res2 < 0.01).all()
+    print(res1[(res1 - res2) < 0.01], res2[(res1 - res2) < 0.01])
+    print("ALL", res1[0,0], res2[0,0])
+    return np.allclose(res1, res2, rtol=0.01)
     # print(res1[0:2, 0:2], res2[0:2, 0:2])
 
 
