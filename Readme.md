@@ -85,7 +85,7 @@ In [5]: fg = h5py.File("/sf/bernina/data/res/p16582/gains.h5")
 In [6]: images = f["jungfrau/data"]
 In [7]: G = fg["gains"][:]
 In [8]: P = fp["gains"][:]
-In [9]: corrected_image = ju.apply_gain_pede(images[2], G, P, pixel_mask=None)
+In [9]: corrected_image = ju.apply_gain_pede(images[2], G, P, pixel_mask=fp["pixelMask"][:])
 
 ```
 
