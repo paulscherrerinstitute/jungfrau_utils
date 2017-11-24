@@ -8,7 +8,7 @@ setup(name='jungfrau_utils',
       description='',
       author='Paul Scherrer Institute',
       license='GNU GPLv3',
-      packages=['jungfrau_utils', 'jungfrau_utils.scripts'],
+      packages=['jungfrau_utils', 'jungfrau_utils.scripts', 'jungfrau_utils.plot'],
       # managed by conda
       #install_requires=[
       #    'pyzmq',
