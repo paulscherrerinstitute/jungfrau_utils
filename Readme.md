@@ -50,7 +50,7 @@ In [7]: client.start()
 
 ```
 backend_config = {"n_frames": 100000, "pede_corrections_filename": "/sf/bernina/data/res/p16582/pedestal_20171119_1027_res.h5", "pede_corrections_dataset": "gains", "gain_corrections_filename": "/sf/bernina/data/res/p16582/gains.h5", "gain_corrections_dataset": "gains", "activate_corrections_preview": True, "pede_mask_dataset": "pixel_mask"}
-detector_config = {"exptime": 0.0001, "cycles":20000, "timing": "trigger", "frames": 1} 
+detector_config = {"exptime": 0.00001, "cycles":20000, "timing": "trigger", "frames": 1} 
 
 client.reset()
 writer_config = {'dataset_name': 'jungfrau/data','output_file': '/gpfs/sf-data/bernina/raw/p16582/Bi11_pp_delayXXPP_tests.h5','process_gid': 16582,   'process_uid': 16582, "disable_processing": False};
@@ -61,6 +61,16 @@ client.get_status()
 
 ## only if it is {'state': 'ok', 'status': 'IntegrationStatus.DETECTOR_STOPPED'}
 client.reset()
+```
+
+## Taking a pedestal
+
+```
+# This records a pedestal run
+python jungfrau_run_pedestals.py --numberFrames 3000 --period 0.05
+
+# This analyses and creates a pedestal correction file, in this case /sf/bernina/data/res/p16582/pedestal_20171124_1646_res.h5
+jungfrau_create_pedestals -f /sf/bernina/data/raw/p16582/pedestal_20171124_1646.h5 -v 3 -o /sf/bernina/data/res/p16582/
 ```
 
 ## Correct data on file
