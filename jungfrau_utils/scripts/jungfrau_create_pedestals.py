@@ -121,9 +121,16 @@ def main():
             for i in range(len(daq_recs)):
                 if trueGain != ((daq_recs[i] & 0b11000000000000) >> 12):
                     gainGoodAllModules = False
+
+        nFramesGain = np.sum(gainData==trueGain)
+        if nFramesGain < (nModules-0.5)*(1024*512):  # make sure that most are the modules are in correct gain 
+            gainGoodAllModules = False
+            if args.v >= 3:
+                print("Too many bad pixels, skip the frame {}, true gain: {} ({});  gain0 : {}; gain1 : {}; gain2 : {}; undefined gain : {}".format(n, trueGain, nFramesGain, np.sum(gainData==0),np.sum(gainData==1),np.sum(gainData==3),np.sum(gainData==2)))
+
         if not gainGoodAllModules:
             if args.v >= 3:
-                print("In Frame Number {} gain mismatch in modules and general settings, {} vs {}".format(n, trueGain, ((daq_recs & 0b11000000000000) >> 12)))
+                print("In Frame Number {} gain mismatch in modules and general settings, {} vs {} (or too many bad pixels)".format(n, trueGain, ((daq_recs & 0b11000000000000) >> 12)))
             continue
         nGoodFramesGain += 1
 
@@ -141,23 +148,24 @@ def main():
                 print("Gain changed for ({}x{}) channel {} -> {}, frame number {}, match: {}".format(tX, tY, gainCheck, gainData[tY][tX], n, gainData[tY][tX] == trueGain))
                 gainCheck = gainData[tY][tX]
 
-        pixelMask[gainData != trueGain] |= (1 << trueGain)
+        if gainGoodAllModules:
+            pixelMask[gainData != trueGain] |= (1 << trueGain)
 
-        nMgain[trueGain] += 1
+            nMgain[trueGain] += 1
 
-        if nMgain[trueGain] > averagePedestalFrames:
-            adcValuesN[trueGain] -= adcValuesN[trueGain] / averagePedestalFrames
-            adcValuesNN[trueGain] -= adcValuesNN[trueGain] / averagePedestalFrames
+            if nMgain[trueGain] > averagePedestalFrames:
+                adcValuesN[trueGain] -= adcValuesN[trueGain] / averagePedestalFrames
+                adcValuesNN[trueGain] -= adcValuesNN[trueGain] / averagePedestalFrames
 
-        adcValuesN[trueGain] += frameData
-        adcValuesNN[trueGain] += frameData * frameData
+            adcValuesN[trueGain] += frameData
+            adcValuesNN[trueGain] += frameData * frameData
 
     if args.v >= 1:
         print("{} frames analyzed, {} good frames, {} frames without gain mismatch. Gain frames distribution (0,1,2,3) : ({})".format(analyzeFrames, nGoodFrames, nGoodFramesGain, nMgain))
 
     fileNameIn = os.path.splitext(os.path.basename(args.f))[0]
     outFile = h5py.File(args.o + "/" + fileNameIn + "_res.h5", "w")
-    dset = outFile.create_dataset('pixelMask', data=pixelMask)
+    dset = outFile.create_dataset('pixel_mask', data=pixelMask)
 
     gains = [None, None, None]
     gainsRMS = [None, None, None]
