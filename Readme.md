@@ -35,8 +35,9 @@ In [2]: detector_config = {"timing": "trigger", "exptime": 0.0001, "cycles": 100
 In [3]: backend_config = {"n_frames": 1000, "gain_corrections_filename": "/sf/bernina/data/res/p16582/gains.h5", "gain_corrections_dataset": "gains", "pede_corrections_filename": "/sf/bernina//data/res/p16582/JF_pedestal/pedestal_20171124_1646_res.h5", "pede_corrections_dataset": 
    ...: "gains", "activate_corrections_preview": True}
 
-In [4]:bsread_config = {'output_file': '/sf/bernina/data/raw/p16582/test_bsread.h5', 'process_uid': 16582, 'process_gid': 16582, 'channels': ['SAROP21-CVME-PBPS2:Lnk9Ch7-BG-DATA',
-    ...:   'SAROP21-CVME-PBPS2:Lnk9Ch7-BG-DATA-CALIBRATED']}
+In [4]: default_channels_list = jungfrau_utils.load_default_channel_list()
+
+In [4]: bsread_config = {'output_file': '/sf/bernina/data/raw/p16582/test_bsread.h5', 'process_uid': 16582, 'process_gid': 16582, 'channels': default_channels_list}
 
 In [5]: client.reset()
 
