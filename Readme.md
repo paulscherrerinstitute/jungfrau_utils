@@ -30,7 +30,7 @@ jungfrau_console.sh
 ```
 In [1]: writer_config = {"output_file": "/sf/bernina/data/raw/p16582/test_data.h5", "process_uid": 16582, "process_gid": 16582, "dataset_name": "jungfrau/data", "n_messages": 1000}
 
-In [2]: detector_config = {"timing": "trigger", "exptime": 0.0001, "cycles": 1000}
+In [2]: detector_config = {"timing": "trigger", "exptime": 0.00001, "cycles": 1000}
 
 In [3]: backend_config = {"n_frames": 1000, "gain_corrections_filename": "/sf/bernina/data/res/p16582/gains.h5", "gain_corrections_dataset": "gains", "pede_corrections_filename": "/sf/bernina//data/res/p16582/JF_pedestal/pedestal_20171124_1646_res.h5", "pede_corrections_dataset": 
    ...: "gains", "activate_corrections_preview": True}
