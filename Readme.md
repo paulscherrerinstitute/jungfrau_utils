@@ -28,7 +28,7 @@ jungfrau_console.sh
 
 **Example:** starting a data acquisition with a Jungfrau 1.5M at Bernina
 ```
-In [1]: writer_config = {"output_file": "/sf/bernina/data/raw/p16582/test.h5", "process_uid": 16582, "process_gid": 16582, "dataset_name": "jungfrau/data"}
+In [1]: writer_config = {"output_file": "/sf/bernina/data/raw/p16582/test.h5", "process_uid": 16582, "process_gid": 16582, "dataset_name": "jungfrau/data", n_messages=1000}
 
 In [2]: detector_config = {"timing": "trigger", "exptime": 0.0001, "cycles": 1000}
 
