@@ -37,7 +37,7 @@ In [3]: backend_config = {"n_frames": 1000, "gain_corrections_filename": "/sf/be
 
 In [4]: default_channels_list = jungfrau_utils.load_default_channel_list()
 
-In [5]: bsread_config = {'output_file': '/sf/bernina/data/raw/p16582/test_bsread.h5', 'process_uid': 16582, 'process_gid': 16582, 'channels': default_channels_list}
+In [5]: bsread_config = {'output_file': '/sf/bernina/data/raw/p16582/test_bsread.h5', 'process_uid': 16582, 'process_gid': 16582, 'channels': default_channels_list, 'n_pulses':550}
 
 In [6]: client.reset()
 
