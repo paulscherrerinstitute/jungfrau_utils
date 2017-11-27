@@ -28,29 +28,32 @@ jungfrau_console.sh
 
 **Example:** starting a data acquisition with a Jungfrau 1.5M at Bernina
 ```
-In [1]: writer_config = {"output_file": "/sf/bernina/data/raw/p16582/test.h5", "process_uid": 16582, "process_gid": 16582, "dataset_name": "jungfrau/data"}
+In [1]: writer_config = {"output_file": "/sf/bernina/data/raw/p16582/test_data.h5", "process_uid": 16582, "process_gid": 16582, "dataset_name": "jungfrau/data", "n_messages": 1000}
 
-In [2]: detector_config = {"timing": "trigger", "exptime": 0.0001, "cycles": 1000}
+In [2]: detector_config = {"timing": "trigger", "exptime": 0.00001, "cycles": 1000}
 
-In [3]: backend_config = {"n_frames": 1000, "gain_corrections_filename": "/sf/bernina/data/res/p16582/gains.h5", "gain_corrections_dataset": "gains", "pede_corrections_filename": "/sf/bernina/data/res/p16582/pedestal_20171115_1100_res_merge.h5", "pede_corrections_dataset": 
+In [3]: backend_config = {"n_frames": 1000, "gain_corrections_filename": "/sf/bernina/data/res/p16582/gains.h5", "gain_corrections_dataset": "gains", "pede_corrections_filename": "/sf/bernina//data/res/p16582/JF_pedestal/pedestal_20171124_1646_res.h5", "pede_corrections_dataset": 
    ...: "gains", "activate_corrections_preview": True}
 
-In [4]:bsread_config = {'output_file': '/sf/bernina/data/raw/p16582/test_bsread.h5', 'process_uid': 16582, 'process_gid': 16582, 'channels': ['SAROP21-CVME-PBPS2:Lnk9Ch7-BG-DATA',
-    ...:   'SAROP21-CVME-PBPS2:Lnk9Ch7-BG-DATA-CALIBRATED']}
+In [4]: default_channels_list = jungfrau_utils.load_default_channel_list()
 
-In [5]: client.reset()
+In [5]: bsread_config = {'output_file': '/sf/bernina/data/raw/p16582/test_bsread.h5', 'process_uid': 16582, 'process_gid': 16582, 'channels': default_channels_list, 'n_pulses':550}
 
-In [6]: client.set_config(writer_config=writer_config, backend_config=backend_config, detector_config=detector_config, bsread_config=bsread_config)
+In [6]: client.reset()
 
-In [7]: client.start()
+In [7]: client.set_config(writer_config=writer_config, backend_config=backend_config, detector_config=detector_config, bsread_config=bsread_config)
+
+In [8]: client.start()
 
 ```
+
+You can load a default list with `ju.load_default_channel_list()`
 
 ## Commissioning 2017-11-19
 
 ```
 backend_config = {"n_frames": 100000, "pede_corrections_filename": "/sf/bernina/data/res/p16582/pedestal_20171119_1027_res.h5", "pede_corrections_dataset": "gains", "gain_corrections_filename": "/sf/bernina/data/res/p16582/gains.h5", "gain_corrections_dataset": "gains", "activate_corrections_preview": True, "pede_mask_dataset": "pixel_mask"}
-detector_config = {"exptime": 0.0001, "cycles":20000, "timing": "trigger", "frames": 1} 
+detector_config = {"exptime": 0.00001, "cycles":20000, "timing": "trigger", "frames": 1} 
 
 client.reset()
 writer_config = {'dataset_name': 'jungfrau/data','output_file': '/gpfs/sf-data/bernina/raw/p16582/Bi11_pp_delayXXPP_tests.h5','process_gid': 16582,   'process_uid': 16582, "disable_processing": False};
@@ -61,6 +64,16 @@ client.get_status()
 
 ## only if it is {'state': 'ok', 'status': 'IntegrationStatus.DETECTOR_STOPPED'}
 client.reset()
+```
+
+## Taking a pedestal
+
+```
+# This records a pedestal run
+jungfrau_run_pedestals --numberFrames 3000 --period 0.05
+
+# This analyses and creates a pedestal correction file, in this case /sf/bernina/data/res/p16582/pedestal_20171124_1646_res.h5
+jungfrau_create_pedestals -f /sf/bernina/data/raw/p16582/pedestal_20171124_1646.h5 -v 3 -o /sf/bernina/data/res/p16582/
 ```
 
 ## Correct data on file
@@ -75,7 +88,7 @@ In [5]: fg = h5py.File("/sf/bernina/data/res/p16582/gains.h5")
 In [6]: images = f["jungfrau/data"]
 In [7]: G = fg["gains"][:]
 In [8]: P = fp["gains"][:]
-In [9]: corrected_image = ju.apply_gain_pede(images[2], G, P, pixel_mask=None)
+In [9]: corrected_image = ju.apply_gain_pede(images[2], G, P, pixel_mask=fp["pixelMask"][:])
 
 ```
 

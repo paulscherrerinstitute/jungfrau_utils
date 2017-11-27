@@ -45,8 +45,10 @@ def main():
         detector_config = {"period": args.period, "exptime": args.exptime, "frames": 1, 'cycles': args.numberFrames, "timing": "trigger"}
     backend_config = {"n_frames": args.numberFrames}
 
+    bsread_config = {'output_file':  "/dev/null", 'process_uid': args.uid, 'process_gid': args.uid, 'channels': []}
+
     client.reset()
-    client.set_config(writer_config=writer_config, backend_config=backend_config, detector_config=detector_config)
+    client.set_config(writer_config=writer_config, backend_config=backend_config, detector_config=detector_config, bsread_config=bsread_config)
     print(client.get_config())
 
     sleepTime = args.numberFrames * args.period / 3
