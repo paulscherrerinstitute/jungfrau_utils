@@ -66,7 +66,15 @@ def rebin(a, *args):
     """
     shape = a.shape
     lenShape = len(shape)
-    factor = np.asarray(shape) / np.asarray(args)
-    #print factor
+    #if len(args) == 1:
+    #    args = [args, ]
+    #if len(shape) == 1:
+    #    shape = (shape, )
+    #print(args)
+    factor = int(np.asarray(shape) / np.asarray(args))
+    if isinstance(factor, int):
+        factor = (factor, )
+    #print(factor)
     evList = ['a.reshape('] + ['args[%d],factor[%d],' % (i, i) for i in range(lenShape)] + [')'] + ['.mean(%d)' % (i + 1) for i in range(lenShape)]
+    #print(evList, ''.join(evList))
     return eval(''.join(evList))
