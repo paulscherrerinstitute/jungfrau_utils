@@ -2,6 +2,7 @@ from datetime import datetime
 from time import sleep
 import argparse
 import os
+import subprocess
 
 from detector_integration_api import DetectorIntegrationClient
 
@@ -28,7 +29,7 @@ def main():
     parser.add_argument("--exptime", default=0.000010, help="Integration time (default 0.000010 - 10us)", type=float)
     parser.add_argument("--numberFrames", default=10000, help="Integration time (default 10000)", type=int)
     parser.add_argument("--trigger", default=1, help="run with the trigger, PERIOD will be ignored in this case(default - 1(yes))", type=int)
-    parser.add_argument("--analyze", default=False, help="Run the pedestal analysis (default False)", type=bool)
+    parser.add_argument("--analyze", default=False, help="Run the pedestal analysis (default False)", action="store_true")
     args = parser.parse_args()
 
     api_address = args.api
@@ -70,8 +71,8 @@ def main():
 
     print("Pedestal run data saved in %s" % writer_config["output_file"])
     if args.analyze:
-        print("Running pedestal analysis, output file in %s", os.join.path(args.directory.replace("raw", "res"), "JF_pedestal"))
-        os.subprocess(["jungfrau_create_pedestal", "-f", writer_config["output_file"], "-o", os.join.path(args.directory.replace("raw", "res"), "JF_pedestal"), "-v", "4"])
+        print("Running pedestal analysis, output file in %s", os.path.join(args.directory.replace("raw", "res"), "JF_pedestal"))
+        subprocess.call(["jungfrau_create_pedestals", "-f", writer_config["output_file"], "-o", os.path.join(args.directory.replace("raw", "res"), "JF_pedestal"), "-v", "4"])
     print("Done")
 
     
