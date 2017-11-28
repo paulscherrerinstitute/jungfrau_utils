@@ -147,6 +147,48 @@ def get_gain_data(image):
     return gain_map, data
 
 
+def add_gap_pixels(image, modules, module_gap, chip_gap=[2, 2]):
+    r"""Add module and pixel gaps to an image.
+
+    Parameters
+    ----------
+    image : array_like
+        2D array to be corrected
+    modules : array_like
+        number of modules, in the form [rows, columns]. E.g., for a 1.5M in vertical this is [3, 1]
+    module_gap : array_like
+        gap between the modules in pixels
+    chip_gap : array_like
+        gap between the chips in a module, default: [2, 2]
+ 
+    Returns
+    -------
+    res : NDArray
+        Corrected image
+
+    Notes
+    -----
+    Performances for correcting a random image as of 2017-11-28, shape [3*512, 1024]
+
+    4.47 ms ± 734 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
+    """
+    chips = [2, 4]
+    shape = image.shape
+    mod_size = [256, 256]  # this is the chip size
+    new_shape = [shape[i] + (module_gap[i]) * (modules[i] - 1) + (chips[i] - 1) * chip_gap[i] * modules[i] for i in range(2)]
+
+    res = np.zeros(new_shape)
+    m = [module_gap[i] - chip_gap[i] for i in range(2)]
+
+    for i in range(modules[0] * chips[0]):
+        for j in range(modules[1] * chips[1]):
+            disp = [int(i / chips[0]) * m[0] + i * chip_gap[0], int(j / chips[1]) * m[1] + j * chip_gap[1]]
+            init = [i * mod_size[0], j * mod_size[1]]
+            end = [(1 + i) * mod_size[0], (1 + j) * mod_size[1]]
+            res[disp[0] + init[0]: disp[0] + end[0], disp[1] + init[1]:disp[1] + end[1]] = image[init[0]:end[0], init[1]:end[1]]
+
+    return res
+
 def test():
     data = np.random.randint(0, 60000, size=[1500, 1000], dtype=np.uint16)
     pede = 60000 * np.random.random(size=[3, 1500, 1000])

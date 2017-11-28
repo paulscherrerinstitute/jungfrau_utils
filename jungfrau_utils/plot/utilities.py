@@ -1,9 +1,12 @@
-import matplotlib as mpl
+try:
+    import matplotlib as mpl
+    import matplotlib.gridspec as gridspec
+    import matplotlib.pyplot as plt
+except:
+    print("[WARNING] Cannot load matplotlib")
 import numpy as np
 from sys import exc_info
 import os 
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
 import imp
 
 
@@ -32,16 +35,15 @@ def plot_image_and_proj(image, title="", **kwargs):
            optional title for the plot
     """
     fig = plt.figure()
-    gs = gridspec.GridSpec(3, 2, width_ratios=[3, 1], height_ratios=[0.2, 3, 1]) 
-    ax0 = plt.subplot(gs[1,0])
+    gs = gridspec.GridSpec(3, 2, width_ratios=[3, 1], height_ratios=[0.2, 3, 1])
+    ax0 = plt.subplot(gs[1, 0])
     plt.title(title)
     ims = plt.imshow(image, aspect="auto", **kwargs)
-    
-    ax2 = plt.subplot(gs[2,0], sharex=ax0, )
-    plt.plot(image.sum(axis=0))
-    plt.subplot(gs[1,1], sharey=ax0)
+    ax2 = plt.subplot(gs[2, 0], sharex=ax0, )
+    plt.plot(image.sum(axis=0), origin="lower")
+    plt.subplot(gs[1, 1], sharey=ax0)
     plt.plot(image.sum(axis=1), list(range(len(image.sum(axis=1)))))
-    ax = plt.subplot(gs[0,0])
+    ax = plt.subplot(gs[0, 0])
     plt.colorbar(ims, orientation="horizontal", cax=ax)
     fig.show()
 
