@@ -1,6 +1,7 @@
 from datetime import datetime
 from time import sleep
 import argparse
+import os
 
 from detector_integration_api import DetectorIntegrationClient
 
@@ -21,12 +22,13 @@ def main():
     parser = argparse.ArgumentParser(description="Create a pedestal file for Jungrau")
     parser.add_argument("--api", default="http://sf-daq-1:10000")
     parser.add_argument("--filename", default="pedestal_%s.h5" % date_string, help="Output file name")
-    parser.add_argument("--directory", default="/gpfs/sf-data/bernina/raw/p16582", help="Output directory")
+    parser.add_argument("--directory", default="/sf/bernina/data/raw/p16582", help="Output directory")
     parser.add_argument("--uid", default=16582, help="User ID which needs to own the file", type=int)
     parser.add_argument("--period", default=0.01, help="Period (default is 10Hz - 0.01)", type=float)
     parser.add_argument("--exptime", default=0.000010, help="Integration time (default 0.000010 - 10us)", type=float)
     parser.add_argument("--numberFrames", default=10000, help="Integration time (default 10000)", type=int)
     parser.add_argument("--trigger", default=1, help="run with the trigger, PERIOD will be ignored in this case(default - 1(yes))", type=int)
+    parser.add_argument("--analyze", default=False, help="Run the pedestal analysis (default False)", type=bool)
     args = parser.parse_args()
 
     api_address = args.api
@@ -45,7 +47,7 @@ def main():
         detector_config = {"period": args.period, "exptime": args.exptime, "frames": 1, 'cycles': args.numberFrames, "timing": "trigger"}
     backend_config = {"n_frames": args.numberFrames}
 
-    bsread_config = {'output_file':  "/dev/null", 'process_uid': args.uid, 'process_gid': args.uid, 'channels': []}
+    bsread_config = {'output_file': "/dev/null", 'process_uid': args.uid, 'process_gid': args.uid, 'channels': []}
 
     client.reset()
     client.set_config(writer_config=writer_config, backend_config=backend_config, detector_config=detector_config, bsread_config=bsread_config)
@@ -65,7 +67,13 @@ def main():
     client.stop()
     client.reset()
     reset_bits(client)
+
+    print("Pedestal run data saved in %s" % writer_config["output_file"])
+    if args.analyze:
+        print("Running pedestal analysis, output file in %s", os.join.path(args.directory.replace("raw", "res"), "JF_pedestal"))
+        os.subprocess(["jungfrau_create_pedestal", "-f", writer_config["output_file"], "-o", os.join.path(args.directory.replace("raw", "res"), "JF_pedestal"), "-v", "4"])
     print("Done")
 
+    
 if __name__ == "__main__":
     main()

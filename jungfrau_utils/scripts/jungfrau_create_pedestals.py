@@ -164,6 +164,7 @@ def main():
         print("{} frames analyzed, {} good frames, {} frames without gain mismatch. Gain frames distribution (0,1,2,3) : ({})".format(analyzeFrames, nGoodFrames, nGoodFramesGain, nMgain))
 
     fileNameIn = os.path.splitext(os.path.basename(args.f))[0]
+    print("Output file with pedestal corrections in: %s" % (args.o + "/" + fileNameIn + "_res.h5"))
     outFile = h5py.File(args.o + "/" + fileNameIn + "_res.h5", "w")
     dset = outFile.create_dataset('pixel_mask', data=pixelMask)
     dset2 = outFile.create_dataset('pixelMask', data=pixelMask)
