@@ -10,13 +10,15 @@ def h5_printname(name):
     print("  {}".format(name))
 
 
-def forcedGainValue(i, n0, n1, n2):
+def forcedGainValue(i, n0, n1, n2, n3):
     if i <= n0 - 1:
         return 0
     if i <= (n0 + n1) - 1:
         return 1
     if i <= (n0 + n1 + n2) - 1:
         return 3
+    if i <= (n0 + n1 + n2 + n3) - 1:
+        return 4
     return 2
 
 
@@ -28,14 +30,16 @@ def main():
     parser.add_argument("-tX", type=int, default=0, help="x position of the test pixel")
     parser.add_argument("-tY", type=int, default=0, help="y position of the test pixel")
     parser.add_argument("-nFramesPede", type=int, default=1000, help="number of pedestal frames to average pedestal value")
-    parser.add_argument("-numberGain0", type=int, default=0, help="force to treat pedestal run as first numberGain0 taken in gain0, then numberGain1 in gain1, and numberGain2 in gain2")
-    parser.add_argument("-numberGain1", type=int, default=0, help="force to treat pedestal run as first numberGain0 taken in gain0, then numberGain1 in gain1, and numberGain2 in gain2")
-    parser.add_argument("-numberGain2", type=int, default=0, help="force to treat pedestal run as first numberGain0 taken in gain0, then numberGain1 in gain1, and numberGain2 in gain2")
+    parser.add_argument("-numberGain0", type=int, default=0, help="force to treat pedestal run as first numberGain0 taken in gain0, then numberGain1 in gain1, and numberGain2 in gain2 and HG0")
+    parser.add_argument("-numberGain1", type=int, default=0, help="force to treat pedestal run as first numberGain0 taken in gain0, then numberGain1 in gain1, and numberGain2 in gain2 and HG0")
+    parser.add_argument("-numberGain2", type=int, default=0, help="force to treat pedestal run as first numberGain0 taken in gain0, then numberGain1 in gain1, and numberGain2 in gain2 and HG0")
+    parser.add_argument("-numberGainH0", type=int, default=0, help="force to treat pedestal run as first numberGain0 taken in gain0, then numberGain1 in gain1, and numberGain2 in gain2 and Hg0") 
     parser.add_argument("-totalFrames", type=int, default=1000000, help="analyze only first TOTALFRAMES frame")
     parser.add_argument("-pedestalFrames", type=int, default=1000, help="for pedestal in each gain average over last PEDESTALFRAMES frames, reducing weight of previous")
     parser.add_argument("-o", default="./", help="Output directory where to store pixelmask and gain file")
     parser.add_argument("-gainModule", type=int, default=1, help="check that gain setting in each of the module correspnds to the general gain switch, (0 - dont check)")
     parser.add_argument("-showPixelMask", type=int, default=0, help=">0 - show pixel mask image at the end of the run (default: not)")
+    parser.add_argument("-nBadModules", type=int, default=0, help="Number of bad modules (default 0)")
     args = parser.parse_args()
 
     if not (os.path.isfile(args.f) and os.access(args.f, os.R_OK)):
@@ -89,12 +93,12 @@ def main():
 
     pixelMask = np.zeros((sh_y, sh_x), dtype=np.int)
 
-    adcValuesN = [np.zeros((sh_y, sh_x)), np.zeros((sh_y, sh_x)), np.zeros((sh_y, sh_x)), np.zeros((sh_y, sh_x))]
-    adcValuesNN = [np.zeros((sh_y, sh_x)), np.zeros((sh_y, sh_x)), np.zeros((sh_y, sh_x)), np.zeros((sh_y, sh_x))]
+    adcValuesN = [np.zeros((sh_y, sh_x)), np.zeros((sh_y, sh_x)), np.zeros((sh_y, sh_x)), np.zeros((sh_y, sh_x)), np.zeros((sh_y, sh_x))]
+    adcValuesNN = [np.zeros((sh_y, sh_x)), np.zeros((sh_y, sh_x)), np.zeros((sh_y, sh_x)), np.zeros((sh_y, sh_x)), np.zeros((sh_y, sh_x))]
 
     averagePedestalFrames = args.pedestalFrames
 
-    nMgain = [0] * 4
+    nMgain = [0] * 5
 
     gainCheck = -1
     printFalseGain = False
@@ -113,17 +117,18 @@ def main():
 
         frameData = (np.bitwise_and(f["jungfrau/data"][n], 0b0011111111111111)).astype(np.float64)  # without cast can't use easily self multiplication
         gainData = np.bitwise_and(f["jungfrau/data"][n], 0b1100000000000000) >> 14
-        trueGain = forcedGainValue(n, args.numberGain0, args.numberGain1, args.numberGain2) if overwriteGain else ((daq_rec & 0b11000000000000) >> 12)
+        trueGain = forcedGainValue(n, args.numberGain0, args.numberGain1, args.numberGain2, args.numberGainH0) if overwriteGain else ( (daq_rec & 0b11000000000000) >> 12 )
+        highG0 = (daq_rec & 0b1)
 
         gainGoodAllModules = True
         if args.gainModule > 0:
             daq_recs = f["jungfrau/daq_recs"][n]
             for i in range(len(daq_recs)):
-                if trueGain != ((daq_recs[i] & 0b11000000000000) >> 12):
+                if trueGain != ((daq_recs[i] & 0b11000000000000) >> 12) or highG0 != (daq_recs[i] & 0b1):
                     gainGoodAllModules = False
 
-        nFramesGain = np.sum(gainData==trueGain)
-        if nFramesGain < (nModules-0.5)*(1024*512):  # make sure that most are the modules are in correct gain 
+        nFramesGain = np.sum(gainData==(trueGain))
+        if nFramesGain < (nModules-0.5-args.nBadModules)*(1024*512):  # make sure that most are the modules are in correct gain 
             gainGoodAllModules = False
             if args.v >= 3:
                 print("Too many bad pixels, skip the frame {}, true gain: {} ({});  gain0 : {}; gain1 : {}; gain2 : {}; undefined gain : {}".format(n, trueGain, nFramesGain, np.sum(gainData==0),np.sum(gainData==1),np.sum(gainData==3),np.sum(gainData==2)))
@@ -151,6 +156,7 @@ def main():
         if gainGoodAllModules:
             pixelMask[gainData != trueGain] |= (1 << trueGain)
 
+            trueGain += 4*highG0
             nMgain[trueGain] += 1
 
             if nMgain[trueGain] > averagePedestalFrames:
@@ -161,7 +167,7 @@ def main():
             adcValuesNN[trueGain] += frameData * frameData
 
     if args.v >= 1:
-        print("{} frames analyzed, {} good frames, {} frames without gain mismatch. Gain frames distribution (0,1,2,3) : ({})".format(analyzeFrames, nGoodFrames, nGoodFramesGain, nMgain))
+        print("{} frames analyzed, {} good frames, {} frames without gain mismatch. Gain frames distribution (0,1,2,3,HG0) : ({})".format(analyzeFrames, nGoodFrames, nGoodFramesGain, nMgain))
 
     fileNameIn = os.path.splitext(os.path.basename(args.f))[0]
     print("Output file with pedestal corrections in: %s" % (args.o + "/" + fileNameIn + "_res.h5"))
@@ -169,10 +175,10 @@ def main():
     dset = outFile.create_dataset('pixel_mask', data=pixelMask)
     dset2 = outFile.create_dataset('pixelMask', data=pixelMask)
 
-    gains = [None, None, None]
-    gainsRMS = [None, None, None]
+    gains = [None] * 4
+    gainsRMS = [None] * 4
 
-    for gain in range(4):
+    for gain in range(5):
         numberFramesAverage = max(1, min(averagePedestalFrames, nMgain[gain]))
         mean = adcValuesN[gain] / numberFramesAverage
         mean2 = adcValuesNN[gain] / numberFramesAverage
@@ -181,7 +187,7 @@ def main():
         if args.v >= 3:
             print("gain {} values results (pixel ({},{}) : {} {}".format(gain, tY, tX, mean[tY][tX], stdDeviation[tY][tX]))
         if gain != 2:
-            g = gain if gain != 3 else 2
+            g = gain if gain < 3 else (gain-1)
             dset = outFile.create_dataset('gain' + str(g), data=mean)
             dset = outFile.create_dataset('gain' + str(g) + '_rms', data=stdDeviation)
             gains[g] = mean
