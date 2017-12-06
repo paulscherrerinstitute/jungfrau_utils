@@ -8,13 +8,13 @@ from detector_integration_api import DetectorIntegrationClient
 
 
 def reset_bits(client):
-    sleep(1)
+    sleep(0.1)
     print(client.set_detector_value("clearbit", "0x5d 0"))
-    sleep(1)
+    sleep(0.1)
     print(client.set_detector_value("clearbit", "0x5d 12"))
-    sleep(1)
+    sleep(0.1)
     print(client.set_detector_value("clearbit", "0x5d 13"))
-    sleep(1)
+    sleep(0.1)
 
 
 def main():
@@ -54,7 +54,7 @@ def main():
     client.set_config(writer_config=writer_config, backend_config=backend_config, detector_config=detector_config, bsread_config=bsread_config)
     print(client.get_config())
 
-    sleepTime = args.numberFrames * args.period / 3
+    sleepTime = args.numberFrames * args.period / 4
 
     client.start()
     print("Taking data at G0")
@@ -64,6 +64,10 @@ def main():
     sleep(sleepTime)
     print(client.set_detector_value("setbit", "0x5d 13"))
     print("Taking data at G2")
+    sleep(sleepTime)
+    reset_bits(client)
+    print(client.set_detector_value("setbit", "0x5d 1"))
+    print("Taking data at HG0")
     sleep(sleepTime)
     client.stop()
     client.reset()
