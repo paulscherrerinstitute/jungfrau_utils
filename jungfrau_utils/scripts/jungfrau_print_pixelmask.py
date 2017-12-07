@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import h5py
 
 
-pixelMaskReasons = ['gain0', 'gain1', 'gain_bad', 'gain2', 'NA', 'NA', 'NA', 'NA', 'NA', 'NA']
+pixelMaskReasons = ['gain0', 'gain1', 'gain_bad', 'gain2', 'highG0', 'NA', 'NA', 'NA', 'NA', 'NA']
 
 
 def print_reasons(mask):
