@@ -54,17 +54,27 @@ def main():
     client.set_config(writer_config=writer_config, backend_config=backend_config, detector_config=detector_config, bsread_config=bsread_config)
     print(client.get_config())
 
-    sleepTime = args.numberFrames * args.period / 3
+    sleepTime = args.numberFrames * args.period / 5
 
     client.start()
+    print(client.set_detector_value("setbit", "0x5d 0"))
+    print("Taking data at HG0")
+    subprocess.check_call(["caput", "SIN-TIMAST-TMA:Evt-24-Ena-Sel", "1"])
+    sleep(sleepTime)
+
+    print(client.set_detector_value("clearbit", "0x5d 0"))
     print("Taking data at G0")
     sleep(sleepTime)
+
     print(client.set_detector_value("setbit", "0x5d 12"))
     print("Taking data at G1")
     sleep(sleepTime)
+
     print(client.set_detector_value("setbit", "0x5d 13"))
     print("Taking data at G2")
-    sleep(sleepTime)
+    sleep(2 * sleepTime)
+
+    subprocess.check_call(["caput", "SIN-TIMAST-TMA:Evt-24-Ena-Sel", "0"])
     client.stop()
     client.reset()
     reset_bits(client)
