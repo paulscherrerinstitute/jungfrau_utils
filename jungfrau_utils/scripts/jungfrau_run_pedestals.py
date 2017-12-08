@@ -59,7 +59,7 @@ def main():
     client.start()
     print(client.set_detector_value("setbit", "0x5d 0"))
     print("Taking data at HG0")
-    subprocess.check_call(["caput", "SIN-TIMAST-TMA:Evt-24-Ena-Sel", "1"])
+    #subprocess.check_call(["caput", "SIN-TIMAST-TMA:Evt-24-Ena-Sel", "1"])
     sleep(sleepTime)
 
     print(client.set_detector_value("clearbit", "0x5d 0"))
@@ -74,7 +74,7 @@ def main():
     print("Taking data at G2")
     sleep(2 * sleepTime)
 
-    subprocess.check_call(["caput", "SIN-TIMAST-TMA:Evt-24-Ena-Sel", "0"])
+    #subprocess.check_call(["caput", "SIN-TIMAST-TMA:Evt-24-Ena-Sel", "0"])
     client.stop()
     client.reset()
     reset_bits(client)
