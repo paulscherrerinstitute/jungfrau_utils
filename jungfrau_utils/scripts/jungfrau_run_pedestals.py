@@ -8,13 +8,13 @@ from detector_integration_api import DetectorIntegrationClient
 
 
 def reset_bits(client):
-    sleep(1)
+    sleep(0.1)
     print(client.set_detector_value("clearbit", "0x5d 0"))
-    sleep(1)
+    sleep(0.1)
     print(client.set_detector_value("clearbit", "0x5d 12"))
-    sleep(1)
+    sleep(0.1)
     print(client.set_detector_value("clearbit", "0x5d 13"))
-    sleep(1)
+    sleep(0.1)
 
 
 def main():
@@ -40,7 +40,7 @@ def main():
     print("Resetting gain bits on Jungfrau")
     reset_bits(client)
 
-    writer_config = {"output_file": args.directory + "/" + args.filename, "process_uid": args.uid, "process_gid": args.uid, "dataset_name": "jungfrau/data", "disable_processing": False}
+    writer_config = {"output_file": args.directory + "/" + args.filename, "process_uid": args.uid, "process_gid": args.uid, "dataset_name": "jungfrau/data", "disable_processing": False, "n_messages": args.numberFrames}
     print(writer_config)
     if args.trigger == 0:
         detector_config = {"period": args.period, "exptime": args.exptime, "frames": args.numberFrames}
