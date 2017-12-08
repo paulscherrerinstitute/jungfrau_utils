@@ -6,6 +6,20 @@ from datetime import datetime
 
 # a = np.fromfile("gainMaps_M022.bin", np.double)
 
+GAINS = ["G0", "G1", "G2", "HG0"]
+
+def merge_gainmaps(maps, shape, module_shape):
+    if maps[0].shape != module_shape:
+        print("[ERROR]: shape of the provided maps is not correct. Provided shape: %s, required shape: %s" % (maps[0].shape, module_shape))
+    res = np.zeros([module_shape[0], shape[0] * module_shape[1], shape[1] * module_shape[2]], dtype=np.float)
+    for i in range(shape[0]):
+        for j in range(shape[1]):
+            for z in range(module_shape[0]):
+                ri = (i * module_shape[1], (i + 1) * module_shape[1])
+                rj = (j * module_shape[2], (j + 1) * module_shape[2])
+                res[z, ri[0]:ri[1], rj[0]:rj[1]] = maps[i + j][z]
+    return res
+
 
 def main():
     parser = argparse.ArgumentParser(description="""
@@ -18,12 +32,11 @@ Utility to read binary Jungfrau gain maps from PSI Detectors Group and save them
                         help="Binary file as provided by the Detectors Group, usually one per module. Order matters! The first file provided is the bottom-left module.", nargs="+")
     parser.add_argument("--outfile", type=str, help="NAme for the hdf5 outputg", default="gains.h5")
     parser.add_argument("--attributes", type=str, help="Additional attributes to be added to the destination dataset, in the form key=value,key=value,...", default="")
-    parser.add_argument("--shape", type=list, help="Dimension of the final image, in modules. For example, a 1.5 Jungfrau with three modules one on top of each other is [3,1].", default=[-1, -1])
+    parser.add_argument("--shape", type=int, nargs=2, help="Dimension of the final image, in modules. For example, a 1.5 Jungfrau with three modules one on top of each other is [3,1].", default=[-1, -1])
     args = parser.parse_args()
 
     files = args.files
     shape = args.shape
-    module_shape = [3, shape[0] * 512, shape[1] * 1024]
 
     dst_name = "gains"
     module_shape = (3, 512, 1024)
@@ -32,7 +45,12 @@ Utility to read binary Jungfrau gain maps from PSI Detectors Group and save them
     if args.shape == [-1, -1]:
         args.shape = [n_modules, 1]
 
-    maps = [np.fromfile(f, np.double).reshape(module_shape) for f in args.files]
+    maps = [np.fromfile(f, np.double) for f in args.files]
+    # .reshape(module_shape)
+    if maps[0].shape[0] == 4 * 512 * 1024:
+        module_shape = (4, 512, 1024)
+    maps = [i.reshape(module_shape) for i in maps]
+
     res = merge_gainmaps(maps, args.shape, module_shape)
 
     f = h5py.File(args.outfile)
@@ -52,7 +70,7 @@ Utility to read binary Jungfrau gain maps from PSI Detectors Group and save them
         print("\t %s = %s" % (k, str(v)))
     print("Gain averages:")
     for i in range(module_shape[0]):
-        print("\t G%d = %.2f +- %.2f" % (i, dst[i].mean(), dst[i].std()))
+        print("\t %s = %.2f +- %.2f" % (GAINS[i], dst[i].mean(), dst[i].std()))
     f.close()
 
 

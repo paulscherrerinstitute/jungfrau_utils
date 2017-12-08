@@ -4,7 +4,13 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import h5py
+import logging
 
+ch = logging.StreamHandler()
+ch.setFormatter(logging.Formatter('[%(levelname)s] %(message)s'))
+
+log = logging.getLogger("create_pedestals")
+log.addHandler(ch)
 
 def h5_printname(name):
     print("  {}".format(name))
@@ -26,7 +32,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-f", default="pedestal.h5", help="pedestal file")
     parser.add_argument("-N", type=int, default=-1, help="show frame number N and exit")
-    parser.add_argument("-v", type=int, default=0, help="verbosity level (0 - silent)")
+    parser.add_argument("-v", type=int, default=0, help="verbosity level (0 - silent, 3 - DEBUG)")
     parser.add_argument("-tX", type=int, default=0, help="x position of the test pixel")
     parser.add_argument("-tY", type=int, default=0, help="y position of the test pixel")
     parser.add_argument("-nFramesPede", type=int, default=1000, help="number of pedestal frames to average pedestal value")
@@ -46,6 +52,11 @@ def main():
         print("Pedestal file {} not found, exit".format(args.f))
         exit()
 
+    #if args.v > 2:
+    log.setLevel(args.v)
+
+    #log.debug("test")
+    #return
     overwriteGain = False
     if (args.numberGain0 + args.numberGain1 + args.numberGain2) > 0:
         if args.v >= 1:
@@ -107,6 +118,7 @@ def main():
     nGoodFramesGain = 0
 
     analyzeFrames = min(numberOfFrames, args.totalFrames)
+    print("%s %s" % (numberOfFrames, args.totalFrames))
     for n in range(analyzeFrames):
 
         if not f["jungfrau/is_good_frame"][n]:
@@ -133,7 +145,7 @@ def main():
             print("Jungfrau is in the high G0 mode ({}), but gain settings is strange: {}".format( highG0, trueGain))
 
         nFramesGain = np.sum(gainData==(trueGain))
-        if nFramesGain < (nModules-0.5-args.nBadModules)*(1024*512):  # make sure that most are the modules are in correct gain 
+        if nFramesGain < (nModules - 0.5 - args.nBadModules) * (1024 * 512):  # make sure that most are the modules are in correct gain 
             gainGoodAllModules = False
             if args.v >= 3:
                 print("Too many bad pixels, skip the frame {}, true gain: {}(highG0: {}) ({});  gain0 : {}; gain1 : {}; gain2 : {}; undefined gain : {}".format(n, trueGain, highG0, nFramesGain, np.sum(gainData==0),np.sum(gainData==1),np.sum(gainData==3),np.sum(gainData==2)))

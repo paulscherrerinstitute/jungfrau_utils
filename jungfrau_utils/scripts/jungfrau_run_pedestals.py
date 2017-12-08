@@ -60,6 +60,7 @@ def main():
     sleep(5) # for the moment there is a delay to make sure detectory is in the highG0 mode
     print("Taking data at HG0")
     client.start()
+
     #subprocess.check_call(["caput", "SIN-TIMAST-TMA:Evt-24-Ena-Sel", "1"])
     sleep(sleepTime)
 

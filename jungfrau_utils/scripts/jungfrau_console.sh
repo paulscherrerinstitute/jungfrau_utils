@@ -25,3 +25,4 @@ else
 fi
     
 ipython -i -c "from detector_integration_api import DetectorIntegrationClient;"${str}";import h5py;import numpy as np;import matplotlib.pyplot as plt;import dask.array as da;print('Imported matplotlib (as plt), h5py, numpy (as np), dask.array (as da)');print('Jungfrau client available as client. Try: client.get_status()\n')"
+
