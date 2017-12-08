@@ -140,7 +140,7 @@ def main():
 
         if not gainGoodAllModules:
             if args.v >= 3:
-                print("In Frame Number {} gain mismatch in modules and general settings, {} vs {} (or too many bad pixels)".format(n, trueGain, ((daq_recs & 0b11000000000000) >> 12)))
+                print("In Frame Number {} : mismatch in modules and general settings, Gain: {} vs {}; HighG0: {} vs {} (or too many bad pixels)".format(n, trueGain, ((daq_recs & 0b11000000000000) >> 12), highG0, (daq_recs & 0b1)))
             continue
         nGoodFramesGain += 1
 
@@ -174,7 +174,7 @@ def main():
             adcValuesNN[trueGain] += frameData * frameData
 
     if args.v >= 1:
-        print("{} frames analyzed, {} good frames, {} frames without gain mismatch. Gain frames distribution (0,1,2,3,HG0) : ({})".format(analyzeFrames, nGoodFrames, nGoodFramesGain, nMgain))
+        print("{} frames analyzed, {} good frames, {} frames without settings mismatch. Gain frames distribution (0,1,2,3,HG0) : ({})".format(analyzeFrames, nGoodFrames, nGoodFramesGain, nMgain))
 
     fileNameIn = os.path.splitext(os.path.basename(args.f))[0]
     print("Output file with pedestal corrections in: %s" % (args.o + "/" + fileNameIn + "_res.h5"))

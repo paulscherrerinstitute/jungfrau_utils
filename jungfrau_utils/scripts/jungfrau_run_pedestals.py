@@ -37,9 +37,6 @@ def main():
 
     client.get_status()
 
-    print("Resetting gain bits on Jungfrau")
-    reset_bits(client)
-
     writer_config = {"output_file": args.directory + "/" + args.filename, "process_uid": args.uid, "process_gid": args.uid, "dataset_name": "jungfrau/data", "disable_processing": False, "n_messages": args.numberFrames}
     print(writer_config)
     if args.trigger == 0:
@@ -54,21 +51,31 @@ def main():
     client.set_config(writer_config=writer_config, backend_config=backend_config, detector_config=detector_config, bsread_config=bsread_config)
     print(client.get_config())
 
-    sleepTime = args.numberFrames * args.period / 4
+    sleepTime = args.numberFrames * args.period / 5
 
+    print("Resetting gain bits on Jungfrau")
+    reset_bits(client)
+
+    print(client.set_detector_value("setbit", "0x5d 0"))
+    sleep(5) # for the moment there is a delay to make sure detectory is in the highG0 mode
+    print("Taking data at HG0")
     client.start()
+    #subprocess.check_call(["caput", "SIN-TIMAST-TMA:Evt-24-Ena-Sel", "1"])
+    sleep(sleepTime)
+
+    print(client.set_detector_value("clearbit", "0x5d 0"))
     print("Taking data at G0")
     sleep(sleepTime)
+
     print(client.set_detector_value("setbit", "0x5d 12"))
     print("Taking data at G1")
     sleep(sleepTime)
+
     print(client.set_detector_value("setbit", "0x5d 13"))
     print("Taking data at G2")
-    sleep(sleepTime)
-    reset_bits(client)
-    print(client.set_detector_value("setbit", "0x5d 1"))
-    print("Taking data at HG0")
-    sleep(sleepTime)
+    sleep(2 * sleepTime)
+
+    #subprocess.check_call(["caput", "SIN-TIMAST-TMA:Evt-24-Ena-Sel", "0"])
     client.stop()
     client.reset()
     reset_bits(client)
