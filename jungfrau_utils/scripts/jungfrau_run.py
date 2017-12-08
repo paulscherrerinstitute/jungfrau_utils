@@ -17,7 +17,7 @@ def reset_bits(client):
     sleep(1)
 
 
-def run_jungfrau(n_frames, save=True, exptime=0.000010, outfile="", outdir="", uid=16852, api_address="http://sf-daq-1:10001", gain_filename="", pede_filename=""):
+def run_jungfrau(n_frames, save=True, exptime=0.000010, outfile="", outdir="", uid=16852, api_address="http://sf-daq-1:10001", gain_filename="", pede_filename="", is_HG0=False):
     client = DetectorIntegrationClient(api_address)
 
     client.get_status()
@@ -43,7 +43,11 @@ def run_jungfrau(n_frames, save=True, exptime=0.000010, outfile="", outdir="", u
         backend_config["activate_corrections_preview"] = True
         print("Corrections in online viewer activated")
     
-    backend_config["is_HG0"] = True
+    if is_HG0:
+        backend_config["is_HG0"] = True
+        detector_config["setbit"] = "0x5d 0"
+    else:
+        print(client.set_detector_value("clearbit", "0x5d 0"))
 
     client.reset()
     client.set_config(writer_config=writer_config, backend_config=backend_config, detector_config=detector_config, bsread_config=bsread_config)
@@ -77,9 +81,10 @@ def main():
     parser.add_argument("--exptime", default=0.000010, help="Integration time (default 0.000010 - 10us)", type=float)
     parser.add_argument("--frames", default=10000, help="Integration time (default 10000)", type=int)
     parser.add_argument("--save", default=False, help="Save data file", action="store_true")
+    parser.add_argument("--highgain", default=False, help="Enable High Gain (HG0)", action="store_true")
     args = parser.parse_args()
 
-    run_jungfrau(args.frames, args.save, args.exptime, outfile=args.filename, outdir=args.directory, uid=args.uid, api_address=args.api, gain_filename=args.gain, pede_filename=args.pede)
+    run_jungfrau(args.frames, args.save, args.exptime, outfile=args.filename, outdir=args.directory, uid=args.uid, api_address=args.api, gain_filename=args.gain, pede_filename=args.pede, is_HG0=args.highgain)
 
     
 if __name__ == "__main__":
