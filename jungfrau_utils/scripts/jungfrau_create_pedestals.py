@@ -101,6 +101,7 @@ def main():
     nMgain = [0] * 5
 
     gainCheck = -1
+    highG0Check = 0
     printFalseGain = False
     nGoodFrames = 0
     nGoodFramesGain = 0
@@ -127,11 +128,15 @@ def main():
                 if trueGain != ((daq_recs[i] & 0b11000000000000) >> 12) or highG0 != (daq_recs[i] & 0b1):
                     gainGoodAllModules = False
 
+        if highG0 == 1 and trueGain != 0:
+            gainGoodAllModules = False
+            print("Jungfrau is in the high G0 mode ({}), but gain settings is strange: {}".format( highG0, trueGain))
+
         nFramesGain = np.sum(gainData==(trueGain))
         if nFramesGain < (nModules-0.5-args.nBadModules)*(1024*512):  # make sure that most are the modules are in correct gain 
             gainGoodAllModules = False
             if args.v >= 3:
-                print("Too many bad pixels, skip the frame {}, true gain: {} ({});  gain0 : {}; gain1 : {}; gain2 : {}; undefined gain : {}".format(n, trueGain, nFramesGain, np.sum(gainData==0),np.sum(gainData==1),np.sum(gainData==3),np.sum(gainData==2)))
+                print("Too many bad pixels, skip the frame {}, true gain: {}(highG0: {}) ({});  gain0 : {}; gain1 : {}; gain2 : {}; undefined gain : {}".format(n, trueGain, highG0, nFramesGain, np.sum(gainData==0),np.sum(gainData==1),np.sum(gainData==3),np.sum(gainData==2)))
 
         if not gainGoodAllModules:
             if args.v >= 3:
@@ -149,12 +154,14 @@ def main():
                     print("Gain was wrong for channel ({}x{}) in previous frames, but now correct : {}. Frame {}.".format(tX, tY, gainData[tY, tX], n))
                 printFalseGain = False
 
-            if gainData[tY][tX] != gainCheck:
-                print("Gain changed for ({}x{}) channel {} -> {}, frame number {}, match: {}".format(tX, tY, gainCheck, gainData[tY][tX], n, gainData[tY][tX] == trueGain))
+            if gainData[tY][tX] != gainCheck or highG0Check != highG0:
+                print("Gain changed for ({}x{}) channel {} -> {} (highG0 setting: {} -> {}), frame number {}, match: {}".format(tX, tY, gainCheck, gainData[tY][tX], highG0Check, highG0, n, gainData[tY][tX] == trueGain))
                 gainCheck = gainData[tY][tX]
+                highG0Check = highG0
 
         if gainGoodAllModules:
-            pixelMask[gainData != trueGain] |= (1 << trueGain)
+
+            pixelMask[gainData != trueGain] |= (1 << (trueGain+4*highG0))
 
             trueGain += 4*highG0
             nMgain[trueGain] += 1
@@ -173,7 +180,7 @@ def main():
     print("Output file with pedestal corrections in: %s" % (args.o + "/" + fileNameIn + "_res.h5"))
     outFile = h5py.File(args.o + "/" + fileNameIn + "_res.h5", "w")
     dset = outFile.create_dataset('pixel_mask', data=pixelMask)
-    dset2 = outFile.create_dataset('pixelMask', data=pixelMask)
+#    dset2 = outFile.create_dataset('pixelMask', data=pixelMask)
 
     gains = [None] * 4
     gainsRMS = [None] * 4
