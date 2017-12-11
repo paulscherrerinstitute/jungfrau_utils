@@ -73,7 +73,7 @@ def main():
     date_string = datetime.now().strftime("%Y%m%d_%H%M")
 
     parser = argparse.ArgumentParser(description="Create a pedestal file for Jungrau")
-    parser.add_argument("--api", default="http://sf-daq-1:10000")
+    parser.add_argument("--api", default="http://sf-daq-1:10000", required=True)
     parser.add_argument("--filename", default="run_%s.h5" % date_string, help="Output file name")
     parser.add_argument("--pede", default="", help="File containing pedestal corrections")
     parser.add_argument("--gain", default="", help="File containing gain corrections")
@@ -81,7 +81,7 @@ def main():
     parser.add_argument("--uid", default=16582, help="User ID which needs to own the file", type=int)
     parser.add_argument("--period", default=0.01, help="Period (default is 10Hz - 0.01)", type=float)
     parser.add_argument("--exptime", default=0.000010, help="Integration time (default 0.000010 - 10us)", type=float)
-    parser.add_argument("--frames", default=10000, help="Integration time (default 10000)", type=int)
+    parser.add_argument("--frames", default=10, help="Integration time (default 10)", type=int)
     parser.add_argument("--save", default=False, help="Save data file", action="store_true")
     parser.add_argument("--highgain", default=False, help="Enable High Gain (HG0)", action="store_true")
     parser.add_argument("--caput", default=False, help="Use the CAPUT trick (experts only!!!)", action="store_true")
