@@ -49,24 +49,28 @@ def run_jungfrau(n_frames, save=True, exptime=0.000010, outfile="", outdir="", u
     else:
         print(client.set_detector_value("clearbit", "0x5d 0"))
 
-    client.reset()
-    client.set_config(writer_config=writer_config, backend_config=backend_config, detector_config=detector_config, bsread_config=bsread_config)
-    client.set_clients_enabled(bsread=False)
-    print(client.get_config())
+    try:
+        client.reset()
+        client.set_config(writer_config=writer_config, backend_config=backend_config, detector_config=detector_config, bsread_config=bsread_config)
+        client.set_clients_enabled(bsread=False)
+        print(client.get_config())
 
-    print("Starting acquisition")
-    client.start()
-    if caput:
-        subprocess.check_call(["caput", "SIN-TIMAST-TMA:Evt-24-Ena-Sel", "1"])
+        if caput:
+            subprocess.check_call(["caput", "SIN-TIMAST-TMA:Evt-24-Ena-Sel", "0"])
 
-    client.wait_for_status(["IntegrationStatus.DETECTOR_STOPPED", "IntegrationStatus.FINISHED"], polling_interval=0.1)
+        print("Starting acquisition")
+        client.start()
+        if caput:
+            subprocess.check_call(["caput", "SIN-TIMAST-TMA:Evt-24-Ena-Sel", "1"])
 
-    print("Stopping acquisition")
-    if caput:
-        subprocess.check_call(["caput", "SIN-TIMAST-TMA:Evt-24-Ena-Sel", "0"])
-    client.reset()
-    print("Done")
+        client.wait_for_status(["IntegrationStatus.DETECTOR_STOPPED", "IntegrationStatus.FINISHED"], polling_interval=0.1)
 
+        print("Stopping acquisition")
+        client.reset()
+        print("Done")
+    except KeyboardInterrupt:
+        print("Caught CTRL-C, resetting")
+        client.reset()
 
 def main():
     
