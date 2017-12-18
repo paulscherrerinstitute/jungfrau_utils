@@ -38,18 +38,18 @@ def main():
     client = DetectorIntegrationClient(api_address)
 
     client.get_status()
-
-    writer_config = {"output_file": args.directory + "/" + args.filename, "process_uid": args.uid, "process_gid": args.uid, "dataset_name": "jungfrau/data", "disable_processing": False, "n_messages": args.numberFrames}
-    print(writer_config)
-    if args.trigger == 0:
-        detector_config = {"period": args.period, "exptime": args.exptime, "frames": args.numberFrames}
-    else:
-        detector_config = {"period": args.period, "exptime": args.exptime, "frames": 1, 'cycles': args.numberFrames, "timing": "trigger"}
-    backend_config = {"n_frames": args.numberFrames}
-
-    bsread_config = {'output_file': "/dev/null", 'process_uid': args.uid, 'process_gid': args.uid, 'channels': []}
-
     try:
+        writer_config = {"output_file": args.directory + "/" + args.filename, "process_uid": args.uid, "process_gid": args.uid, "dataset_name": "jungfrau/data", "disable_processing": False, "n_messages": args.numberFrames}
+        print(writer_config)
+        if args.trigger == 0:
+            detector_config = {"period": args.period, "exptime": args.exptime, "frames": args.numberFrames}
+        else:
+            detector_config = {"period": args.period, "exptime": args.exptime, "frames": 1, 'cycles': args.numberFrames, "timing": "trigger"}
+        backend_config = {"n_frames": args.numberFrames}
+
+        bsread_config = {'output_file': "/dev/null", 'process_uid': args.uid, 'process_gid': args.uid, 'channels': []}
+
+    
         client.reset()
         client.set_config(writer_config=writer_config, backend_config=backend_config, detector_config=detector_config, bsread_config=bsread_config)
         print(client.get_config())
