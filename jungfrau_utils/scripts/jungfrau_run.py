@@ -51,8 +51,11 @@ def run_jungfrau(n_frames, save=True, exptime=0.000010, outfile="", outdir="", u
 
     try:
         client.reset()
-        client.set_config(writer_config=writer_config, backend_config=backend_config, detector_config=detector_config, bsread_config=bsread_config)
-        client.set_clients_enabled(bsread=False)
+        
+        configuration = {"writer": writer_config, "backend": backend_config, "detector": detector_config, "bsread": bsread_config}
+        client.set_config(configuration); 
+
+        client.set_clients_enabled({"bsread": False})
         print(client.get_config())
 
         if caput:
