@@ -51,7 +51,8 @@ def main():
 
     
         client.reset()
-        client.set_config(writer_config=writer_config, backend_config=backend_config, detector_config=detector_config, bsread_config=bsread_config)
+        configuration = {"writer": writer_config, "backend": backend_config, "detector": detector_config, "bsread": bsread_config}
+        client.set_config(configuration)
         print(client.get_config())
 
         sleepTime = args.numberFrames * args.period / 5
