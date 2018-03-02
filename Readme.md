@@ -26,6 +26,13 @@ jungfrau_console.sh
 ```
 
 **Example Alvra**:
+Start the anaconda environment.
+```bash
+source /sf/alvra/anaconda/jungfrau_env.sh
+ipython
+```
+
+Use the client to communicate with DIA:
 ```python
 from detector_integration_api import DetectorIntegrationClient
 
