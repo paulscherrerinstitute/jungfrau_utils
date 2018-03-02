@@ -25,6 +25,37 @@ Then, to open an IPython shell already configured for the Jungfrau detector at t
 jungfrau_console.sh
 ```
 
+**Example Alvra**:
+```python
+from detector_integration_api import DetectorIntegrationClient
+
+client = DetectorIntegrationClient("http://sf-daq-2:10000")
+
+detector_config = {"exptime": 0.00001, "cycles": 1000, "dr":16}
+backend_config = {"n_frames": 1000, "bit_depth":16}
+writer_config = {"n_frames": 1000, "user_id": 16581, "output_file": "/sf/alvra/data/raw/p16581/test_writer.h5"}
+bsread_config = {"user_id": 16581, "output_file": "/sf/alvra/data/raw/p16581/test_bsread.h5"}
+
+FORMAT_PARAMETERS = {"general/user": "p16581", 
+                     "general/instrument": "Alvra, JF 4.5M", 
+                     "general/created": "today", 
+                     "general/process": "detector integration api"}
+
+writer_config.update(FORMAT_PARAMETERS)
+bsread_config.update(FORMAT_PARAMETERS)
+
+configuration = {"detector": detector_config, 
+                 "backend": backend_config, 
+                 "writer": writer_config, 
+                 "bsread": bsread_config}
+
+client.reset()
+
+client.set_config(configuration)
+
+client.start()
+```
+
 
 **Example:** starting a data acquisition with a Jungfrau 1.5M at Bernina
 ```
