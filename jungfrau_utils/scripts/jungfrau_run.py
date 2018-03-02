@@ -95,7 +95,7 @@ def main():
     
     args = parser.parse_args()
 
-    run_jungfrau(args.frames, args.save, args.exptime, outfile=args.filename, outdir=args.directory, uid=args.uid, api_address=args.api, gain_filename=args.gain, pede_filename=args.pede, is_HG0=args.highgain, caput=args.caput)
+    run_jungfrau(args.frames, args.save, args.exptime, outfile=args.filename, outdir=args.directory, uid=args.uid, api_address=args.api, gain_filename=args.gain, pede_filename=args.pede, is_HG0=args.highgain)
 
     
 if __name__ == "__main__":
