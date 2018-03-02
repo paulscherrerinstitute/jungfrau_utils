@@ -49,7 +49,31 @@ In [8]: client.start()
 
 You can load a default list with `ju.load_default_channel_list()`
 
-## Commissioning 2017-11-19
+## Alvra pilot
+
+From a console:
+
+```
+source /sf/alvra/config/jungfrau/jungfrau_env.sh
+```
+
+Running a pedestal and create pedestal corrections with pgroup `p16581`:
+
+```
+PGROUP=16581
+jungfrau_run_pedestals --api http://sf-daq-2:10000 --directory /sf/alvra/data/raw/p$PGROUP --uid $PGROUP --period 0.01 --numberFrames 4000 --exptime 0.000005 --analyze
+```
+
+Run a test jungrau run:
+
+```
+jungfrau_run --api http://sf-daq-2:10000 --filename test.h5 --directory /sf/alvra/data/res/p${PGROUP}/ --uid ${PGROUP} --frames 1000 --pede /sf/alvra/data/res/p16581//pedestal_20171208_1123_res.h5 --gain /sf/alvra/config/jungfrau/jungfrau_4p5_gaincorrections_v0.h5 --exptime 0.000005
+```
+
+Please have a look at [jungfrau_utils/scripts/jungfrau_run.py](jungfrau_utils/scripts/jungfrau_run.py) for how to set up your own scanning routine.
+
+
+## Bernina Commissioning 2017-11-19
 
 ```
 backend_config = {"n_frames": 100000, "pede_corrections_filename": "/sf/bernina/data/res/p16582/pedestal_20171119_1027_res.h5", "pede_corrections_dataset": "gains", "gain_corrections_filename": "/sf/bernina/data/res/p16582/gains.h5", "gain_corrections_dataset": "gains", "activate_corrections_preview": True, "pede_mask_dataset": "pixel_mask"}
