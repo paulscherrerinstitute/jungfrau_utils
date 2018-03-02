@@ -41,9 +41,11 @@ In [5]: bsread_config = {'output_file': '/sf/bernina/data/raw/p16582/test_bsread
 
 In [6]: client.reset()
 
-In [7]: client.set_config(writer_config=writer_config, backend_config=backend_config, detector_config=detector_config, bsread_config=bsread_config)
+In [7]: configuration = {"writer": writer_config, "backend": backend_config, "detector": detector_config, "bsread": bsread_config}
 
-In [8]: client.start()
+In [8]: client.set_config(configuration)
+
+In [9]: client.start()
 
 ```
 
@@ -81,7 +83,8 @@ detector_config = {"exptime": 0.00001, "cycles":20000, "timing": "trigger", "fra
 
 client.reset()
 writer_config = {'dataset_name': 'jungfrau/data','output_file': '/gpfs/sf-data/bernina/raw/p16582/Bi11_pp_delayXXPP_tests.h5','process_gid': 16582,   'process_uid': 16582, "disable_processing": False};
-client.set_config(writer_config=writer_config,backend_config=backend_config, detector_config=detector_config); 
+configuration = {"writer": writer_config, "backend": backend_config, "detector": detector_config}
+client.set_config(configuration); 
 client.start()
 
 client.get_status()

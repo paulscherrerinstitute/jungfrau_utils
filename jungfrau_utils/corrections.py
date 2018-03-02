@@ -77,7 +77,7 @@ except:
     #print(sys.exc_info())
     
 
-def apply_gain_pede(image, G=None, P=None, pixel_mask=None, inverse_gain=False):
+def apply_gain_pede(image, G=None, P=None, pixel_mask=None, highgain=False, inverse_gain=False):
     r"""Apply gain corrections to Jungfrau image. Gain and Pedestal corrections are
     to be provided as a 3D array of shape (3, image.shape[0], image.shape[1]).
     The formula for the correction is: (image - P) / G
@@ -94,6 +94,8 @@ def apply_gain_pede(image, G=None, P=None, pixel_mask=None, inverse_gain=False):
         3D array containing pedestal corrections
     pixel_mask : array_like, int
         2D array containing pixels to be masked (tagged with a one)
+    highgain : bool
+        Are you using G0 or HG0? If the latter, then this should be True (default: False)
     inverse_gain : bool
         The inverse of the gain correction is provided
 
@@ -115,6 +117,11 @@ def apply_gain_pede(image, G=None, P=None, pixel_mask=None, inverse_gain=False):
     Numba plus inverse
     6.15 ms +- 42.2 us per loop (mean +- std. dev. of 7 runs, 100 loops each)
     """
+
+    if highgain:
+        G[0] = G[3]
+        P[0] = P[3]
+
     if is_numba:
         return apply_gain_pede_numba(image, G=G, P=P, pixel_mask=pixel_mask, inverse_gain=inverse_gain)
     return apply_gain_pede_np(image, G=G, P=P, pixel_mask=pixel_mask, inverse_gain=inverse_gain)
