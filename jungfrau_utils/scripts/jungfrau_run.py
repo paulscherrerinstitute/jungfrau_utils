@@ -28,7 +28,7 @@ def run_jungfrau(n_frames, save=True, exptime=0.000010, outfile="", outdir="", u
     writer_config = {"output_file": outdir + "/" + outfile,
                      "user_id": uid,
                      "n_frames": n_frames,
-                     "general/user": uid,
+                     "general/user": str(uid),
                      "general/process": __name__,
                      "general/created": str(datetime.now()),
                      "general/instrument": "JF 4.5M"

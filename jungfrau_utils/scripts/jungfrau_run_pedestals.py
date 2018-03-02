@@ -42,7 +42,7 @@ def main():
         writer_config = {"output_file": args.directory + "/" + args.filename,
                          "user_id": args.uid,
                          "n_frames": args.numberFrames,
-                         "general/user": args.uid,
+                         "general/user": str(args.uid),
                          "general/process": __name__,
                          "general/created": str(datetime.now()),
                          "general/instrument": "JF 4.5M"
