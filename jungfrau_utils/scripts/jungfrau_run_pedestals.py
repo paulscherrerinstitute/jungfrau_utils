@@ -53,12 +53,14 @@ def main():
             detector_config = {"period": args.period,
                                "exptime": args.exptime,
                                "frames": args.numberFrames,
-                               'cycles': 1}
+                               'cycles': 1,
+                               "dr":16}
         else:
             detector_config = {"period": args.period,
                                "exptime": args.exptime,
                                "frames": 1, 'cycles': args.numberFrames,
-                               "timing": "trigger"
+                               "timing": "trigger",
+                               "dr": 16
                                }
 
         backend_config = {"n_frames": args.numberFrames,

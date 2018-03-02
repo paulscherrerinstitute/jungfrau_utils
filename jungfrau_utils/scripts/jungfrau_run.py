@@ -42,7 +42,8 @@ def run_jungfrau(n_frames, save=True, exptime=0.000010, outfile="", outdir="", u
     detector_config = {"exptime": exptime,
                        "frames": 1,
                        'cycles': n_frames,
-                       "timing": "trigger"
+                       "timing": "trigger",
+                       "dr": 16
                        }
 
     backend_config = {"n_frames": n_frames,
