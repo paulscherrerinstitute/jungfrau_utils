@@ -17,7 +17,7 @@ def reset_bits(client):
     sleep(1)
 
 
-def run_jungfrau(n_frames, save=True, exptime=0.000010, outfile="", outdir="", uid=16852, api_address="http://sf-daq-1:10001", gain_filename="", pede_filename="", is_HG0=False, caput=False):
+def run_jungfrau(n_frames, save=True, exptime=0.000010, outfile="", outdir="", uid=16852, api_address="http://sf-daq-1:10001", gain_filename="", pede_filename="", is_HG0=False, ):  # caput=False):
     client = DetectorIntegrationClient(api_address)
 
     client.get_status()
@@ -58,13 +58,13 @@ def run_jungfrau(n_frames, save=True, exptime=0.000010, outfile="", outdir="", u
         client.set_clients_enabled({"bsread": False})
         print(client.get_config())
 
-        if caput:
-            subprocess.check_call(["caput", "SIN-TIMAST-TMA:Evt-24-Ena-Sel", "0"])
+        #if caput:
+        #    subprocess.check_call(["caput", "SIN-TIMAST-TMA:Evt-24-Ena-Sel", "0"])
 
         print("Starting acquisition")
         client.start()
-        if caput:
-            subprocess.check_call(["caput", "SIN-TIMAST-TMA:Evt-24-Ena-Sel", "1"])
+        #if caput:
+        #    subprocess.check_call(["caput", "SIN-TIMAST-TMA:Evt-24-Ena-Sel", "1"])
 
         client.wait_for_status(["IntegrationStatus.DETECTOR_STOPPED", "IntegrationStatus.FINISHED"], polling_interval=0.1)
 
@@ -91,7 +91,7 @@ def main():
     parser.add_argument("--frames", default=10, help="Integration time (default 10)", type=int)
     parser.add_argument("--save", default=False, help="Save data file", action="store_true")
     parser.add_argument("--highgain", default=False, help="Enable High Gain (HG0)", action="store_true")
-    parser.add_argument("--caput", default=False, help="Use the CAPUT trick (experts only!!!)", action="store_true")
+    # parser.add_argument("--caput", default=False, help="Use the CAPUT trick (experts only!!!)", action="store_true")
     
     args = parser.parse_args()
 
