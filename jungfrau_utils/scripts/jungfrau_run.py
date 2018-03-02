@@ -51,7 +51,11 @@ def run_jungfrau(n_frames, save=True, exptime=0.000010, outfile="", outdir="", u
                       }
 
     bsread_config = {'output_file': "/dev/null",
-                     'user_id': uid
+                     'user_id': uid,
+                     "general/user": str(uid),
+                     "general/process": __name__,
+                     "general/created": str(datetime.now()),
+                     "general/instrument": "JF 4.5M"
                      }
 
     if gain_filename != "" or pede_filename != "":

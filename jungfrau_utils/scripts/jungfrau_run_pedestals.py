@@ -54,7 +54,7 @@ def main():
                                "exptime": args.exptime,
                                "frames": args.numberFrames,
                                'cycles': 1,
-                               "dr":16}
+                               "dr": 16}
         else:
             detector_config = {"period": args.period,
                                "exptime": args.exptime,
@@ -68,7 +68,11 @@ def main():
                           }
 
         bsread_config = {'output_file': "/dev/null",
-                         'user_id': args.uid
+                         'user_id': args.uid,
+                         "general/user": str(args.uid),
+                         "general/process": __name__,
+                         "general/created": str(datetime.now()),
+                         "general/instrument": "JF 4.5M"
                          }
 
 
