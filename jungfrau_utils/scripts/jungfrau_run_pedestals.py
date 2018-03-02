@@ -39,19 +39,42 @@ def main():
 
     client.get_status()
     try:
-        writer_config = {"output_file": args.directory + "/" + args.filename, "process_uid": args.uid, "process_gid": args.uid, "dataset_name": "jungfrau/data", "disable_processing": False, "n_messages": args.numberFrames}
+        writer_config = {"output_file": args.directory + "/" + args.filename,
+                         "user_id": args.uid,
+                         "n_frames": args.numberFrames,
+                         "general/user": args.uid,
+                         "general/process": __name__,
+                         "general/created": str(datetime.now()),
+                         "general/instrument": "JF 4.5M"
+                         }
+
         print(writer_config)
         if args.trigger == 0:
-            detector_config = {"period": args.period, "exptime": args.exptime, "frames": args.numberFrames}
+            detector_config = {"period": args.period,
+                               "exptime": args.exptime,
+                               "frames": args.numberFrames,
+                               'cycles': 1}
         else:
-            detector_config = {"period": args.period, "exptime": args.exptime, "frames": 1, 'cycles': args.numberFrames, "timing": "trigger"}
-        backend_config = {"n_frames": args.numberFrames}
+            detector_config = {"period": args.period,
+                               "exptime": args.exptime,
+                               "frames": 1, 'cycles': args.numberFrames,
+                               "timing": "trigger"
+                               }
 
-        bsread_config = {'output_file': "/dev/null", 'process_uid': args.uid, 'process_gid': args.uid, 'channels': []}
+        backend_config = {"n_frames": args.numberFrames,
+                          "bit_depth": 16
+                          }
 
-    
+        bsread_config = {'output_file': "/dev/null",
+                         'user_id': args.uid
+                         }
+
+
         client.reset()
-        configuration = {"writer": writer_config, "backend": backend_config, "detector": detector_config, "bsread": bsread_config}
+
+        configuration = {"writer": writer_config, "backend": backend_config,
+                         "detector": detector_config, "bsread": bsread_config}
+
         client.set_config(configuration)
         print(client.get_config())
 

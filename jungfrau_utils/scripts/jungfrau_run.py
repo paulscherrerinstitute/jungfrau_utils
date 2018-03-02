@@ -25,14 +25,33 @@ def run_jungfrau(n_frames, save=True, exptime=0.000010, outfile="", outdir="", u
     #print("Resetting gain bits on Jungfrau")
     #reset_bits(client)
 
-    writer_config = {"output_file": outdir + "/" + outfile, "process_uid": uid, "process_gid": uid, "dataset_name": "jungfrau/data", "disable_processing": False, "n_messages": n_frames}
+    writer_config = {"output_file": outdir + "/" + outfile,
+                     "user_id": uid,
+                     "n_frames": n_frames,
+                     "general/user": uid,
+                     "general/process": __name__,
+                     "general/created": str(datetime.now()),
+                     "general/instrument": "JF 4.5M"
+                     }
+
     if not save:
-        writer_config["disable_processing"] = True
+        writer_config["output_file"] = "/dev/null"
 
     print(writer_config)
-    detector_config = {"exptime": exptime, "frames": 1, 'cycles': n_frames, "timing": "trigger"}
-    backend_config = {"n_frames": n_frames}
-    bsread_config = {'output_file': "/dev/null", 'process_uid': uid, 'process_gid': uid, 'channels': []}
+
+    detector_config = {"exptime": exptime,
+                       "frames": 1,
+                       'cycles': n_frames,
+                       "timing": "trigger"
+                       }
+
+    backend_config = {"n_frames": n_frames,
+                      "bit_depth": 16
+                      }
+
+    bsread_config = {'output_file': "/dev/null",
+                     'user_id': uid
+                     }
 
     if gain_filename != "" or pede_filename != "":
         backend_config["gain_corrections_filename"] = gain_filename
@@ -52,24 +71,23 @@ def run_jungfrau(n_frames, save=True, exptime=0.000010, outfile="", outdir="", u
     try:
         client.reset()
         
-        configuration = {"writer": writer_config, "backend": backend_config, "detector": detector_config, "bsread": bsread_config}
-        client.set_config(configuration); 
+        configuration = {"writer": writer_config,
+                         "backend": backend_config,
+                         "detector": detector_config,
+                         "bsread": bsread_config}
 
-        client.set_clients_enabled({"bsread": False})
+        client.set_config(configuration)
+
         print(client.get_config())
-
-        #if caput:
-        #    subprocess.check_call(["caput", "SIN-TIMAST-TMA:Evt-24-Ena-Sel", "0"])
 
         print("Starting acquisition")
         client.start()
-        #if caput:
-        #    subprocess.check_call(["caput", "SIN-TIMAST-TMA:Evt-24-Ena-Sel", "1"])
 
-        client.wait_for_status(["IntegrationStatus.DETECTOR_STOPPED", "IntegrationStatus.FINISHED"], polling_interval=0.1)
+        client.wait_for_status(["IntegrationStatus.FINISHED"], polling_interval=0.1)
 
         print("Stopping acquisition")
         client.reset()
+
         print("Done")
     except KeyboardInterrupt:
         print("Caught CTRL-C, resetting")
