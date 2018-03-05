@@ -15,7 +15,9 @@ DIR=/sf/${dest}/anaconda/4.4.0
 echo "Creating jungfrau_client Conda env"
 #conda create -c paulscherrerinstitute --copy -p /sf/${dest}/config/jungfrau/envs/jungfrau_client detector_integration_api ipython setuptools h5py numpy matplotlib numba jungfrau_utils
 #mkdir -p /sf/${dest}/anaconda/4.4.0
-conda create -c paulscherrerinstitute --copy -p $DIR/jungfrau_utils detector_integration_api ipython setuptools h5py numpy matplotlib numba jungfrau_utils
 
-source activate $DIR/jungfrau_client
+conda create -p $DIR ipython setuptools h5py numpy matplotlib numba dask
+
+source activate $DIR
+conda install -c paulscherrerinstitute  detector_integration_api jungfrau_utils
 conda install --copy -c conda-forge pyFAI

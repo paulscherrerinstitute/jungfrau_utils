@@ -1,14 +1,10 @@
 #!/bin/bash
 
-check=`which conda | grep /alvra/anaconda/4.4.0/jungfrau_utils`
+BL=alvra
+check=`which conda | grep /$BL/anaconda/4.4.0`
 
 if [ "$check" == "" ]; then
-    #echo Loading PSI Anaconda Python distribution 3.6
-    #module load psi-python36/4.4.0
-    #source /opt/gfa/python
-
-    echo Activating Conda environment
-    source /sf/alvra/anaconda/jungfrau_env.sh
+    source /sf/$BL/bin/anaconda_env
 fi
 
 MATPLOT_TRY='exec("try: import matplotlib.pyplot as plt\nexcept: sys.exit(1)");'
@@ -17,6 +13,10 @@ CONFIG='import sys; from detector_integration_api import DetectorIntegrationClie
 
 echo Starting Interactive Python session
 export QT_XKB_CONFIG_ROOT=/sf/alvra/anaconda/4.4.0/jungfrau_utils/lib
-#export QT_QPA_PLATFORM='offscreen'
+if [ "$1" == "nox" ]; then
+    export QT_QPA_PLATFORM='offscreen'
+    echo "Starting no-graphics version"
+else
+    echo If you get \"Could not connect to display\" or similar, try: \"jungfrau_console nox\"
+fi
 ipython -i -c "$CONFIG"
-
