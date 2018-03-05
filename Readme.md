@@ -12,23 +12,30 @@ For more information about the Detector Integration Api please visit:
 
 # Usage
 
-`jungfrau_utils` is provided on the Alvra, Bernina beamlines already in a conda environment. To get into the environment, execute e.g.:
+`jungfrau_utils` is provided on the Alvra, Bernina beamlines already in a dedicated analysis-friendly Anaconda environment. To get into the environment, execute e.g.:
 
-```
-source /sf/bernina/jungfrau/bin/jungfrau_env.sh
+```bash
+source anaconda_env
 ```
 
 
 Then, to open an IPython shell already configured for the Jungfrau detector at the beamline:
 
+```bash
+jungfrau_console
 ```
-jungfrau_console.sh
+
+In case you do not have graphical access, please do:
+
+```bash
+jungfrau_console nox
 ```
+
 
 **Example Alvra**:
 Start the anaconda environment.
 ```bash
-source /sf/alvra/anaconda/jungfrau_env.sh
+source anaconda_env
 ipython
 ```
 
