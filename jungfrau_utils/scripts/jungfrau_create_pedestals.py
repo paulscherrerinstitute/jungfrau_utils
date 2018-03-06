@@ -28,7 +28,7 @@ def forcedGainValue(i, n0, n1, n2, n3):
         return 4
     return 2
 
-@profile
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-f", default="pedestal.h5", help="pedestal file")
