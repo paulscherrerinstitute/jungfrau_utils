@@ -28,7 +28,7 @@ def forcedGainValue(i, n0, n1, n2, n3):
         return 4
     return 2
 
-@profile
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-f", default="pedestal.h5", help="pedestal file")
@@ -65,8 +65,8 @@ def main():
 
     f = h5py.File(args.f, "r")
 
-    numberOfFrames = len(f["jungfrau/data"])
-    (sh_y, sh_x) = f["jungfrau/data"][0].shape
+    numberOfFrames = len(f["data/JF4.5M/data"])
+    (sh_y, sh_x) = f["data/JF4.5M/data"][0].shape
     nModules = (sh_x * sh_y) // (1024 * 512)
     if (nModules * 1024 * 512) != (sh_x * sh_y):
         log.error("Something very strange in the data, Jungfrau consists of (1024x512) modules, while data has {}x{}".format(sh_x, sh_y))
@@ -83,14 +83,14 @@ def main():
     log.debug("Following groups are available:")
     if args.v >= 3:
         f.visit(h5_printname)
-    log.debug("    data has the following shape: {}, type: {}, {} modules".format(f["jungfrau/data"][0].shape, f["jungfrau/data"][0].dtype, nModules))
+    log.debug("    data has the following shape: {}, type: {}, {} modules".format(f["data/JF4.5M/data"][0].shape, f["data/JF4.5M/data"][0].dtype, nModules))
 
     if args.N != -1:
         frameToShow = args.N
         if frameToShow <= numberOfFrames and frameToShow >= 0:
             log.info("Show frame number {}".format(frameToShow))
-            frameData = np.bitwise_and(f["jungfrau/data"][frameToShow], 0b0011111111111111)
-            gainData = np.bitwise_and(f["jungfrau/data"][frameToShow], 0b1100000000000000) >> 14
+            frameData = np.bitwise_and(f["data/JF4.5M/data"][frameToShow], 0b0011111111111111)
+            gainData = np.bitwise_and(f["data/JF4.5M/data"][frameToShow], 0b1100000000000000) >> 14
             log.info("Number of channels in gain0 : {}; gain1 : {}; gain2 : {}; undefined gain : {}".format(np.sum(gainData == 0), np.sum(gainData == 1), np.sum(gainData == 3), np.sum(gainData == 2)))
             plt.imshow(frameData, vmax=25000, origin='lower')
             plt.colorbar()
@@ -122,24 +122,24 @@ def main():
 
     for n in range(analyzeFrames):
 
-        if not f["jungfrau/is_good_frame"][n]:
+        if not f["data/JF4.5M/is_good_frame"][n]:
             continue
 
         nGoodFrames += 1
 
-        daq_rec = f["jungfrau/daq_rec"][n]
+        daq_rec = f["data/JF4.5M/daq_rec"][n]
 
-        image = f["jungfrau/data"][n][:]
-        #frameData = (np.bitwise_and(f["jungfrau/data"][n], 0b0011111111111111)).astype(np.float64)  # without cast can't use easily self multiplication
+        image = f["data/JF4.5M/data"][n][:]
+        #frameData = (np.bitwise_and(f["data/JF4.5M/data"][n], 0b0011111111111111)).astype(np.float64)  # without cast can't use easily self multiplication
         frameData = (np.bitwise_and(image, 0b0011111111111111))
-        #gainData = np.bitwise_and(f["jungfrau/data"][n], 0b1100000000000000) >> 14
+        #gainData = np.bitwise_and(f["data/JF4.5M/data"][n], 0b1100000000000000) >> 14
         gainData = np.bitwise_and(image, 0b1100000000000000) >> 14
         trueGain = forcedGainValue(n, args.numberGain0, args.numberGain1, args.numberGain2, args.numberGainH0) if overwriteGain else ( (daq_rec & 0b11000000000000) >> 12 )
         highG0 = (daq_rec & 0b1)
 
         gainGoodAllModules = True
         if args.gainModule > 0:
-            daq_recs = f["jungfrau/daq_recs"][n]
+            daq_recs = f["data/JF4.5M/daq_recs"][n]
             for i in range(len(daq_recs)):
                 if trueGain != ((daq_recs[i] & 0b11000000000000) >> 12) or highG0 != (daq_recs[i] & 0b1):
                     gainGoodAllModules = False

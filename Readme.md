@@ -12,17 +12,62 @@ For more information about the Detector Integration Api please visit:
 
 # Usage
 
-`jungfrau_utils` is provided on the Alvra, Bernina beamlines already in a conda environment. To get into the environment, execute e.g.:
+`jungfrau_utils` is provided on the Alvra, Bernina beamlines already in a dedicated analysis-friendly Anaconda environment. To get into the environment, execute e.g.:
 
-```
-source /sf/bernina/jungfrau/bin/jungfrau_env.sh
+```bash
+source anaconda_env
 ```
 
 
 Then, to open an IPython shell already configured for the Jungfrau detector at the beamline:
 
+```bash
+jungfrau_console
 ```
-jungfrau_console.sh
+
+In case you do not have graphical access, please do:
+
+```bash
+jungfrau_console nox
+```
+
+
+**Example Alvra**:
+Start the anaconda environment.
+```bash
+source anaconda_env
+ipython
+```
+
+Use the client to communicate with DIA:
+```python
+from detector_integration_api import DetectorIntegrationClient
+
+client = DetectorIntegrationClient("http://sf-daq-2:10000")
+
+detector_config = {"exptime": 0.00001, "cycles": 1000, "dr":16}
+backend_config = {"n_frames": 1000, "bit_depth":16}
+writer_config = {"n_frames": 1000, "user_id": 16581, "output_file": "/sf/alvra/data/raw/p16581/test_writer.h5"}
+bsread_config = {"user_id": 16581, "output_file": "/sf/alvra/data/raw/p16581/test_bsread.h5"}
+
+FORMAT_PARAMETERS = {"general/user": "p16581", 
+                     "general/instrument": "Alvra, JF 4.5M", 
+                     "general/created": "today", 
+                     "general/process": "detector integration api"}
+
+writer_config.update(FORMAT_PARAMETERS)
+bsread_config.update(FORMAT_PARAMETERS)
+
+configuration = {"detector": detector_config, 
+                 "backend": backend_config, 
+                 "writer": writer_config, 
+                 "bsread": bsread_config}
+
+client.reset()
+
+client.set_config(configuration)
+
+client.start()
 ```
 
 
