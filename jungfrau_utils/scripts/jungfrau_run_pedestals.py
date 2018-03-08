@@ -118,6 +118,7 @@ def run(api_address, filename, directory, uid, period, exptime, numberFrames, tr
         print("Running pedestal analysis, output file in %s", os.path.join(directory.replace("raw", "res"), ""))
         subprocess.call(["jungfrau_create_pedestals", "-f", writer_config["output_file"], "-o", os.path.join(directory.replace("raw", "res"), ""), "-v", "4", "-nBadModules", nBadModules])
     print("Done")
+    return configuration
 
     
 if __name__ == "__main__":
@@ -145,4 +146,4 @@ if __name__ == "__main__":
             print("[ERROR] Pgroup must be in the form pXXXXX, e.g. p12345")
             sys.exit(-1)
         uid = int(args.pgroup[1:])
-    run(args.api, args.filename, args.directory, args.uid, args.period, args.exptime, args.numberFrames, args.trigger, args.analyze, args.nBadModules)
+    cfg = run(args.api, args.filename, args.directory, args.uid, args.period, args.exptime, args.numberFrames, args.trigger, args.analyze, args.nBadModules)
