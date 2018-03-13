@@ -103,21 +103,36 @@ def run(api_address, filename, directory, uid, period, exptime, numberFrames, tr
         sleep(2 * sleepTime)
 
         #subprocess.check_call(["caput", "SIN-TIMAST-TMA:Evt-24-Ena-Sel", "0"])
-        client.stop()
+
+        print("Waiting for acquisition to finish.")
+        client.wait_for_status("IntegrationStatus.FINISHED", polling_interval=0.1)
+
+        print("Reseting acquisition status.")
         client.reset()
+
         reset_bits(client)
+
+        if analyze:
+            print("Running pedestal analysis, output file in %s", os.path.join(directory.replace("raw", "res"), ""))
+
+            subprocess.call(["jungfrau_create_pedestals", "-f", writer_config["output_file"], "-o",
+                             os.path.join(directory.replace("raw", "res"), ""), "-v", "4", "-nBadModules", nBadModules])
+
+        print("Done.")
 
     except KeyboardInterrupt:
-        print("CTRL-C caught, stopping and resetting")
-        client.stop()
-        client.reset()
-        reset_bits(client)
+
+        print("CTRL-C caught, stopping and resetting.")
+
+        try:
+            client.stop()
+            client.reset()
+            reset_bits(client)
+        except:
+            raise Exception("Cannot stop the integration. Check status details or reset services.")
 
     print("Pedestal run data saved in %s" % writer_config["output_file"])
-    if analyze:
-        print("Running pedestal analysis, output file in %s", os.path.join(directory.replace("raw", "res"), ""))
-        subprocess.call(["jungfrau_create_pedestals", "-f", writer_config["output_file"], "-o", os.path.join(directory.replace("raw", "res"), ""), "-v", "4", "-nBadModules", nBadModules])
-    print("Done")
+
     return configuration
 
     

@@ -96,7 +96,12 @@ def run_jungfrau(n_frames, save=True, exptime=0.000010, outfile="", outdir="", u
         print("Done")
     except KeyboardInterrupt:
         print("Caught CTRL-C, resetting")
-        client.reset()
+
+        try:
+            client.reset()
+        except:
+            raise Exception("Cannot reset the integration. Check status details or reset services.")
+
 
 def main():
     
