@@ -1,6 +1,6 @@
 package:
     name: jungfrau_utils
-    version: 0.1.2
+    version: 0.1.3
 source:
     path: ..
 
@@ -18,7 +18,7 @@ build:
   number: 1
   entry_points:
     - jungfrau_convert_gainmaps = jungfrau_utils.scripts.jungfrau_convert_gainmaps:main
-    - jungfrau_run_pedestals = jungfrau_utils.scripts.jungfrau_run_pedestals:main
+    - jungfrau_run_pedestals = jungfrau_utils.scripts.jungfrau_run_pedestals:run
     - jungfrau_print_pixelmask = jungfrau_utils.scripts.jungfrau_print_pixelmask:main
     - jungfrau_create_pedestals = jungfrau_utils.scripts.jungfrau_create_pedestals:main
     - jungfrau_run = jungfrau_utils.scripts.jungfrau_run:main
