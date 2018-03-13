@@ -112,7 +112,7 @@ def main():
     parser.add_argument("--filename", default="run_%s.h5" % date_string, help="Output file name")
     parser.add_argument("--pede", default="", help="File containing pedestal corrections")
     parser.add_argument("--gain", default="", help="File containing gain corrections")
-    parser.add_argument("--directory", default="/sf/bernina/data/raw/p16582", help="Output directory")
+    parser.add_argument("--directory", default="/sf/bernina/data/p16582/raw", help="Output directory")
     parser.add_argument("--uid", default=16582, help="User ID which needs to own the file", type=int)
     parser.add_argument("--period", default=0.01, help="Period (default is 10Hz - 0.01)", type=float)
     parser.add_argument("--exptime", default=0.000010, help="Integration time (default 0.000010 - 10us)", type=float)
