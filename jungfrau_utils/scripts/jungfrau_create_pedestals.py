@@ -176,7 +176,21 @@ def main():
 
             pixelMask[gainData != trueGain] |= (1 << (trueGain+4*highG0))
 
+            # ask dima
+            if len(highG0) == 1:
+                highG0 = highG0[0]
+            else:
+                print("highGain not a single element array, ?")
+                print("trueGain: %d highG0: %d" % (trueGain, highG0))
+
+            if len(trueGain) == 1:
+                trueGain = trueGain[0]
+            else:
+                print("trueGain not a single element array, ?")
+                print("trueGain: %d highG0: %d" % (trueGain, highG0))
             trueGain += 4 * highG0
+        
+
             nMgain[trueGain] += 1
 
             if nMgain[trueGain] > averagePedestalFrames:
