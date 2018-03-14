@@ -17,7 +17,7 @@ def reset_bits(client):
     sleep(1)
 
 
-def run_jungfrau(n_frames, save=True, exptime=0.000010, outfile="", outdir="", uid=16852, api_address="http://sf-daq-1:10001", gain_filename="", pede_filename="", is_HG0=False, ):  # caput=False):
+def run_jungfrau(n_frames, save=True, exptime=0.000010, outfile="", outdir="", uid=16852, api_address="http://sf-daq-1:10001", gain_filename="", pede_filename="", is_HG0=False, instrument=""):  # caput=False):
     client = DetectorIntegrationClient(api_address)
 
     client.get_status()
@@ -31,7 +31,7 @@ def run_jungfrau(n_frames, save=True, exptime=0.000010, outfile="", outdir="", u
                      "general/user": str(uid),
                      "general/process": __name__,
                      "general/created": str(datetime.now()),
-                     "general/instrument": "JF 4.5M"
+                     "general/instrument": instrument
                      }
 
     if not save:
@@ -55,7 +55,7 @@ def run_jungfrau(n_frames, save=True, exptime=0.000010, outfile="", outdir="", u
                      "general/user": str(uid),
                      "general/process": __name__,
                      "general/created": str(datetime.now()),
-                     "general/instrument": "JF 4.5M"
+                     "general/instrument": instrument
                      }
 
     if gain_filename != "" or pede_filename != "":
@@ -114,11 +114,12 @@ def main():
     parser.add_argument("--frames", default=10, help="Integration time (default 10)", type=int)
     parser.add_argument("--save", default=False, help="Save data file", action="store_true")
     parser.add_argument("--highgain", default=False, help="Enable High Gain (HG0)", action="store_true")
+    parser.add_argument("--instrument", default="", help="Name of the instrument, e.g. Alvra")
     # parser.add_argument("--caput", default=False, help="Use the CAPUT trick (experts only!!!)", action="store_true")
     
     args = parser.parse_args()
 
-    run_jungfrau(args.frames, args.save, args.exptime, outfile=args.filename, outdir=args.directory, uid=args.uid, api_address=args.api, gain_filename=args.gain, pede_filename=args.pede, is_HG0=args.highgain)
+    run_jungfrau(args.frames, args.save, args.exptime, outfile=args.filename, outdir=args.directory, uid=args.uid, api_address=args.api, gain_filename=args.gain, pede_filename=args.pede, is_HG0=args.highgain, instrument=args.instrument)
 
     
 if __name__ == "__main__":
