@@ -47,8 +47,8 @@ client = DetectorIntegrationClient("http://sf-daq-2:10000")
 
 detector_config = {"exptime": 0.00001, "cycles": 1000, "dr":16}
 backend_config = {"n_frames": 1000, "bit_depth":16}
-writer_config = {"n_frames": 1000, "user_id": 16581, "output_file": "/sf/alvra/data/raw/p16581/test_writer.h5"}
-bsread_config = {"user_id": 16581, "output_file": "/sf/alvra/data/raw/p16581/test_bsread.h5"}
+writer_config = {"n_frames": 1000, "user_id": 16581, "output_file": "/sf/alvra/data/p16581/raw/test_writer.h5"}
+bsread_config = {"user_id": 16581, "output_file": "/sf/alvra/data/p16581/raw/test_bsread.h5"}
 
 FORMAT_PARAMETERS = {"general/user": "p16581", 
                      "general/instrument": "Alvra, JF 4.5M", 
@@ -73,16 +73,16 @@ client.start()
 
 **Example:** starting a data acquisition with a Jungfrau 1.5M at Bernina
 ```
-In [1]: writer_config = {"output_file": "/sf/bernina/data/raw/p16582/test_data.h5", "process_uid": 16582, "process_gid": 16582, "dataset_name": "jungfrau/data", "n_messages": 1000}
+In [1]: writer_config = {"output_file": "/sf/bernina/data/p16582/raw/test_data.h5", "process_uid": 16582, "process_gid": 16582, "dataset_name": "jungfrau/data", "n_messages": 1000}
 
 In [2]: detector_config = {"timing": "trigger", "exptime": 0.00001, "cycles": 1000}
 
-In [3]: backend_config = {"n_frames": 1000, "gain_corrections_filename": "/sf/bernina/data/res/p16582/gains.h5", "gain_corrections_dataset": "gains", "pede_corrections_filename": "/sf/bernina//data/res/p16582/JF_pedestal/pedestal_20171124_1646_res.h5", "pede_corrections_dataset": 
+In [3]: backend_config = {"n_frames": 1000, "gain_corrections_filename": "/sf/bernina/data/p16582/res/gains.h5", "gain_corrections_dataset": "gains", "pede_corrections_filename": "/sf/bernina//data/p16582/res/JF_pedestal/pedestal_20171124_1646_res.h5", "pede_corrections_dataset": 
    ...: "gains", "activate_corrections_preview": True}
 
 In [4]: default_channels_list = jungfrau_utils.load_default_channel_list()
 
-In [5]: bsread_config = {'output_file': '/sf/bernina/data/raw/p16582/test_bsread.h5', 'process_uid': 16582, 'process_gid': 16582, 'channels': default_channels_list, 'n_pulses':550}
+In [5]: bsread_config = {'output_file': '/sf/bernina/data/p16582/raw/test_bsread.h5', 'process_uid': 16582, 'process_gid': 16582, 'channels': default_channels_list, 'n_pulses':550}
 
 In [6]: client.reset()
 
@@ -123,11 +123,11 @@ Please have a look at [jungfrau_utils/scripts/jungfrau_run.py](jungfrau_utils/sc
 ## Bernina Commissioning 2017-11-19
 
 ```
-backend_config = {"n_frames": 100000, "pede_corrections_filename": "/sf/bernina/data/res/p16582/pedestal_20171119_1027_res.h5", "pede_corrections_dataset": "gains", "gain_corrections_filename": "/sf/bernina/data/res/p16582/gains.h5", "gain_corrections_dataset": "gains", "activate_corrections_preview": True, "pede_mask_dataset": "pixel_mask"}
+backend_config = {"n_frames": 100000, "pede_corrections_filename": "/sf/bernina/data/p16582/res/pedestal_20171119_1027_res.h5", "pede_corrections_dataset": "gains", "gain_corrections_filename": "/sf/bernina/data/p16582/res/gains.h5", "gain_corrections_dataset": "gains", "activate_corrections_preview": True, "pede_mask_dataset": "pixel_mask"}
 detector_config = {"exptime": 0.00001, "cycles":20000, "timing": "trigger", "frames": 1} 
 
 client.reset()
-writer_config = {'dataset_name': 'jungfrau/data','output_file': '/gpfs/sf-data/bernina/raw/p16582/Bi11_pp_delayXXPP_tests.h5','process_gid': 16582,   'process_uid': 16582, "disable_processing": False};
+writer_config = {'dataset_name': 'jungfrau/data','output_file': '/sf/bernina/data/p16582/raw/Bi11_pp_delayXXPP_tests.h5','process_gid': 16582,   'process_uid': 16582, "disable_processing": False};
 configuration = {"writer": writer_config, "backend": backend_config, "detector": detector_config}
 client.set_config(configuration); 
 client.start()
@@ -144,8 +144,8 @@ client.reset()
 # This records a pedestal run
 jungfrau_run_pedestals --numberFrames 3000 --period 0.05
 
-# This analyses and creates a pedestal correction file, in this case /sf/bernina/data/res/p16582/pedestal_20171124_1646_res.h5
-jungfrau_create_pedestals -f /sf/bernina/data/raw/p16582/pedestal_20171124_1646.h5 -v 3 -o /sf/bernina/data/res/p16582/
+# This analyses and creates a pedestal correction file, in this case /sf/bernina/data/p16582/res/pedestal_20171124_1646_res.h5
+jungfrau_create_pedestals -f /sf/bernina/data/p16582/raw/pedestal_20171124_1646.h5 -v 3 -o /sf/bernina/data/p16582/res/
 ```
 
 ## Correct data on file
@@ -154,9 +154,9 @@ One utility `jungfrau_utils` provides is a pede and gain subtraction routine. Eg
 
 ```
 In [2]: import jungfrau_utils as ju
-In [3]: f = h5py.File("/gpfs/sf-data/bernina/raw/p16582/AgBeNH_dtz60_run3.h5")
-In [4]: fp = h5py.File("/sf/bernina/data/res/p16582/pedestal_20171119_0829_res_merge.h5")
-In [5]: fg = h5py.File("/sf/bernina/data/res/p16582/gains.h5")
+In [3]: f = h5py.File("/sf/bernina/data/p16582/raw/AgBeNH_dtz60_run3.h5")
+In [4]: fp = h5py.File("/sf/bernina/data/p16582/res/pedestal_20171119_0829_res_merge.h5")
+In [5]: fg = h5py.File("/sf/bernina/data/p16582/res/gains.h5")
 In [6]: images = f["jungfrau/data"]
 In [7]: G = fg["gains"][:]
 In [8]: P = fp["gains"][:]

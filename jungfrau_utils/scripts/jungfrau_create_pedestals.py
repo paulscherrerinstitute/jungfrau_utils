@@ -127,7 +127,7 @@ def main():
 
         nGoodFrames += 1
 
-        daq_rec = f["data/JF4.5M/daq_rec"][n]
+        daq_rec = (f["data/JF4.5M/daq_rec"][n])[0]
 
         image = f["data/JF4.5M/data"][n][:]
         #frameData = (np.bitwise_and(f["data/JF4.5M/data"][n], 0b0011111111111111)).astype(np.float64)  # without cast can't use easily self multiplication
@@ -177,6 +177,8 @@ def main():
             pixelMask[gainData != trueGain] |= (1 << (trueGain+4*highG0))
 
             trueGain += 4 * highG0
+        
+
             nMgain[trueGain] += 1
 
             if nMgain[trueGain] > averagePedestalFrames:
