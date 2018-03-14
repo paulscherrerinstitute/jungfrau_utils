@@ -17,7 +17,7 @@ def reset_bits(client):
     sleep(0.1)
 
 
-def run(api_address, filename, directory, uid, period, exptime, numberFrames, trigger, analyze, nBadModules):
+def run(api_address, filename, directory, uid, period, exptime, numberFrames, trigger, analyze, nBadModules, instrument=""):
     if api_address == "":
         print("[ERROR] Please specify an API address, like http://sf-daq-2:10000 (Alvra) or http://sf-daq-a:10000 (Bernina)")
         return
@@ -38,7 +38,7 @@ def run(api_address, filename, directory, uid, period, exptime, numberFrames, tr
                          "general/user": str(uid),
                          "general/process": __name__,
                          "general/created": str(datetime.now()),
-                         "general/instrument": "JF 4.5M"
+                         "general/instrument": instrument
                          }
 
         print(writer_config)
@@ -65,9 +65,8 @@ def run(api_address, filename, directory, uid, period, exptime, numberFrames, tr
                          "general/user": str(uid),
                          "general/process": __name__,
                          "general/created": str(datetime.now()),
-                         "general/instrument": "JF 4.5M"
+                         "general/instrument": instrument
                          }
-
 
         client.reset()
 
@@ -153,6 +152,7 @@ def main():
     parser.add_argument("--nBadModules",
                         default=0, help="Number of bad modules in the detector. Makes sense only together with --analyse (default 0)",
                         action="store", type=int)
+    parser.add_argument("-instrument", default="", type=str, help="Instrument (either Alvra or Bernina, used only for metadata)", action="store")
     args = parser.parse_args()
 
     uid = args.uid
@@ -162,7 +162,8 @@ def main():
             print("[ERROR] Pgroup must be in the form pXXXXX, e.g. p12345")
             sys.exit(-1)
         uid = int(args.pgroup[1:])
-    cfg = run(args.api, args.filename, args.directory, args.uid, args.period, args.exptime, args.numberFrames, args.trigger, args.analyze, args.nBadModules)
+
+    cfg = run(args.api, args.filename, args.directory, uid, args.period, args.exptime, args.numberFrames, args.trigger, args.analyze, args.nBadModules, args.instrument)
 
 
 if __name__ == "__main__":
