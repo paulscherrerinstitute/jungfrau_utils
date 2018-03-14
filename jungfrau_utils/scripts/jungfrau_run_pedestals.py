@@ -120,8 +120,8 @@ def run(api_address, filename, directory, uid, period, exptime, numberFrames, tr
     print("Done")
     return configuration
 
-    
-if __name__ == "__main__":
+
+def main():
     date_string = datetime.now().strftime("%Y%m%d_%H%M")
 
     parser = argparse.ArgumentParser(description="Create a pedestal file for Jungrau")
@@ -135,7 +135,8 @@ if __name__ == "__main__":
     parser.add_argument("--numberFrames", default=10000, help="Integration time (default 10000)", type=int)
     parser.add_argument("--trigger", default=1, help="run with the trigger, PERIOD will be ignored in this case(default - 1(yes))", type=int)
     parser.add_argument("--analyze", default=False, help="Run the pedestal analysis (default False)", action="store_true")
-    parser.add_argument("--nBadModules", default=0, help="Number of bad modules in the detector. Makes sense only together with --analyse (default 0)", 
+    parser.add_argument("--nBadModules",
+                        default=0, help="Number of bad modules in the detector. Makes sense only together with --analyse (default 0)",
                         action="store", type=int)
     args = parser.parse_args()
 
@@ -147,3 +148,7 @@ if __name__ == "__main__":
             sys.exit(-1)
         uid = int(args.pgroup[1:])
     cfg = run(args.api, args.filename, args.directory, args.uid, args.period, args.exptime, args.numberFrames, args.trigger, args.analyze, args.nBadModules)
+
+
+if __name__ == "__main__":
+    main()
