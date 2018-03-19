@@ -60,7 +60,7 @@ def run(api_address, filename, directory, uid, period, exptime, numberFrames, tr
                           "bit_depth": 16
                           }
 
-        bsread_config = {'output_file': "/dev/null",
+        bsread_config = {'output_file': directory + "/BSREAD_" + filename,
                          'user_id': uid,
                          "general/user": str(uid),
                          "general/process": __name__,

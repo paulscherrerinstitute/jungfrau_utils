@@ -50,7 +50,7 @@ def run_jungfrau(n_frames, save=True, exptime=0.000010, outfile="", outdir="", u
                       "bit_depth": 16
                       }
 
-    bsread_config = {'output_file': "/dev/null",
+    bsread_config = {'output_file': outdir + "/BSREAD_" + outfile,
                      'user_id': uid,
                      "general/user": str(uid),
                      "general/process": __name__,
