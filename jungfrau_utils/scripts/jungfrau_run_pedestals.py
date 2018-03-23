@@ -17,7 +17,7 @@ def reset_bits(client):
     sleep(0.1)
 
 
-def run(api_address, filename, directory, uid, period, exptime, numberFrames, trigger, analyze, nBadModules, instrument=""):
+def run(api_address, filename, directory, uid, period, exptime, numberFrames, trigger, analyze, nBadModules, instrument="", jungfrau_name = "JF"):
     if api_address == "":
         print("[ERROR] Please specify an API address, like http://sf-daq-2:10000 (Alvra) or http://sf-daq-a:10000 (Bernina)")
         return
@@ -60,7 +60,7 @@ def run(api_address, filename, directory, uid, period, exptime, numberFrames, tr
                           "bit_depth": 16
                           }
 
-        bsread_config = {'output_file': "/dev/null",
+        bsread_config = {'output_file': directory + "/BSREAD_" + filename,
                          'user_id': uid,
                          "general/user": str(uid),
                          "general/process": __name__,
@@ -115,7 +115,7 @@ def run(api_address, filename, directory, uid, period, exptime, numberFrames, tr
             print("Running pedestal analysis, output file in %s", os.path.join(directory.replace("raw", "res"), ""))
 
             subprocess.call(["jungfrau_create_pedestals", "-f", writer_config["output_file"], "-o",
-                             os.path.join(directory.replace("raw", "res"), ""), "-v", "4", "-nBadModules", nBadModules])
+                             os.path.join(directory.replace("raw", "res"), ""), "-v", "4", "-nBadModules", str(nBadModules), "-jungfrau_name", jungfrau_name])
 
         print("Done.")
 
@@ -152,7 +152,8 @@ def main():
     parser.add_argument("--nBadModules",
                         default=0, help="Number of bad modules in the detector. Makes sense only together with --analyse (default 0)",
                         action="store", type=int)
-    parser.add_argument("-instrument", default="", type=str, help="Instrument (either Alvra or Bernina, used only for metadata)", action="store")
+    parser.add_argument("--instrument", default="", type=str, help="Instrument (either Alvra or Bernina, used only for metadata)", action="store")
+    parser.add_argument("--jungfrau_name", default="JF", type=str, help="Name of Jungfrau Detector", action="store")
     args = parser.parse_args()
 
     uid = args.uid

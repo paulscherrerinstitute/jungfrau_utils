@@ -47,7 +47,7 @@ def main():
     parser.add_argument("-gainModule", type=int, default=1, help="check that gain setting in each of the module correspnds to the general gain switch, (0 - dont check)")
     parser.add_argument("-showPixelMask", type=int, default=0, help=">0 - show pixel mask image at the end of the run (default: not)")
     parser.add_argument("-nBadModules", type=int, default=0, help="Number of bad modules (default 0)")
-    parser.add_argument("-jungfrau_name", type=str, default=0, help="Name of the jungfrau detector, e.g. JF1.5M")
+    parser.add_argument("-jungfrau_name", type=str, default="JF", help="Name of the jungfrau detector, e.g. JF_1.5M")
     args = parser.parse_args()
 
     if not (os.path.isfile(args.f) and os.access(args.f, os.R_OK)):
