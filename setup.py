@@ -4,7 +4,7 @@
 from setuptools import setup
 
 setup(name='jungfrau_utils',
-      version='0.1.5',
+      version='0.1.6',
       description='',
       author='Paul Scherrer Institute',
       license='GNU GPLv3',
