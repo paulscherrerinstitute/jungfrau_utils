@@ -17,7 +17,7 @@ def reset_bits(client):
     sleep(0.1)
 
 
-def run(api_address, filename, directory, uid, period, exptime, numberFrames, trigger, analyze, nBadModules, instrument="", jungfrau_name = "JF"):
+def run(api_address, filename, directory, uid, period, exptime, numberFrames, trigger, analyze, number_bad_modules, instrument="", jungfrau_name = "JF"):
     if api_address == "":
         print("[ERROR] Please specify an API address, like http://sf-daq-2:10000 (Alvra) or http://sf-daq-a:10000 (Bernina)")
         return
@@ -114,8 +114,8 @@ def run(api_address, filename, directory, uid, period, exptime, numberFrames, tr
         if analyze:
             print("Running pedestal analysis, output file in %s", os.path.join(directory.replace("raw", "res"), ""))
 
-            subprocess.call(["jungfrau_create_pedestals", "-f", writer_config["output_file"], "-o",
-                             os.path.join(directory.replace("raw", "res"), ""), "-v", "4", "-nBadModules", str(nBadModules), "-jungfrau_name", jungfrau_name])
+            subprocess.call(["jungfrau_create_pedestals", "--filename", writer_config["output_file"], "--directory",
+                             os.path.join(directory.replace("raw", "res"), ""), "--verbosity", "4", "--number_bad_modules", str(number_bad_modules), "--jungfrau_name", jungfrau_name])
 
         print("Done.")
 
@@ -144,12 +144,12 @@ def main():
     parser.add_argument("--directory", default="", help="Output directory")
     parser.add_argument("--uid", default=0, help="User ID which needs to own the file", type=int)
     parser.add_argument("--pgroup", default="", help="Same as --uid, but specifying the pgroup instead", type=str)
-    parser.add_argument("--period", default=0.01, help="Period (default is 10Hz - 0.01)", type=float)
+    parser.add_argument("--period", default=0.01, help="Period (default is 100Hz - 0.01)", type=float)
     parser.add_argument("--exptime", default=0.000010, help="Integration time (default 0.000010 - 10us)", type=float)
-    parser.add_argument("--numberFrames", default=10000, help="Integration time (default 10000)", type=int)
+    parser.add_argument("--number_frames", default=10000, help="Number of total frames to be acquired (default 10000)", type=int)
     parser.add_argument("--trigger", default=1, help="run with the trigger, PERIOD will be ignored in this case(default - 1(yes))", type=int)
     parser.add_argument("--analyze", default=False, help="Run the pedestal analysis (default False)", action="store_true")
-    parser.add_argument("--nBadModules",
+    parser.add_argument("--number_bad_modules",
                         default=0, help="Number of bad modules in the detector. Makes sense only together with --analyse (default 0)",
                         action="store", type=int)
     parser.add_argument("--instrument", default="", type=str, help="Instrument (either Alvra or Bernina, used only for metadata)", action="store")
@@ -164,7 +164,7 @@ def main():
             sys.exit(-1)
         uid = int(args.pgroup[1:])
 
-    cfg = run(args.api, args.filename, args.directory, uid, args.period, args.exptime, args.numberFrames, args.trigger, args.analyze, args.nBadModules, args.instrument)
+    cfg = run(args.api, args.filename, args.directory, uid, args.period, args.exptime, args.number_frames, args.trigger, args.analyze, args.number_bad_modules, args.instrument, args.jungfrau_name)
 
 
 if __name__ == "__main__":
