@@ -9,17 +9,17 @@ from detector_integration_api import DetectorIntegrationClient
 
 def reset_bits(client):
     sleep(0.1)
-    print(client.set_detector_value("clearbit", "0x5d 0"))
+    client.set_detector_value("clearbit", "0x5d 0")
     sleep(0.1)
-    print(client.set_detector_value("clearbit", "0x5d 12"))
+    client.set_detector_value("clearbit", "0x5d 12")
     sleep(0.1)
-    print(client.set_detector_value("clearbit", "0x5d 13"))
+    client.set_detector_value("clearbit", "0x5d 13")
     sleep(0.1)
 
 
 def run(api_address, filename, directory, uid, period, exptime, numberFrames, trigger, analyze, number_bad_modules, instrument="", jungfrau_name = "JF"):
     if api_address == "":
-        print("[ERROR] Please specify an API address, like http://sf-daq-2:10000 (Alvra) or http://sf-daq-a:10000 (Bernina)")
+        print("[ERROR] Please specify an API address, like http://sf-daq-alvra:10000 (Alvra) or http://sf-daq-bernina:10000 (Bernina)")
         return
     if uid == 0:
         print("[ERROR] Please specify the user id (the pgroup)")
@@ -41,7 +41,6 @@ def run(api_address, filename, directory, uid, period, exptime, numberFrames, tr
                          "general/instrument": instrument
                          }
 
-        print(writer_config)
         if trigger == 0:
             detector_config = {"period": period,
                                "exptime": exptime,
@@ -76,35 +75,39 @@ def run(api_address, filename, directory, uid, period, exptime, numberFrames, tr
         client.set_config(configuration)
         print(client.get_config())
 
-        sleepTime = numberFrames * period / 5
+        if trigger == 1:
+            print("\nPedestal run use external trigger. To have enough statistics --period should be set to right value. Currently %d Hz\n" % int(1/period))
+
+        sleepTime = numberFrames * period / 4
 
         print("Resetting gain bits on Jungfrau")
         reset_bits(client)
 
-        print(client.set_detector_value("setbit", "0x5d 0"))
-        sleep(5) # for the moment there is a delay to make sure detectory is in the highG0 mode
+        client.set_detector_value("setbit", "0x5d 0")
+        sleep(1) # for the moment there is a delay to make sure detector is in the highG0 mode
         print("Taking data at HG0")
         client.start()
 
-        #subprocess.check_call(["caput", "SIN-TIMAST-TMA:Evt-24-Ena-Sel", "1"])
         sleep(sleepTime)
 
-        print(client.set_detector_value("clearbit", "0x5d 0"))
+        client.set_detector_value("clearbit", "0x5d 0")
         print("Taking data at G0")
         sleep(sleepTime)
 
-        print(client.set_detector_value("setbit", "0x5d 12"))
+        client.set_detector_value("setbit", "0x5d 12")
         print("Taking data at G1")
         sleep(sleepTime)
 
-        print(client.set_detector_value("setbit", "0x5d 13"))
+        client.set_detector_value("setbit", "0x5d 13")
         print("Taking data at G2")
-        sleep(2 * sleepTime)
-
-        #subprocess.check_call(["caput", "SIN-TIMAST-TMA:Evt-24-Ena-Sel", "0"])
+        sleep(sleepTime)
 
         print("Waiting for acquisition to finish.")
-        client.wait_for_status("IntegrationStatus.FINISHED", polling_interval=0.1)
+        try:
+            client.wait_for_status(["IntegrationStatus.FINISHED"], polling_interval=0.1)
+        except IntegrationStatus.ERROR:
+            print("Got IntegrationStatus ERROR")
+            print(client.get_status_details())
 
         print("Reseting acquisition status.")
         client.reset()
@@ -112,10 +115,16 @@ def run(api_address, filename, directory, uid, period, exptime, numberFrames, tr
         reset_bits(client)
 
         if analyze:
-            print("Running pedestal analysis, output file in %s", os.path.join(directory.replace("raw", "res"), ""))
+            print("Running pedestal analysis")
 
-            subprocess.call(["jungfrau_create_pedestals", "--filename", writer_config["output_file"], "--directory",
-                             os.path.join(directory.replace("raw", "res"), ""), "--verbosity", "4", "--number_bad_modules", str(number_bad_modules), "--jungfrau_name", jungfrau_name])
+            try:
+                subprocess.call(["jungfrau_create_pedestals", "--filename", writer_config["output_file"], "--directory",
+                                 os.path.join(directory.replace("raw", "res"), ""), "--verbosity", "4", 
+                                 "--number_bad_modules", str(number_bad_modules), "--jungfrau_name", jungfrau_name])
+                #print("pedestal analysis output file is %s " % os.path.join(directory.replace("raw", "res"), "") )
+            except:
+                print("Pedestal analysis failed. Do manually")
+                
 
         print("Done.")
 
@@ -146,7 +155,7 @@ def main():
     parser.add_argument("--pgroup", default="", help="Same as --uid, but specifying the pgroup instead", type=str)
     parser.add_argument("--period", default=0.01, help="Period (default is 100Hz - 0.01)", type=float)
     parser.add_argument("--exptime", default=0.000010, help="Integration time (default 0.000010 - 10us)", type=float)
-    parser.add_argument("--number_frames", default=10000, help="Number of total frames to be acquired (default 10000)", type=int)
+    parser.add_argument("--frames", default=4000, help="Number of total frames to be acquired (default 4000)", type=int)
     parser.add_argument("--trigger", default=1, help="run with the trigger, PERIOD will be ignored in this case(default - 1(yes))", type=int)
     parser.add_argument("--analyze", default=False, help="Run the pedestal analysis (default False)", action="store_true")
     parser.add_argument("--number_bad_modules",
@@ -164,7 +173,7 @@ def main():
             sys.exit(-1)
         uid = int(args.pgroup[1:])
 
-    cfg = run(args.api, args.filename, args.directory, uid, args.period, args.exptime, args.number_frames, args.trigger, args.analyze, args.number_bad_modules, args.instrument, args.jungfrau_name)
+    cfg = run(args.api, args.filename, args.directory, uid, args.period, args.exptime, args.frames, args.trigger, args.analyze, args.number_bad_modules, args.instrument, args.jungfrau_name)
 
 
 if __name__ == "__main__":
