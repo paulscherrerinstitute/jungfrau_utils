@@ -206,13 +206,13 @@ def main():
         log.debug("gain {} values results (pixel ({},{}) : {} {}".format(gain, tY, tX, mean[tY][tX], stdDeviation[tY][tX]))
         if gain != 2:
             g = gain if gain < 3 else (gain-1)
-            dset = outFile.create_dataset('gain' + str(g), data=mean)
-            dset = outFile.create_dataset('gain' + str(g) + '_rms', data=stdDeviation)
+            #dset = outFile.create_dataset('gain' + str(g), data=mean)
+            #dset = outFile.create_dataset('gain' + str(g) + '_rms', data=stdDeviation)
             gains[g] = mean
             gainsRMS[g] = stdDeviation
 
     dset = outFile.create_dataset('gains', data=gains)
-    dset = outFile.create_dataset('gainsRMS', data=gains)
+    dset = outFile.create_dataset('gainsRMS', data=gainsRMS)
 
     outFile.close()
 

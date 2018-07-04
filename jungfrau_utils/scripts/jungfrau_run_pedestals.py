@@ -30,7 +30,8 @@ def run(api_address, filename, directory, uid, period, exptime, numberFrames, tr
 
     client = DetectorIntegrationClient(api_address)
 
-    client.get_status()
+    #client.get_status() empty at this moment
+
     try:
         writer_config = {"output_file": directory + "/" + filename,
                          "user_id": uid,
@@ -59,7 +60,7 @@ def run(api_address, filename, directory, uid, period, exptime, numberFrames, tr
                           "bit_depth": 16
                           }
 
-        bsread_config = {'output_file': directory + "/BSREAD_" + filename,
+        bsread_config = {'output_file': '/dev/null',
                          'user_id': uid,
                          "general/user": str(uid),
                          "general/process": __name__,
@@ -78,7 +79,7 @@ def run(api_address, filename, directory, uid, period, exptime, numberFrames, tr
         if trigger == 1:
             print("\nPedestal run use external trigger. To have enough statistics --period should be set to right value. Currently %d Hz\n" % int(1/period))
 
-        sleepTime = numberFrames * period / 4
+        sleepTime = numberFrames * period / 7
 
         print("Resetting gain bits on Jungfrau")
         reset_bits(client)
@@ -88,11 +89,11 @@ def run(api_address, filename, directory, uid, period, exptime, numberFrames, tr
         print("Taking data at HG0")
         client.start()
 
-        sleep(sleepTime)
+        sleep(sleepTime * 3)
 
         client.set_detector_value("clearbit", "0x5d 0")
         print("Taking data at G0")
-        sleep(sleepTime)
+        sleep(sleepTime * 2)
 
         client.set_detector_value("setbit", "0x5d 12")
         print("Taking data at G1")
@@ -117,13 +118,20 @@ def run(api_address, filename, directory, uid, period, exptime, numberFrames, tr
         if analyze:
             print("Running pedestal analysis")
 
-            try:
-                subprocess.call(["jungfrau_create_pedestals", "--filename", writer_config["output_file"], "--directory",
-                                 os.path.join(directory.replace("raw", "res"), ""), "--verbosity", "4", 
-                                 "--number_bad_modules", str(number_bad_modules), "--jungfrau_name", jungfrau_name])
-                #print("pedestal analysis output file is %s " % os.path.join(directory.replace("raw", "res"), "") )
-            except:
-                print("Pedestal analysis failed. Do manually")
+            client_status = client.get_status_details()
+            enabled_detectors = list(client_status['details'].keys())
+            if 'bsread' in enabled_detectors:
+                enabled_detectors.remove('bsread')
+            print("Following detectors are enabled %s, will run over them" % enabled_detectors)
+
+            for detector in enabled_detectors:
+                try:
+                    subprocess.call(["jungfrau_create_pedestals", "--filename", writer_config["output_file"] + "." + detector + ".h5", "--directory",
+                                     os.path.join(directory.replace("raw", "res"), ""), "--verbosity", "4", 
+                                     "--number_bad_modules", str(number_bad_modules), "--jungfrau_name", jungfrau_name])
+                    #print("pedestal analysis output file is %s " % os.path.join(directory.replace("raw", "res"), "") )
+                except:
+                    print("Pedestal analysis failed for detector %s. Do manually.", detector)
                 
 
         print("Done.")
@@ -149,7 +157,7 @@ def main():
 
     parser = argparse.ArgumentParser(description="Create a pedestal file for Jungrau")
     parser.add_argument("--api", default="")
-    parser.add_argument("--filename", default="pedestal_%s.h5" % date_string, help="Output file name")
+    parser.add_argument("--filename", default="pedestal_%s" % date_string, help="Output file name")
     parser.add_argument("--directory", default="", help="Output directory")
     parser.add_argument("--uid", default=0, help="User ID which needs to own the file", type=int)
     parser.add_argument("--pgroup", default="", help="Same as --uid, but specifying the pgroup instead", type=str)
