@@ -18,12 +18,8 @@ def reset_bits(client):
 
 
 def run_jungfrau(n_frames, save=True, exptime=0.000010, outfile="", outdir="", uid=16852, api_address="http://sf-daq-1:10001", gain_filename="", pede_filename="", is_HG0=False, instrument=""):  # caput=False):
+
     client = DetectorIntegrationClient(api_address)
-
-    client.get_status()
-
-    #print("Resetting gain bits on Jungfrau")
-    #reset_bits(client)
 
     writer_config = {"output_file": outdir + "/" + outfile,
                      "user_id": uid,
