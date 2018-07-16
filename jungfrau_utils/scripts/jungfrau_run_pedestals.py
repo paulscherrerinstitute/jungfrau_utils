@@ -127,8 +127,7 @@ def run(api_address, filename, directory, uid, period, exptime, numberFrames, tr
             for detector in enabled_detectors:
                 try:
                     subprocess.call(["jungfrau_create_pedestals", "--filename", writer_config["output_file"] + "." + detector + ".h5", "--directory",
-                                     os.path.join(directory.replace("raw", "res"), ""), "--verbosity", "4", 
-                                     "--number_bad_modules", str(number_bad_modules), "--jungfrau_name", jungfrau_name])
+                                     os.path.join(directory.replace("raw", "res"), ""), "--verbosity", "4"]) 
                 except:
                     print("Pedestal analysis failed for detector %s. Do manually.", detector)
                 
