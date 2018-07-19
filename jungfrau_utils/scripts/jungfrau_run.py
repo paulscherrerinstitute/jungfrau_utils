@@ -7,16 +7,6 @@ import subprocess
 from detector_integration_api import DetectorIntegrationClient
 
 
-def reset_bits(client):
-    sleep(1)
-    print(client.set_detector_value("clearbit", "0x5d 0"))
-    sleep(1)
-    print(client.set_detector_value("clearbit", "0x5d 12"))
-    sleep(1)
-    print(client.set_detector_value("clearbit", "0x5d 13"))
-    sleep(1)
-
-
 def run_jungfrau(n_frames, save=True, exptime=0.000010, outfile="", outdir="", uid=16852, api_address="http://sf-daq-1:10001", gain_filename="", pede_filename="", is_HG0=False, instrument=""):  # caput=False):
 
     client = DetectorIntegrationClient(api_address)
@@ -64,8 +54,10 @@ def run_jungfrau(n_frames, save=True, exptime=0.000010, outfile="", outdir="", u
     if is_HG0:
         backend_config["is_HG0"] = True
         detector_config["setbit"] = "0x5d 0"
+        print("Running in highG0 mode")
     else:
-        print(client.set_detector_value("clearbit", "0x5d 0"))
+        client.set_detector_value("clearbit", "0x5d 0")
+        print("Running in normal mode (not highG0)")
 
     try:
         client.reset()
