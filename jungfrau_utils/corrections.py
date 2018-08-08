@@ -8,7 +8,7 @@ is_numba = False
 
 import ctypes
 
-_mod = ctypes.cdll.LoadLibrary("/home/sala/Work/GIT/psi/swissfel/jungfrau_utils/jungfrau_utils/tests/libcorrections_test.so")
+_mod = ctypes.cdll.LoadLibrary("libcorrections_test.so")
 
 correct = _mod.jf_apply_pede_gain_mask
 correct.argtypes = (ctypes.c_uint16, ctypes.c_uint16, 
