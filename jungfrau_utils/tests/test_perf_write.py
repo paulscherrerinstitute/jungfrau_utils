@@ -87,7 +87,7 @@ def main():
                                             arguments.n_frames,
                                             arguments.n_modules,
                                             arguments.frame_rate,
-                                            arguments.n_metadata) + "\t%f\t%f"
+                                            arguments.n_metadata) + "\t%d\t%f\t%f"
 
     image_buffer_size_bytes = arguments.n_modules * 512 * 1024 * 2
     metadata_buffer_size_bytes = arguments.n_modules * 4
@@ -133,7 +133,7 @@ def main():
         if time_to_sleep > 0:
             sleep(time_to_sleep)
 
-        print(output_format % (time_to_write, time_to_sleep))
+        print(output_format % (x, time_to_write, time_to_sleep))
 
         start_time_frame = time()
 
