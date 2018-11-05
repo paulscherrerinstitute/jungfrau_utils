@@ -1,21 +1,21 @@
-import numpy as np
-import sys
+import ctypes
+import os
 from time import time
-import numpy.ma as ma
 
+import numpy as np
+from numpy import ma
 
 is_numba = False
 
-import ctypes
-
-_mod = ctypes.cdll.LoadLibrary("libcorrections_test.so")
+_mod = ctypes.cdll.LoadLibrary(os.path.join(os.path.dirname(__file__), "libcorrections.so"))
 
 correct = _mod.jf_apply_pede_gain_mask
-correct.argtypes = (ctypes.c_uint16, ctypes.c_uint16, 
-                    np.ctypeslib.ndpointer(ctypes.c_uint16, flags="C_CONTIGUOUS"),
-                    np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),
-                    np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),
-                    np.ctypeslib.ndpointer(ctypes.c_int, flags="C_CONTIGUOUS"),
+correct.argtypes = (
+    ctypes.c_uint16, ctypes.c_uint16,
+    np.ctypeslib.ndpointer(ctypes.c_uint16, flags="C_CONTIGUOUS"),
+    np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),
+    np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),
+    np.ctypeslib.ndpointer(ctypes.c_int, flags="C_CONTIGUOUS"),
 )
 correct.restype = None
 correct.__doc__ = """Insert doc here
@@ -104,10 +104,10 @@ try:
 except:
     print("[INFO][corrections] Numba not available, reverting to Numpy")
     #print(sys.exc_info())
-    
+
 
 def apply_gain_pede(image, G=None, P=None, pixel_mask=None, highgain=False, inverse_gain=False):
-    r"""Apply gain corrections to Jungfrau image. Gain and Pedestal corrections are
+    """Apply gain corrections to Jungfrau image. Gain and Pedestal corrections are
     to be provided as a 3D array of shape (3, image.shape[0], image.shape[1]).
     The formula for the correction is: (image - P) / G
 
@@ -160,7 +160,7 @@ def apply_gain_pede(image, G=None, P=None, pixel_mask=None, highgain=False, inve
 
 
 def get_gain_data(image):
-    r"""Return the Jungfrau gain map and data using as an input the 16 bit encoded raw data.
+    """Return the Jungfrau gain map and data using as an input the 16 bit encoded raw data.
     RAW data is composed by the two MSB (most significant bits) encoding the gain, and 14
     bits containing the actual data counts. Possible gain levels are: 00, 01, 11.
 
@@ -187,7 +187,7 @@ def get_gain_data(image):
 
 
 def add_gap_pixels(image, modules, module_gap, chip_gap=[2, 2]):
-    r"""Add module and pixel gaps to an image.
+    """Add module and pixel gaps to an image.
 
     Parameters
     ----------
@@ -199,7 +199,7 @@ def add_gap_pixels(image, modules, module_gap, chip_gap=[2, 2]):
         gap between the modules in pixels
     chip_gap : array_like
         gap between the chips in a module, default: [2, 2]
- 
+
     Returns
     -------
     res : NDArray
@@ -233,14 +233,14 @@ class JungfrauCalibration():
 
     def __init__(self, G, P, pixel_mask=None, highgain=False):
         """[summary]
-        
+
         Parameters
         ----------
         G : [type]
             [description]
         P : [type]
             [description]
-        
+
         """
 
         G = G.astype(np.float32)
@@ -261,7 +261,7 @@ class JungfrauCalibration():
 
     from numba import jit
 
-    # FIXME add HG0 
+    # FIXME add HG0
     @staticmethod
     @jit(nopython=True, nogil=True, cache=True)
     def apply_gain_pede_corrections_numba(m, n, image, GP, mask, mask2, pede_mask, gain_mask):
@@ -279,16 +279,16 @@ class JungfrauCalibration():
 
     def apply_gain_pede(self, image):
         res = np.empty(shape=image.shape, dtype=np.float32)
-        correct(image.shape[0], image.shape[1], 
-                image, self.GP, res, self.pixel_mask
-                )
+        correct(image.shape[0], image.shape[1], image, self.GP, res, self.pixel_mask)
         return res
 
 
 def test():
-    data = np.random.randint(0, 60000, size=[1500, 1000], dtype=np.uint16)
-    pede = 60000 * np.random.random(size=[4, 1500, 1000])
-    gain = 100 * np.random.random(size=[4, 1500, 1000])
+    size_1 = 4500
+    size_2 = 4000
+    data = np.random.randint(0, 60000, size=[size_1, size_2], dtype=np.uint16)
+    pede = 60000 * np.random.random(size=[4, size_1, size_2]).astype(np.float16)
+    gain = 100 * np.random.random(size=[4, size_1, size_2]).astype(np.float16)
     gain[gain > 1] = 3
 
     t_i = time()
@@ -301,7 +301,7 @@ def test():
     res2 = apply_gain_pede(data, gain, pede)
     print("Numba", time() - t_i)
 
-    calib = JungfrauCalibration(G=gain, P=pede)  
+    calib = JungfrauCalibration(G=gain, P=pede)
     t_i = time()
     res3 = calib.apply_gain_pede(data)
     print("C", time() - t_i)
