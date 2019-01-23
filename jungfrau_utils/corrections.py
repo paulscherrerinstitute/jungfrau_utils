@@ -2,7 +2,7 @@ import numpy as np
 import sys
 from time import time
 import numpy.ma as ma
-
+from jungfrau_utils.geometry import modules_orig
 
 is_numba = False
 
@@ -75,7 +75,7 @@ try:
 except:
     print("[INFO][corrections] Numba not available, reverting to Numpy")
     #print(sys.exc_info())
-    
+
 
 def apply_gain_pede(image, G=None, P=None, pixel_mask=None, highgain=False, inverse_gain=False):
     r"""Apply gain corrections to Jungfrau image. Gain and Pedestal corrections are
@@ -167,7 +167,7 @@ def add_gap_pixels(image, modules, module_gap, chip_gap=[2, 2]):
         gap between the modules in pixels
     chip_gap : array_like
         gap between the chips in a module, default: [2, 2]
- 
+
     Returns
     -------
     res : NDArray
@@ -195,6 +195,51 @@ def add_gap_pixels(image, modules, module_gap, chip_gap=[2, 2]):
             res[disp[0] + init[0]: disp[0] + end[0], disp[1] + init[1]:disp[1] + end[1]] = image[init[0]:end[0], init[1]:end[1]]
 
     return res
+
+
+def apply_geometry(image_in, detector_name):
+    chip_shape_x = 256
+    chip_shape_y = 256
+
+    chip_gap_x = 2
+    chip_gap_y = 2
+
+    chip_num_x = 4
+    chip_num_y = 2
+
+    module_shape_x = 1024
+    module_shape_y = 512
+
+    if detector_name in modules_orig:
+        modules_orig_y, modules_orig_x = modules_orig[detector_name]
+    else:
+        return image_in
+
+    image_out_shape_x = max(modules_orig_x) + module_shape_x + (chip_num_x-1)*chip_gap_x
+    image_out_shape_y = max(modules_orig_y) + module_shape_y + (chip_num_y-1)*chip_gap_y
+    image_out = np.zeros((image_out_shape_y, image_out_shape_x), dtype=image_in.dtype)
+
+    for i, (oy, ox) in enumerate(zip(modules_orig_y, modules_orig_x)):
+        module_in = image_in[i*module_shape_y:(i+1)*module_shape_y, :]
+        for j in range(chip_num_y):
+            for k in range(chip_num_x):
+                # reading positions
+                ry_s = j*chip_shape_y
+                rx_s = k*chip_shape_x
+
+                # writing positions
+                wy_s = oy + ry_s + j*chip_gap_y
+                wx_s = ox + rx_s + k*chip_gap_x
+
+                image_out[wy_s:wy_s+chip_shape_y, wx_s:wx_s+chip_shape_x] = \
+                    module_in[ry_s:ry_s+chip_shape_y, rx_s:rx_s+chip_shape_x]
+
+    # rotate image in case of alvra detector
+    if detector_name == 'JF06T32V01':
+        image_out = np.rot90(image_out)  # check .copy()
+
+    return image_out
+
 
 def test():
     data = np.random.randint(0, 60000, size=[1500, 1000], dtype=np.uint16)
