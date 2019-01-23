@@ -1,6 +1,8 @@
+{% set data = load_setup_py_data() %}
+
 package:
     name: jungfrau_utils
-    version: 0.2.0
+    version: {{ data['version'] }}
 
 source:
     path: ..
@@ -24,6 +26,6 @@ build:
     - jungfrau_create_pedestals = jungfrau_utils.scripts.jungfrau_create_pedestals:main
     - jungfrau_run = jungfrau_utils.scripts.jungfrau_run:main
 
-#about:
-#    home: https://github.com/datastreaming/mflow
-#    summary: "mflow library."
+about:
+   home: https://github.com/paulscherrerinstitute/jungfrau_utils
+   summary: {{ data['description'] }}
