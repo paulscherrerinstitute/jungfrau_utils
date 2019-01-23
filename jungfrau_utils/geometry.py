@@ -1,5 +1,9 @@
 # Module geometry parameters
 modules_orig = {
+    'JF03T01V01': (
+        [0],
+        [0],
+    ),
     'JF06T32V01': (
         [
             68, 0, 618, 618,
