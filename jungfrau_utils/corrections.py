@@ -165,7 +165,7 @@ def apply_gain_pede(image, G=None, P=None, pixel_mask=None, highgain=False, inve
 
     if is_numba:
         return apply_gain_pede_numba(image, G=G, P=P, pixel_mask=pixel_mask, inverse_gain=inverse_gain)
-    return apply_gain_pede_np(image, G=G, P=P, pixel_mask=pixel_mask, inverse_gain=inverse_gain)
+    return apply_gain_pede_np(image, G=G, P=P, pixel_mask=pixel_mask)
 
 
 def get_gain_data(image):
