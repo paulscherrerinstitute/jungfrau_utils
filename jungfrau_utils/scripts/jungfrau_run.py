@@ -7,23 +7,9 @@ import subprocess
 from detector_integration_api import DetectorIntegrationClient
 
 
-def reset_bits(client):
-    sleep(1)
-    print(client.set_detector_value("clearbit", "0x5d 0"))
-    sleep(1)
-    print(client.set_detector_value("clearbit", "0x5d 12"))
-    sleep(1)
-    print(client.set_detector_value("clearbit", "0x5d 13"))
-    sleep(1)
-
-
 def run_jungfrau(n_frames, save=True, exptime=0.000010, outfile="", outdir="", uid=16852, api_address="http://sf-daq-1:10001", gain_filename="", pede_filename="", is_HG0=False, instrument=""):  # caput=False):
+
     client = DetectorIntegrationClient(api_address)
-
-    client.get_status()
-
-    #print("Resetting gain bits on Jungfrau")
-    #reset_bits(client)
 
     writer_config = {"output_file": outdir + "/" + outfile,
                      "user_id": uid,
@@ -37,8 +23,6 @@ def run_jungfrau(n_frames, save=True, exptime=0.000010, outfile="", outdir="", u
     if not save:
         writer_config["output_file"] = "/dev/null"
 
-    print(writer_config)
-
     detector_config = {"exptime": exptime,
                        "frames": 1,
                        'cycles': n_frames,
@@ -50,7 +34,7 @@ def run_jungfrau(n_frames, save=True, exptime=0.000010, outfile="", outdir="", u
                       "bit_depth": 16
                       }
 
-    bsread_config = {'output_file': "/dev/null",
+    bsread_config = {'output_file': outdir + "/" + outfile,
                      'user_id': uid,
                      "general/user": str(uid),
                      "general/process": __name__,
@@ -70,8 +54,10 @@ def run_jungfrau(n_frames, save=True, exptime=0.000010, outfile="", outdir="", u
     if is_HG0:
         backend_config["is_HG0"] = True
         detector_config["setbit"] = "0x5d 0"
+        print("Running in highG0 mode")
     else:
-        print(client.set_detector_value("clearbit", "0x5d 0"))
+        client.set_detector_value("clearbit", "0x5d 0")
+        print("Running in normal mode (not highG0)")
 
     try:
         client.reset()
@@ -88,7 +74,12 @@ def run_jungfrau(n_frames, save=True, exptime=0.000010, outfile="", outdir="", u
         print("Starting acquisition")
         client.start()
 
-        client.wait_for_status(["IntegrationStatus.FINISHED"], polling_interval=0.1)
+        try:
+            client.wait_for_status(["IntegrationStatus.FINISHED"], polling_interval=0.1)
+        except:
+            print("Got IntegrationStatus ERROR")
+            print(client.get_status())
+            print(client.get_status_details())
 
         print("Stopping acquisition")
         client.reset()
@@ -111,7 +102,7 @@ def main():
     parser.add_argument("--uid", default=16582, help="User ID which needs to own the file", type=int)
     parser.add_argument("--period", default=0.01, help="Period (default is 10Hz - 0.01)", type=float)
     parser.add_argument("--exptime", default=0.000010, help="Integration time (default 0.000010 - 10us)", type=float)
-    parser.add_argument("--frames", default=10, help="Integration time (default 10)", type=int)
+    parser.add_argument("--frames", default=10, help="Number of frames to take", type=int)
     parser.add_argument("--save", default=False, help="Save data file", action="store_true")
     parser.add_argument("--highgain", default=False, help="Enable High Gain (HG0)", action="store_true")
     parser.add_argument("--instrument", default="", help="Name of the instrument, e.g. Alvra")

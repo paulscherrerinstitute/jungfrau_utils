@@ -50,17 +50,17 @@ backend_config = {"n_frames": 1000, "bit_depth":16}
 writer_config = {"n_frames": 1000, "user_id": 16581, "output_file": "/sf/alvra/data/p16581/raw/test_writer.h5"}
 bsread_config = {"user_id": 16581, "output_file": "/sf/alvra/data/p16581/raw/test_bsread.h5"}
 
-FORMAT_PARAMETERS = {"general/user": "p16581", 
-                     "general/instrument": "Alvra, JF 4.5M", 
-                     "general/created": "today", 
+FORMAT_PARAMETERS = {"general/user": "p16581",
+                     "general/instrument": "Alvra, JF 4.5M",
+                     "general/created": "today",
                      "general/process": "detector integration api"}
 
 writer_config.update(FORMAT_PARAMETERS)
 bsread_config.update(FORMAT_PARAMETERS)
 
-configuration = {"detector": detector_config, 
-                 "backend": backend_config, 
-                 "writer": writer_config, 
+configuration = {"detector": detector_config,
+                 "backend": backend_config,
+                 "writer": writer_config,
                  "bsread": bsread_config}
 
 client.reset()
@@ -77,7 +77,7 @@ In [1]: writer_config = {"output_file": "/sf/bernina/data/p16582/raw/test_data.h
 
 In [2]: detector_config = {"timing": "trigger", "exptime": 0.00001, "cycles": 1000}
 
-In [3]: backend_config = {"n_frames": 1000, "gain_corrections_filename": "/sf/bernina/data/p16582/res/gains.h5", "gain_corrections_dataset": "gains", "pede_corrections_filename": "/sf/bernina//data/p16582/res/JF_pedestal/pedestal_20171124_1646_res.h5", "pede_corrections_dataset": 
+In [3]: backend_config = {"n_frames": 1000, "gain_corrections_filename": "/sf/bernina/data/p16582/res/gains.h5", "gain_corrections_dataset": "gains", "pede_corrections_filename": "/sf/bernina//data/p16582/res/JF_pedestal/pedestal_20171124_1646_res.h5", "pede_corrections_dataset":
    ...: "gains", "activate_corrections_preview": True}
 
 In [4]: default_channels_list = jungfrau_utils.load_default_channel_list()
@@ -124,12 +124,12 @@ Please have a look at [jungfrau_utils/scripts/jungfrau_run.py](jungfrau_utils/sc
 
 ```
 backend_config = {"n_frames": 100000, "pede_corrections_filename": "/sf/bernina/data/p16582/res/pedestal_20171119_1027_res.h5", "pede_corrections_dataset": "gains", "gain_corrections_filename": "/sf/bernina/data/p16582/res/gains.h5", "gain_corrections_dataset": "gains", "activate_corrections_preview": True, "pede_mask_dataset": "pixel_mask"}
-detector_config = {"exptime": 0.00001, "cycles":20000, "timing": "trigger", "frames": 1} 
+detector_config = {"exptime": 0.00001, "cycles":20000, "timing": "trigger", "frames": 1}
 
 client.reset()
 writer_config = {'dataset_name': 'jungfrau/data','output_file': '/sf/bernina/data/p16582/raw/Bi11_pp_delayXXPP_tests.h5','process_gid': 16582,   'process_uid': 16582, "disable_processing": False};
 configuration = {"writer": writer_config, "backend": backend_config, "detector": detector_config}
-client.set_config(configuration); 
+client.set_config(configuration);
 client.start()
 
 client.get_status()
@@ -161,7 +161,7 @@ In [6]: images = f["jungfrau/data"]
 In [7]: G = fg["gains"][:]
 In [8]: P = fp["gains"][:]
 In [9]: corrected_image = ju.apply_gain_pede(images[2], G, P, pixel_mask=fp["pixelMask"][:])
-
+In [10]: geom_corrected_image = ju.apply_geometry(corrected_image, '<detector_name>')
 ```
 
 ## Restart services
@@ -171,7 +171,7 @@ There are 4 services running on `sf-daq-1`:
 * `detector_backend`: controls the data acquisition
 * `writer`: writes data
 * `detector_visualization`: controls the live visualization
-* 
+*
 
 These services can be restarted from `sf-daq-1` with the user `dbe` with:
 ```
