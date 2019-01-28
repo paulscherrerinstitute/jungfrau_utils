@@ -8,34 +8,40 @@ from jungfrau_utils.geometry import modules_orig
 
 is_numba = False
 
-_mod = ctypes.cdll.LoadLibrary(os.path.join(os.path.dirname(__file__), "libcorrections.so"))
+try:
+    # TODO: make a proper external package integration
+    mod_path = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+    for entry in os.scandir(mod_path):
+        if entry.is_file() and entry.name.startswith('libcorrections') and entry.name.endswith('.so'):
+            _mod = ctypes.cdll.LoadLibrary(os.path.join(mod_path, entry))
 
-correct = _mod.jf_apply_pede_gain_mask
-correct.argtypes = (
-    ctypes.c_uint16, ctypes.c_uint16,
-    np.ctypeslib.ndpointer(ctypes.c_uint16, flags="C_CONTIGUOUS"),
-    np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),
-    np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),
-    np.ctypeslib.ndpointer(ctypes.c_int, flags="C_CONTIGUOUS"),
-)
-correct.restype = None
-correct.__doc__ = """Insert doc here
-Parameters
-----------
-m : int
-    size of the image array, rows
-n : int
-    size of the image array, columns
-image : uint16_t array
-    Jungfrau 2D array to be corrected
-GP : float32 array
-    array containing combined gain and pedestal corrections
-res : float32 array
-    2D array containing corrected image
-pixel_mask : array_like, int
-    2D array containing pixels to be masked (tagged with a one)
-"""
-
+    correct = _mod.jf_apply_pede_gain_mask
+    correct.argtypes = (
+        ctypes.c_uint16, ctypes.c_uint16,
+        np.ctypeslib.ndpointer(ctypes.c_uint16, flags="C_CONTIGUOUS"),
+        np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),
+        np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),
+        np.ctypeslib.ndpointer(ctypes.c_int, flags="C_CONTIGUOUS"),
+    )
+    correct.restype = None
+    correct.__doc__ = """Insert doc here
+    Parameters
+    ----------
+    m : int
+        size of the image array, rows
+    n : int
+        size of the image array, columns
+    image : uint16_t array
+        Jungfrau 2D array to be corrected
+    GP : float32 array
+        array containing combined gain and pedestal corrections
+    res : float32 array
+        2D array containing corrected image
+    pixel_mask : array_like, int
+        2D array containing pixels to be masked (tagged with a one)
+    """
+except:
+    print('Could not load libcorrections.')
 
 def apply_gain_pede_np(image, G=None, P=None, pixel_mask=None):
     mask = int('0b' + 14 * '1', 2)

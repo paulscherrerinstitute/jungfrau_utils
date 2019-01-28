@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, Extension
 
 setup(
     name='jungfrau_utils',
@@ -7,6 +7,9 @@ setup(
     author='Paul Scherrer Institute',
     license='GNU GPLv3',
     packages=['jungfrau_utils', 'jungfrau_utils.scripts', 'jungfrau_utils.plot'],
+    ext_modules=[
+        Extension('libcorrections', sources=['jungfrau_utils/src/corrections.c']),
+    ],
     # managed by conda
     #install_requires=[
     #    'pyzmq',
