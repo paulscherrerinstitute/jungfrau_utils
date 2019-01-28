@@ -1,8 +1,4 @@
-import h5py
 import numpy as np
-import argparse
-import os
-from datetime import datetime
 
 
 def merge_gainmaps(maps, shape, module_shape):

@@ -1,13 +1,15 @@
+import imp
+import os
+from sys import exc_info
+
+import numpy as np
+
 try:
     import matplotlib as mpl
     import matplotlib.gridspec as gridspec
     import matplotlib.pyplot as plt
 except:
     print("[WARNING] Cannot load matplotlib")
-import numpy as np
-from sys import exc_info
-import os 
-import imp
 
 
 module_dir = os.path.dirname(__file__)
@@ -26,7 +28,7 @@ def load_matplotlib_style(name="default"):
 
 
 def plot_image_and_proj(image, title="", **kwargs):
-    """Plots an image and the projections (sums) of it on the x, y axes. 
+    """Plots an image and the projections (sums) of it on the x, y axes.
     Parameters
     ----------
     image: 2-d array
@@ -50,7 +52,7 @@ def plot_image_and_proj(image, title="", **kwargs):
 
 def rebin(a, *args):
     """rebins a numpy array.
-    Example: 
+    Example:
     a = np.arange(20).reshape(10, 2)
     b = rebin(a, 5, 2)
     Parameters

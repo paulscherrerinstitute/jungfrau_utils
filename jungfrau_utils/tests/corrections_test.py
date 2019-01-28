@@ -1,8 +1,8 @@
-# coding: utf-8
+from time import time
+
 import numpy as np
 import numpy.ma as ma
-from numba import autojit, jit
-from time import time
+from numba import jit
 
 
 #@profile
@@ -24,7 +24,7 @@ def test(image, g1, g2, g3, p1, p2, p3):
     m3 = gain_mask < 2
     g = ma.array(g1, mask=m1, dtype=np.uint16).filled(0) + ma.array(g2, mask=m2, dtype=np.uint16).filled(0) + ma.array(g3, mask=m3, dtype=np.uint16).filled(0)
     p = ma.array(p1, mask=m1, dtype=np.uint16).filled(0) + ma.array(p2, mask=m2, dtype=np.uint16).filled(0) + ma.array(p3, mask=m3, dtype=np.uint16).filled(0)
-    
+
     res = np.divide(image - p, g)
     return res
 
@@ -66,7 +66,7 @@ if __name__ == "__main__":
     image = np.random.randint(0, 2**16, size=size, dtype=np.uint16)
     t_i = time()
     res = np.empty((m, n))
- 
+
     print(image.shape[0])
     print(pseudo(image.shape[0], image.shape[1], image, G, P))
     print(time() - t_i)

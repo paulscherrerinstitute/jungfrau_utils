@@ -10,8 +10,4 @@ setup(
     ext_modules=[
         Extension('libcorrections', sources=['jungfrau_utils/src/corrections.c']),
     ],
-    # managed by conda
-    #install_requires=[
-    #    'pyzmq',
-    #],
 )

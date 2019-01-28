@@ -4,6 +4,7 @@ from time import time
 
 import numpy as np
 from numpy import ma
+
 from jungfrau_utils.geometry import modules_orig
 
 is_numba = False
@@ -42,6 +43,7 @@ try:
     """
 except:
     print('Could not load libcorrections.')
+
 
 def apply_gain_pede_np(image, G=None, P=None, pixel_mask=None):
     mask = int('0b' + 14 * '1', 2)

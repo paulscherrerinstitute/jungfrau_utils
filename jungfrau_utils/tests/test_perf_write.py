@@ -1,7 +1,8 @@
 import argparse
+from time import sleep, time
+
 import h5py
 import numpy
-from time import time, sleep
 
 
 def binary_init(args):

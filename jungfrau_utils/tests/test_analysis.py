@@ -1,6 +1,8 @@
 import unittest
-import jungfrau_utils as ju
+
 import numpy as np
+
+import jungfrau_utils as ju
 
 
 class BaseTests(unittest.TestCase):
