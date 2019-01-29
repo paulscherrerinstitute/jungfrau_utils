@@ -2,12 +2,15 @@ from pathlib import Path
 
 import h5py
 
-from jungfrau_utils.corrections import apply_gain_pede
+from jungfrau_utils.corrections import apply_gain_pede, apply_geometry
 
 
 class File():
     """ Jungfrau file """
-    def __init__(self, file_path, gain_file=None, pedestal_file=None):
+    def __init__(self, file_path, gain_file=None, pedestal_file=None, raw=False, geometry=True):
+        self.raw = raw
+        self.geometry = geometry
+
         file_path = Path(file_path)
         self.file_path = file_path
 
@@ -73,9 +76,14 @@ class File():
 
     def __getitem__(self, item):
         jf_data = self.jf_file['/data/{}/data'.format(self.detector_name)][item]
-        # apply gain and pedestal corrections
-        jf_proc = apply_gain_pede(jf_data, G=self.gain, P=self.pedestal, pixel_mask=self.pixel_mask)
-        return jf_proc
+
+        if not self.raw:  # apply gain and pedestal corrections
+            jf_data = apply_gain_pede(jf_data, G=self.gain, P=self.pedestal, pixel_mask=self.pixel_mask)
+
+        if self.geometry:  # apply detector geometry corrections
+            jf_data = apply_geometry(jf_data, self.detector_name)
+
+        return jf_data
 
     def __repr__(self):
         if self.jf_file.id:
