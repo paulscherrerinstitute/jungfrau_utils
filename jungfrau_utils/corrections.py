@@ -16,16 +16,16 @@ try:
         if entry.is_file() and entry.name.startswith('libcorrections') and entry.name.endswith('.so'):
             _mod = ctypes.cdll.LoadLibrary(os.path.join(mod_path, entry))
 
-    correct = _mod.jf_apply_pede_gain_mask
-    correct.argtypes = (
+    correct_mask = _mod.jf_apply_pede_gain_mask
+    correct_mask.argtypes = (
         ctypes.c_uint32,
         np.ctypeslib.ndpointer(ctypes.c_uint16, flags="C_CONTIGUOUS"),
         np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),
         np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),
         np.ctypeslib.ndpointer(ctypes.c_int, flags="C_CONTIGUOUS"),
     )
-    correct.restype = None
-    correct.__doc__ = """Apply gain/pedestal and pixel mask corrections
+    correct_mask.restype = None
+    correct_mask.__doc__ = """Apply gain/pedestal and pixel mask corrections
     Parameters
     ----------
     image_size : c_uint32
@@ -38,6 +38,27 @@ try:
         2D array containing corrected image
     pixel_mask : array_like, int
         2D array containing pixels to be masked (tagged with a one)
+    """
+
+    correct = _mod.jf_apply_pede_gain
+    correct.argtypes = (
+        ctypes.c_uint32,
+        np.ctypeslib.ndpointer(ctypes.c_uint16, flags="C_CONTIGUOUS"),
+        np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),
+        np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),
+    )
+    correct.restype = None
+    correct.__doc__ = """Apply gain/pedestal corrections
+    Parameters
+    ----------
+    image_size : c_uint32
+        number of pixels in the image array
+    image : uint16_t array
+        Jungfrau 2D array to be corrected
+    GP : float32 array
+        array containing combined gain and pedestal corrections
+    res : float32 array
+        2D array containing corrected image
     """
 except:
     print('Could not load libcorrections.')
@@ -279,7 +300,7 @@ class JungfrauCalibration():
 
     def apply_gain_pede(self, image):
         res = np.empty(shape=image.shape, dtype=np.float32)
-        correct(np.uint32(image.size), image, self.GP, res, self.pixel_mask)
+        correct_mask(np.uint32(image.size), image, self.GP, res, self.pixel_mask)
         return res
 
 
