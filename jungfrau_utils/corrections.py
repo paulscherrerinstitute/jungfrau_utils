@@ -18,20 +18,18 @@ try:
 
     correct = _mod.jf_apply_pede_gain_mask
     correct.argtypes = (
-        ctypes.c_uint16, ctypes.c_uint16,
+        ctypes.c_uint32,
         np.ctypeslib.ndpointer(ctypes.c_uint16, flags="C_CONTIGUOUS"),
         np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),
         np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),
         np.ctypeslib.ndpointer(ctypes.c_int, flags="C_CONTIGUOUS"),
     )
     correct.restype = None
-    correct.__doc__ = """Insert doc here
+    correct.__doc__ = """Apply gain/pedestal and pixel mask corrections
     Parameters
     ----------
-    m : int
-        size of the image array, rows
-    n : int
-        size of the image array, columns
+    image_size : c_uint32
+        number of pixels in the image array
     image : uint16_t array
         Jungfrau 2D array to be corrected
     GP : float32 array
@@ -281,7 +279,7 @@ class JungfrauCalibration():
 
     def apply_gain_pede(self, image):
         res = np.empty(shape=image.shape, dtype=np.float32)
-        correct(image.shape[0], image.shape[1], image, self.GP, res, self.pixel_mask)
+        correct(np.uint32(image.size), image, self.GP, res, self.pixel_mask)
         return res
 
 

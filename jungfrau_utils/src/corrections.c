@@ -19,27 +19,21 @@ void pseudo_C(uint16_t m, uint16_t n, uint16_t *image, float *G, float *P, float
         }
 }
 
-void jf_apply_pede_gain_mask(uint16_t m, uint16_t n, uint16_t *image, float *GP, float *res,
+void jf_apply_pede_gain_mask(uint32_t image_size, uint16_t *image, float *GP, float *res,
                              int *pixel_mask) {
     uint16_t gm;
-    uint32_t idx;
 
-    for (int i = 0; i < m; i++)
-        for (int j = 0; j < n; j++) {
-            idx = i * n + j;
-            if (pixel_mask[idx]) {
-                res[idx] = 0;
-            } else {
-                gm = image[idx] >> 14;  // 1100000000000000 in hex
-                if (gm == 3) gm = 2;
-                //     R0 C0                   R0C1
-                // g0 p0 g1 p1 g2 p2 g3 p3 | g0 p0 g1 p1 g2 p2 g3 p3
-                // R1 =
-                res[idx] =
-                    ((image[idx] & 0x3FFF) - GP[8 * idx + 2 * gm + 1]) / GP[8 * idx + 2 * gm];
-                // res[i * n + j] = GP[8 * i * n + 2 * gm + j + 1];
-            }
+    for (uint32_t idx = 0; idx < image_size; idx++) {
+        if (pixel_mask[idx]) {
+            res[idx] = 0;
+        } else {
+            gm = image[idx] >> 14;  // 1100000000000000 in hex
+            if (gm == 3) gm = 2;
+            //     R0 C0                   R0C1
+            // g0 p0 g1 p1 g2 p2 g3 p3 | g0 p0 g1 p1 g2 p2 g3 p3
+            res[idx] = ((image[idx] & 0x3FFF) - GP[8 * idx + 2 * gm + 1]) / GP[8 * idx + 2 * gm];
         }
+    }
 }
 
 void baseline(uint16_t m, uint16_t n, uint16_t *image, float *G, float *P, float *res) {
