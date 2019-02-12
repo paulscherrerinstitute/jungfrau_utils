@@ -353,8 +353,7 @@ def test():
     size_2 = 4000
     data = np.random.randint(0, 60000, size=[size_1, size_2], dtype=np.uint16)
     pede = 60000 * np.random.random(size=[4, size_1, size_2]).astype(np.float16)
-    gain = 100 * np.random.random(size=[4, size_1, size_2]).astype(np.float16)
-    gain[gain > 1] = 3
+    gain = 100 * np.random.random(size=[4, size_1, size_2]).astype(np.float16) + 1
 
     t_i = time()
     res1 = apply_gain_pede_np(data, gain, pede)
