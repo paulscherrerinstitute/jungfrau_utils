@@ -280,24 +280,6 @@ class JungfrauCalibration():
         if self.pixel_mask is None:
             self.pixel_mask = np.zeros([G.shape[1], G.shape[2]], dtype=np.int32)
 
-    from numba import jit
-
-    # FIXME add HG0
-    @staticmethod
-    @jit(nopython=True, nogil=True, cache=True)
-    def apply_gain_pede_corrections_numba(m, n, image, GP, mask, mask2, pede_mask, gain_mask):
-        res = np.empty((m, n), dtype=np.float32)
-        for i in range(m):
-            for j in range(n):
-                if pede_mask[i][j] != 0:
-                    res[i][j] = 0
-                    continue
-                gm = gain_mask[i][j]
-                if gm == 3:
-                    gm = 2
-                res[i][j] = (image[i][j] - GP[i][2 * gm + 8 * j + 1]) / GP[i][2 * gm + 8 * j]
-        return res
-
     def apply_gain_pede(self, image):
         res = np.empty(shape=image.shape, dtype=np.float32)
         correct_mask(np.uint32(image.size), image, self.GP, res, self.pixel_mask)
