@@ -270,19 +270,21 @@ class JungfrauCalibration():
             G[0] = G[3]
             P[0] = P[3]
 
-        self.GP = np.zeros(shape=[G.shape[1], 2 * G.shape[0] * (G.shape[2])], dtype=G.dtype)
+        self.GP = np.empty(shape=[G.shape[1], 2 * G.shape[0] * (G.shape[2])], dtype=G.dtype)
 
         for i in range(G.shape[0]):
             self.GP[:, 2 * i::G.shape[0] * 2] = G[i, :, :]
             self.GP[:, (2 * i + 1)::G.shape[0]*2] = P[i, :, :]
 
         self.pixel_mask = pixel_mask
-        if self.pixel_mask is None:
-            self.pixel_mask = np.zeros([G.shape[1], G.shape[2]], dtype=np.int32)
 
     def apply_gain_pede(self, image):
         res = np.empty(shape=image.shape, dtype=np.float32)
-        correct_mask(np.uint32(image.size), image, self.GP, res, self.pixel_mask)
+        if self.pixel_mask is None:
+            correct(np.uint32(image.size), image, self.GP, res)
+        else:
+            correct_mask(np.uint32(image.size), image, self.GP, res, self.pixel_mask)
+
         return res
 
 
