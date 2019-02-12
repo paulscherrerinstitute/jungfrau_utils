@@ -8,6 +8,14 @@ setup(
     license='GNU GPLv3',
     packages=['jungfrau_utils', 'jungfrau_utils.scripts', 'jungfrau_utils.plot'],
     ext_modules=[
-        Extension('libcorrections', sources=['jungfrau_utils/src/corrections.c']),
+        Extension(
+            'libcorrections',
+            sources=['jungfrau_utils/src/corrections.c'],
+            extra_compile_args=[
+                '--std=c99',
+                '-mtune=core-avx2',
+                '-shared',
+            ],
+        ),
     ],
 )
