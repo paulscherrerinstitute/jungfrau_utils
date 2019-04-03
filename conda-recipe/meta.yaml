@@ -16,6 +16,7 @@ requirements:
         - pyzmq
         - h5py
         - numpy
+        - conda-forge::blosc-hdf5-plugin
 
 build:
   number: 1
