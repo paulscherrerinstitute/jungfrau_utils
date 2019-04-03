@@ -326,7 +326,7 @@ def apply_geometry(image_in, detector_name):
                     module_in[ry_s:ry_s+chip_shape_y, rx_s:rx_s+chip_shape_x]
 
     # rotate image in case of alvra detector
-    if detector_name == 'JF06T32V01':
+    if detector_name.startswith('JF06'):
         image_out = np.rot90(image_out)  # check .copy()
 
     return image_out
