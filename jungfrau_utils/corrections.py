@@ -311,7 +311,11 @@ def apply_geometry(image_in, detector_name):
     image_out = np.zeros((image_out_shape_y, image_out_shape_x), dtype=image_in.dtype)
 
     for i, (oy, ox) in enumerate(zip(modules_orig_y, modules_orig_x)):
-        module_in = image_in[i*module_shape_y:(i+1)*module_shape_y, :]
+        if detector_name == 'JF02T09V01':
+            module_in = image_in[:, i*module_shape_x:(i+1)*module_shape_x]
+        else:
+            module_in = image_in[i*module_shape_y:(i+1)*module_shape_y, :]
+
         for j in range(chip_num_y):
             for k in range(chip_num_x):
                 # reading positions
