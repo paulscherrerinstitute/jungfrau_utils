@@ -2,7 +2,7 @@ from setuptools import setup, Extension
 
 setup(
     name='jungfrau_utils',
-    version='0.2.4',
+    version='0.2.5',
     description='',
     author='Paul Scherrer Institute',
     license='GNU GPLv3',
