@@ -313,6 +313,8 @@ def apply_geometry(image_in, detector_name):
     for i, (oy, ox) in enumerate(zip(modules_orig_y, modules_orig_x)):
         if detector_name == 'JF02T09V01':
             module_in = image_in[:, i*module_shape_x:(i+1)*module_shape_x]
+        elif detector_name == 'JF02T09V02':
+            module_in = np.rot90(image_in[i*module_shape_y:(i+1)*module_shape_y, :], 2)
         else:
             module_in = image_in[i*module_shape_y:(i+1)*module_shape_y, :]
 
