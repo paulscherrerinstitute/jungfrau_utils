@@ -50,23 +50,31 @@ def get_requests(audit_fname, step_name, tfrom, tto):
 
 def write_file(audit_fname, step_name, tfrom, tto):
     # You should load this from the audit trail or from the .err file.
+    print("Reading requests.")
     reqs, params = get_requests(audit_fname, step_name, tfrom, tto)
-    
+    print("Got %d requests. Starting processing." % len(reqs))    
+
     for rp in zip(reqs, params):
         req, par = rp
         
         if os.path.isfile(par["output_file"]): 
-       	    if os.path.getsize(par["output_file"]) != 5296:    
-	    	print("Will not overwrite %s" % (par["output_file"]))
-            	continue
+            
+            if os.path.getsize(par["output_file"]) != 5296:    
+                print("Will not overwrite %s" % (par["output_file"]))
+                continue
 
-	    print("File %s exists, but is empty. Will overwrite.", par["output_file"])
+            print("File %s exists, but is empty. Removing.", par["output_file"])
+            os.remove(par["output_file"])
+        if par['output_file'] == '/dev/null':
+            print("Skipping /dev/null request. %s", par)
+            continue
 
         print("Writing %s" % par)
 
         ti =  time()
         data = get_data_from_buffer(req)
         print("For file %s data retrieval took %.2f" % (step_name, time() - ti))
+      
         ti = time()
         write_data_to_file(par, data)
         print("For file %s data writing took %.2f" % (step_name, time() - ti))
@@ -76,14 +84,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("user_id", type=int, help="Id of the user under which to write the files.")
     parser.add_argument("--audit", default="/var/log/sf_databuffer_audit.log", 
-			help="DataBuffer broker audit file, default: /var/log/sf_databuffer_audit.log")
+      help="DataBuffer broker audit file, default: /var/log/sf_databuffer_audit.log")
     parser.add_argument("--stepname", default="", type=str, 
-			help="Name of the file to write / look for in the audit file, e.g. run035_Bi_time_scan_step0020")
+      help="Name of the file to write / look for in the audit file, e.g. run035_Bi_time_scan_step0020")
     parser.add_argument("--from_time", type=str, default="", help="timestamp to look for in the audit file, e.g. 20180607-213328")
     parser.add_argument("--to_time", type=str, default="", help="timestamp to look for in the audit file, e.g. 20180607-213328")
     args = parser.parse_args()
 
-    os.setgid(user_id)
-    os.setuid(user_id)
+    os.setgid(args.user_id)
+    os.setuid(args.user_id)
     write_file(args.audit, args.stepname, args.from_time, args.to_time)
 
