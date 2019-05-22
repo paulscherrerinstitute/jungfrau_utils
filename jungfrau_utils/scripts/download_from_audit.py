@@ -54,16 +54,15 @@ def write_file(audit_fname, step_name, tfrom, tto):
     
     for rp in zip(reqs, params):
         req, par = rp
-        #par["output_file"] = "/tmp/" + par["output_file"].split("/")[-1]
         
-        if os.path.isfile(par["output_file"]):
-            print("Will not overwrite %s" % (par["output_file"]))
-            continue
+        if os.path.isfile(par["output_file"]): 
+       	    if os.path.getsize(par["output_file"]) != 5296:    
+	    	print("Will not overwrite %s" % (par["output_file"]))
+            	continue
 
-        req["channels"].append({'name': 'SLAAR21-LSCP1-FNS:CH3:VAL_GET'})
-        req["channels"].append({'name': 'SLAAR21-LSCP1-LAS6991:CH3:2'})
-        print("writing %s" % par)
-        #print("req %s" % req)
+	    print("File %s exists, but is empty. Will overwrite.", par["output_file"])
+
+        print("Writing %s" % par)
 
         ti =  time()
         data = get_data_from_buffer(req)
@@ -75,13 +74,14 @@ def write_file(audit_fname, step_name, tfrom, tto):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--audit", default="/var/log/sf_databuffer_audit.log", help="DataBuffer broker audit file, default: /var/log/sf_databuffer_audit.log")
-    parser.add_argument("--stepname", default="", type=str, help="Name of the file to write / look for in the audit file, e.g. run035_Bi_time_scan_step0020")
+    parser.add_argument("user_id", type=int, help="Id of the user under which to write the files.")
+    parser.add_argument("--audit", default="/var/log/sf_databuffer_audit.log", 
+			help="DataBuffer broker audit file, default: /var/log/sf_databuffer_audit.log")
+    parser.add_argument("--stepname", default="", type=str, 
+			help="Name of the file to write / look for in the audit file, e.g. run035_Bi_time_scan_step0020")
     parser.add_argument("--from_time", type=str, default="", help="timestamp to look for in the audit file, e.g. 20180607-213328")
     parser.add_argument("--to_time", type=str, default="", help="timestamp to look for in the audit file, e.g. 20180607-213328")
     args = parser.parse_args()
-
-    user_id = 17295
 
     os.setgid(user_id)
     os.setuid(user_id)
