@@ -58,31 +58,36 @@ def write_file(audit_fname, step_name, tfrom, tto):
         req, par = rp
         
         file_name = par["output_file"]
+        
+        try:
                
-        if file_name == '/dev/null':
-            print("Skipping /dev/null request.")
-            continue
-
-        print("Processing %s file." % file_name)
- 
-        if os.path.isfile(file_name): 
-            
-            if os.path.getsize(file_name) != 5296:    
-                print("Will not overwrite %s." % file_name)
+            if file_name == '/dev/null':
+                print("Skipping /dev/null request.")
                 continue
-
-            print("File %s exists, but is empty. Removing." % file_name)
-            os.remove(par["output_file"])
-
-        print("Downloading %s." % par)
-
-        ti =  time()
-        data = get_data_from_buffer(req)
-        print("For file %s data retrieval took %.2f." % (file_name, time() - ti))
-      
-        ti = time()
-        write_data_to_file(par, data)
-        print("For file %s data writing took %.2f." % (file_name, time() - ti))
+    
+            print("Processing %s file." % file_name)
+     
+            if os.path.isfile(file_name): 
+                
+                if os.path.getsize(file_name) != 5296:    
+                    print("Will not overwrite %s" % file_name)
+                    continue
+    
+                print("File %s exists, but is empty. Removing." % file_name)
+                os.remove(par["output_file"])
+    
+            print("Downloading %s" % par)
+    
+            ti =  time()
+            data = get_data_from_buffer(req)
+            print("For file %s data retrieval took %.2f sec." % (file_name, time() - ti))
+          
+            ti = time()
+            write_data_to_file(par, data)
+            print("For file %s data writing took %.2f sec." % (file_name, time() - ti))
+    
+        except Exception as e:
+            print("Error while trying to write file %s" % file_name, e)
 
 
 if __name__ == "__main__":
