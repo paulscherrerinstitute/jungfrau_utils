@@ -2,6 +2,7 @@ import json
 import argparse
 from sf_databuffer_writer.writer import get_data_from_buffer, write_data_to_file
 import os
+import traceback
 from time import time
 
 
@@ -88,6 +89,7 @@ def write_file(audit_fname, step_name, tfrom, tto):
     
         except Exception as e:
             print("Error while trying to write file %s - " % file_name, e)
+            print(traceback.format_exc())
 
 
 if __name__ == "__main__":
