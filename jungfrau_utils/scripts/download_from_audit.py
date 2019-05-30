@@ -79,7 +79,7 @@ def write_file(audit_fname, step_name, tfrom, tto):
             print("Downloading %s" % par)
     
             ti =  time()
-            data = get_data_from_buffer(req)
+            data, data_len = get_data_from_buffer(req)
             print("For file %s data retrieval took %.2f sec." % (file_name, time() - ti))
           
             ti = time()
@@ -87,7 +87,7 @@ def write_file(audit_fname, step_name, tfrom, tto):
             print("For file %s data writing took %.2f sec." % (file_name, time() - ti))
     
         except Exception as e:
-            print("Error while trying to write file %s" % file_name, e)
+            print("Error while trying to write file %s - " % file_name, e)
 
 
 if __name__ == "__main__":
