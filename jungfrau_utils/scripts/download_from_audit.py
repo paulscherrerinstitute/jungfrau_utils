@@ -69,7 +69,7 @@ def write_file(audit_fname, step_name, tfrom, tto):
      
             if os.path.isfile(file_name): 
                 
-                if os.path.getsize(file_name) != 5296:    
+                if os.path.getsize(file_name) > 5296:    
                     print("Will not overwrite %s" % file_name)
                     continue
     
