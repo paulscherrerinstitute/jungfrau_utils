@@ -168,16 +168,28 @@ def apply_gain_pede(image, G=None, P=None, pixel_mask=None, highgain=False):
     6.23 ms +- 7.22 us per loop (mean +- std. dev. of 7 runs, 100 loops each)
     """
 
-    G = G.astype(np.float32)
-    P = P.astype(np.float32)
+    if G is not None:
+        G = G.astype(np.float32)
+
+    if P is not None:
+        P = P.astype(np.float32)
 
     if highgain:
         G[0] = G[3]
         P[0] = P[3]
 
+    func_to_use = apply_gain_pede_np
     if is_numba:
-        return apply_gain_pede_numba(image, G=G, P=P, pixel_mask=pixel_mask)
-    return apply_gain_pede_np(image, G=G, P=P, pixel_mask=pixel_mask)
+        func_to_use = apply_gain_pede_numba
+
+    partial_func_to_use = lambda X: func_to_use(X, G=G, P=P, pixel_mask=pixel_mask)
+
+    if image.ndim == 3:
+        res = np.stack(partial_func_to_use(i) for i in image)
+    else:
+        res = partial_func_to_use(image)
+
+    return res
 
 
 def get_gain_data(image):
