@@ -280,25 +280,18 @@ class JungfrauCalibration:
         G = G.astype(np.float32)
         P = P.astype(np.float32)
 
-        # save copies to do highgain switch once the JungfrauCalibration object is already created
-        self._G = G.copy()
-        self._P = P.copy()
-
         if G.shape != P.shape:
             raise ValueError(f"Shape mismatch: provided G has shape {G.shape}, while P has shape {P.shape}.")
 
         self.shape = G.shape[1:]
 
-        self._highgain = highgain
-        if highgain:
-            G[0] = G[3]
-            P[0] = P[3]
-
         # array to be used for the actual data conversion
-        self.GP = np.empty(shape=[G.shape[1], 2 * self.num_gains * G.shape[2]], dtype=G.dtype)
-        for i in range(self.num_gains):
-            self.GP[:, 2 * i::self.num_gains * 2] = G[i]
-            self.GP[:, (2 * i + 1)::self.num_gains * 2] = P[i]
+        self._GP = np.empty(shape=[self.shape[0], 2 * self.num_gains * self.shape[1]], dtype=np.float32)
+
+        # this will also fill self._GP with values
+        self.G = G
+        self.P = P
+        self.highgain = highgain
 
         if pixel_mask is not None:
             if pixel_mask.ndim != 2:
@@ -326,7 +319,7 @@ class JungfrauCalibration:
 
         self._G = value
         for i in range(self.num_gains):
-            self.GP[:, 2 * i::self.num_gains * 2] = value[i]
+            self._GP[:, 2 * i::self.num_gains * 2] = value[i]
 
     @property
     def P(self):
@@ -345,7 +338,7 @@ class JungfrauCalibration:
 
         self._P = value
         for i in range(self.num_gains):
-            self.GP[:, (2 * i + 1)::self.num_gains * 2] = value[i]
+            self._GP[:, (2 * i + 1)::self.num_gains * 2] = value[i]
 
     @property
     def highgain(self):
@@ -355,16 +348,16 @@ class JungfrauCalibration:
     def highgain(self, value):
         self._highgain = value
         if value:
-            self.GP[:, ::self.num_gains * 2] = self._G[3]
+            self._GP[:, ::self.num_gains * 2] = self._G[3]
         else:
-            self.GP[:, ::self.num_gains * 2] = self._G[0]
+            self._GP[:, ::self.num_gains * 2] = self._G[0]
 
     def apply_gain_pede(self, image):
         res = np.empty(shape=image.shape, dtype=np.float32)
         if self.pixel_mask is None:
-            correct(np.uint32(image.size), image, self.GP, res)
+            correct(np.uint32(image.size), image, self._GP, res)
         else:
-            correct_mask(np.uint32(image.size), image, self.GP, res, self.pixel_mask)
+            correct_mask(np.uint32(image.size), image, self._GP, res, self.pixel_mask)
 
         return res
 
