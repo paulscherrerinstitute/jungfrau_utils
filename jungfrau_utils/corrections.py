@@ -284,6 +284,11 @@ class JungfrauCalibration:
         self._G = G.copy()
         self._P = P.copy()
 
+        if G.shape != P.shape:
+            raise ValueError(f"Shape mismatch: provided G has shape {G.shape}, while P has shape {P.shape}.")
+
+        self.shape = G.shape[1:]
+
         self._highgain = highgain
         if highgain:
             G[0] = G[3]
@@ -295,6 +300,13 @@ class JungfrauCalibration:
             self.GP[:, 2 * i::self.num_gains * 2] = G[i]
             self.GP[:, (2 * i + 1)::self.num_gains * 2] = P[i]
 
+        if pixel_mask is not None:
+            if pixel_mask.ndim != 2:
+                raise ValueError(f"Pixel mask should have 2 dimensions, provided pixel mask has {pixel_mask.ndim}.")
+
+            if pixel_mask.shape != self.shape:
+                raise ValueError(f"Expected pixel mask shape is {self.shape}, provided pixel mask has {pixel_mask.shape} shape.")
+
         self.pixel_mask = pixel_mask
 
     @property
@@ -303,6 +315,15 @@ class JungfrauCalibration:
 
     @G.setter
     def G(self, value):
+        if value.ndim != 3:
+            raise ValueError(f"G should have 3 dimensions, provided G has {value.ndim} dimensions.")
+
+        if value.shape[0] != 4:
+            raise ValueError(f"First dimension of G should have length 4, provided G has {value.shape[0]}.")
+
+        if self.shape != value.shape[1:]:
+            raise ValueError(f"Expected G shape is {self.shape}, while provided G has {value.shape[1:]}.")
+
         self._G = value
         for i in range(self.num_gains):
             self.GP[:, 2 * i::self.num_gains * 2] = value[i]
@@ -313,6 +334,15 @@ class JungfrauCalibration:
 
     @P.setter
     def P(self, value):
+        if value.ndim != 3:
+            raise ValueError(f"P should have 3 dimensions, provided P has {value.ndim} dimensions.")
+
+        if value.shape[0] != 4:
+            raise ValueError(f"First dimension of P should have length 4, provided P has {value.shape[0]}.")
+
+        if self.shape != value.shape[1:]:
+            raise ValueError(f"Expected P shape is {self.shape}, while provided P has {value.shape[1:]}.")
+
         self._P = value
         for i in range(self.num_gains):
             self.GP[:, (2 * i + 1)::self.num_gains * 2] = value[i]
