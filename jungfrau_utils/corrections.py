@@ -262,8 +262,7 @@ def add_gap_pixels(image, modules, module_gap, chip_gap=[2, 2]):
     return res
 
 
-class JungfrauCalibration():
-
+class JungfrauCalibration:
     def __init__(self, G, P, pixel_mask=None, highgain=False):
         """[summary]
 
@@ -278,17 +277,55 @@ class JungfrauCalibration():
 
         G = G.astype(np.float32)
         P = P.astype(np.float32)
+
+        # save copies to do highgain switch once the JungfrauCalibration object is already created
+        self._G = G.copy()
+        self._P = P.copy()
+
+        self._highgain = highgain
         if highgain:
             G[0] = G[3]
             P[0] = P[3]
 
+        # array to be used for the actual data conversion
         self.GP = np.empty(shape=[G.shape[1], 2 * G.shape[0] * (G.shape[2])], dtype=G.dtype)
-
         for i in range(G.shape[0]):
-            self.GP[:, 2 * i::G.shape[0] * 2] = G[i, :, :]
-            self.GP[:, (2 * i + 1)::G.shape[0]*2] = P[i, :, :]
+            self.GP[:, 2 * i::G.shape[0] * 2] = G[i]
+            self.GP[:, (2 * i + 1)::G.shape[0] * 2] = P[i]
 
         self.pixel_mask = pixel_mask
+
+    @property
+    def G(self):
+        return self._G
+
+    @G.setter
+    def G(self, value):
+        self._G = value
+        for i in range(value.shape[0]):
+            self.GP[:, 2 * i::value.shape[0] * 2] = value[i]
+
+    @property
+    def P(self):
+        return self._P
+
+    @P.setter
+    def P(self, value):
+        self._P = value
+        for i in range(value.shape[0]):
+            self.GP[:, (2 * i + 1)::value.shape[0] * 2] = value[i]
+
+    @property
+    def highgain(self):
+        return self._highgain
+
+    @highgain.setter
+    def highgain(self, value):
+        self._highgain = value
+        if value:
+            self.GP[:, ::self._G.shape[0] * 2] = self._G[3]
+        else:
+            self.GP[:, ::self._G.shape[0] * 2] = self._G[0]
 
     def apply_gain_pede(self, image):
         res = np.empty(shape=image.shape, dtype=np.float32)
