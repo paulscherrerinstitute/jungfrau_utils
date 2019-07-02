@@ -293,13 +293,6 @@ class JungfrauCalibration:
         self.P = P
         self.highgain = highgain
 
-        if pixel_mask is not None:
-            if pixel_mask.ndim != 2:
-                raise ValueError(f"Pixel mask should have 2 dimensions, provided pixel mask has {pixel_mask.ndim}.")
-
-            if pixel_mask.shape != self.shape:
-                raise ValueError(f"Expected pixel mask shape is {self.shape}, provided pixel mask has {pixel_mask.shape} shape.")
-
         self.pixel_mask = pixel_mask
 
     @property
@@ -351,6 +344,21 @@ class JungfrauCalibration:
             self._GP[:, ::self.num_gains * 2] = self._G[3]
         else:
             self._GP[:, ::self.num_gains * 2] = self._G[0]
+
+    @property
+    def pixel_mask(self):
+        return self._pixel_mask
+
+    @pixel_mask.setter
+    def pixel_mask(self, value):
+        if value is not None:
+            if value.ndim != 2:
+                raise ValueError(f"Pixel mask should have 2 dimensions, provided pixel mask has {value.ndim}.")
+
+            if value.shape != self.shape:
+                raise ValueError(f"Expected pixel mask shape is {self.shape}, provided pixel mask has {value.shape} shape.")
+
+        self._pixel_mask = value
 
     def apply_gain_pede(self, image):
         res = np.empty(shape=image.shape, dtype=np.float32)
