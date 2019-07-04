@@ -266,15 +266,14 @@ class JungfrauCalibration:
     num_gains = 4
 
     def __init__(self, G, P, pixel_mask=None, highgain=False):
-        """[summary]
+        """A class to perform jungfrau detector gain and pedestal corrections
 
-        Parameters
-        ----------
-        G : [type]
-            [description]
-        P : [type]
-            [description]
-
+        Args:
+            G (ndarray): 4d array with gain values
+            P (ndarray): 4d array with pedestal values
+            pixel_mask (ndarray, optional): 2d array with non-zero values referring to bad pixels.
+                When None, all pixels assumed to be good. Defaults to None.
+            highgain (bool, optional): Highgain mode where G[3] is used for G[0]. Defaults to False.
         """
 
         G = G.astype(np.float32)
