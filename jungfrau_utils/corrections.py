@@ -305,6 +305,7 @@ class JungfrauCalibration:
         self.highgain = highgain
 
         self.pixel_mask = pixel_mask
+        self.module_map = None
 
     @property
     def G(self):
@@ -373,13 +374,80 @@ class JungfrauCalibration:
 
     def apply_gain_pede(self, image):
         res = np.empty(shape=image.shape, dtype=np.float32)
-        if self.pixel_mask is None:
-            correct(np.uint32(image.size), image, self._GP, res)
+        if self.module_map is None:
+            if self.pixel_mask is None:
+                correct(np.uint32(image.size), image, self._GP, res)
+            else:
+                correct_mask(np.uint32(image.size), image, self._GP, res, self.pixel_mask)
+
         else:
-            correct_mask(np.uint32(image.size), image, self._GP, res, self.pixel_mask)
+            for i, m in enumerate(self.module_map):
+                if m == -1:
+                    continue
+
+                if image.shape[0] == 512 and image.shape[1] != 1024:
+                    # old JF02T09V01 format
+                    module_image = image[:, m*MODULE_SIZE_X:(m+1)*MODULE_SIZE_X]
+                else:
+                    module_image = image[m*MODULE_SIZE_Y:(m+1)*MODULE_SIZE_Y, :]
+
+                module_res = res[m*MODULE_SIZE_Y:(m+1)*MODULE_SIZE_Y, :]
+                module_GP = self._GP[i*MODULE_SIZE_Y:(i+1)*MODULE_SIZE_Y, :]
+                module_size = np.uint32(module_image.size)
+
+                if self.pixel_mask is None:
+                    correct(module_size, module_image, module_GP, module_res)
+                else:
+                    mask_module = self.pixel_mask[i*MODULE_SIZE_Y:(i+1)*MODULE_SIZE_Y, :]
+                    correct_mask(module_size, module_image, module_GP, module_res, mask_module)
 
         return res
 
+    def apply_geometry(self, image, detector_name):
+        if detector_name in modules_orig:
+            modules_orig_y, modules_orig_x = modules_orig[detector_name]
+        else:
+            return image
+
+        res_shape_x = max(modules_orig_x) + MODULE_SIZE_X + (CHIP_NUM_X-1)*CHIP_GAP_X
+        res_shape_y = max(modules_orig_y) + MODULE_SIZE_Y + (CHIP_NUM_Y-1)*CHIP_GAP_Y
+        res = np.zeros((res_shape_y, res_shape_x), dtype=image.dtype)
+
+        if self.module_map is None:
+            # emulate 'all modules are present'
+            module_map = range(len(modules_orig_y))
+        else:
+            module_map = self.module_map
+
+        for m, oy, ox in zip(module_map, modules_orig_y, modules_orig_x):
+            if m == -1:
+                continue
+
+            if detector_name == 'JF02T09V01':
+                module_in = image[:, m*MODULE_SIZE_X:(m+1)*MODULE_SIZE_X]
+            elif detector_name in ('JF02T09V02', 'JF02T01V02'):
+                module_in = np.rot90(image[m*MODULE_SIZE_Y:(m+1)*MODULE_SIZE_Y, :], 2)
+            else:
+                module_in = image[m*MODULE_SIZE_Y:(m+1)*MODULE_SIZE_Y, :]
+
+            for j in range(CHIP_NUM_Y):
+                for k in range(CHIP_NUM_X):
+                    # reading positions
+                    ry_s = j*CHIP_SIZE_Y
+                    rx_s = k*CHIP_SIZE_X
+
+                    # writing positions
+                    wy_s = oy + ry_s + j*CHIP_GAP_Y
+                    wx_s = ox + rx_s + k*CHIP_GAP_X
+
+                    res[wy_s:wy_s+CHIP_SIZE_Y, wx_s:wx_s+CHIP_SIZE_X] = \
+                        module_in[ry_s:ry_s+CHIP_SIZE_Y, rx_s:rx_s+CHIP_SIZE_X]
+
+        # rotate image in case of alvra detector
+        if detector_name.startswith('JF06'):
+            res = np.rot90(res)
+
+        return res
 
 def apply_geometry(image_in, detector_name):
     if detector_name in modules_orig:
@@ -420,11 +488,11 @@ def apply_geometry(image_in, detector_name):
 
 
 def test():
-    size_1 = 4500
-    size_2 = 4000
+    size_1 = 1536
+    size_2 = 1024
     data = np.random.randint(0, 60000, size=[size_1, size_2], dtype=np.uint16)
-    pede = 60000 * np.random.random(size=[4, size_1, size_2]).astype(np.float16)
-    gain = 100 * np.random.random(size=[4, size_1, size_2]).astype(np.float16) + 1
+    pede = 60000 * np.random.random(size=[4, size_1, size_2]).astype(np.float32)
+    gain = 100 * np.random.random(size=[4, size_1, size_2]).astype(np.float32) + 1
 
     t_i = time()
     res1 = apply_gain_pede_np(data, gain, pede)
