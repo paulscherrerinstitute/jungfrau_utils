@@ -17,6 +17,8 @@ class File():
         self.jf_file = h5py.File(file_path, 'r')
         self.detector_name = self.jf_file['/general/detector_name'][()].decode()  #pylint: disable=E1101
 
+        self.daq_rec = self.jf_file['/data/{}/daq_rec'.format(self.detector_name)][:]
+
         if 'module_map' in self.jf_file['/data/{}'.format(self.detector_name)]:
             self.module_map = self.jf_file['/data/{}/module_map'.format(self.detector_name)][:]
         else:
@@ -78,6 +80,9 @@ class File():
 
     def __getitem__(self, item):
         jf_data = self.jf_file['/data/{}/data'.format(self.detector_name)][item]
+
+        if self.jf_handler.highgain != self.daq_rec[item] & 0b1:
+            self.jf_handler.highgain = self.daq_rec[item] & 0b1
 
         if self.module_map is not None:
             if (self.jf_handler.module_map != self.module_map[item]).any():
