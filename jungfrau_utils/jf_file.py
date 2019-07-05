@@ -79,20 +79,28 @@ class File():
         self.close()
 
     def __getitem__(self, item):
-        jf_data = self.jf_file['/data/{}/data'.format(self.detector_name)][item]
+        if isinstance(item, int):
+            ind, roi = item, ()
+        else:
+            ind, roi = item[0], item[1:]
 
-        if self.jf_handler.highgain != self.daq_rec[item] & 0b1:
-            self.jf_handler.highgain = self.daq_rec[item] & 0b1
+        jf_data = self.jf_file['/data/{}/data'.format(self.detector_name)][ind]
+
+        if self.jf_handler.highgain != self.daq_rec[ind] & 0b1:
+            self.jf_handler.highgain = self.daq_rec[ind] & 0b1
 
         if self.module_map is not None:
-            if (self.jf_handler.module_map != self.module_map[item]).any():
-                self.jf_handler.module_map = self.module_map[item]
+            if (self.jf_handler.module_map != self.module_map[ind]).any():
+                self.jf_handler.module_map = self.module_map[ind]
 
         if not self.raw:  # apply gain and pedestal corrections
             jf_data = self.jf_handler.apply_gain_pede(jf_data)
 
         if self.geometry:  # apply detector geometry corrections
             jf_data = self.jf_handler.apply_geometry(jf_data, self.detector_name)
+
+        if roi:
+            jf_data = jf_data[roi]
 
         return jf_data
 
