@@ -2,7 +2,7 @@ from pathlib import Path
 
 import h5py
 
-from jungfrau_utils.corrections import apply_gain_pede, apply_geometry
+from jungfrau_utils.corrections import JFDataHandler
 
 
 class File():
@@ -16,6 +16,11 @@ class File():
 
         self.jf_file = h5py.File(file_path, 'r')
         self.detector_name = self.jf_file['/general/detector_name'][()].decode()  #pylint: disable=E1101
+
+        if 'module_map' in self.jf_file['/data/{}'.format(self.detector_name)]:
+            self.module_map = self.jf_file['/data/{}/module_map'.format(self.detector_name)][:]
+        else:
+            self.module_map = None
 
         # Gain file
         if gain_file is None:
@@ -31,8 +36,6 @@ class File():
         except:
             print('Error reading gain file:', gain_file)
             raise
-
-        self.gain = gain
 
         # Pedestal file (with a pixel mask)
         if pedestal_file is None:
@@ -60,13 +63,12 @@ class File():
         try:
             with h5py.File(pedestal_file, 'r') as h5pedestal:
                 pedestal = h5pedestal['/gains'][:]
-                pixel_mask = h5pedestal['/pixel_mask'][:]
+                pixel_mask = h5pedestal['/pixel_mask'][:].astype('int32')
         except:
             print('Error reading pedestal file:', pedestal_file)
             raise
 
-        self.pedestal = pedestal
-        self.pixel_mask = pixel_mask
+        self.jf_handler = JFDataHandler(gain, pedestal, pixel_mask=pixel_mask)
 
     def __enter__(self):
         return self
@@ -77,11 +79,15 @@ class File():
     def __getitem__(self, item):
         jf_data = self.jf_file['/data/{}/data'.format(self.detector_name)][item]
 
+        if self.module_map is not None:
+            if (self.jf_handler.module_map != self.module_map[item]).any():
+                self.jf_handler.module_map = self.module_map[item]
+
         if not self.raw:  # apply gain and pedestal corrections
-            jf_data = apply_gain_pede(jf_data, G=self.gain, P=self.pedestal, pixel_mask=self.pixel_mask)
+            jf_data = self.jf_handler.apply_gain_pede(jf_data)
 
         if self.geometry:  # apply detector geometry corrections
-            jf_data = apply_geometry(jf_data, self.detector_name)
+            jf_data = self.jf_handler.apply_geometry(jf_data, self.detector_name)
 
         return jf_data
 
