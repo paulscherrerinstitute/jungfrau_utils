@@ -7,6 +7,20 @@ from numpy import ma
 
 from jungfrau_utils.geometry import modules_orig
 
+NUM_GAINS = 4
+
+CHIP_SIZE_X = 256
+CHIP_SIZE_Y = 256
+
+CHIP_NUM_X = 4
+CHIP_NUM_Y = 2
+
+MODULE_SIZE_X = CHIP_NUM_X * CHIP_SIZE_X
+MODULE_SIZE_Y = CHIP_NUM_Y * CHIP_SIZE_Y
+
+CHIP_GAP_X = 2
+CHIP_GAP_Y = 2
+
 is_numba = False
 
 try:
@@ -263,8 +277,6 @@ def add_gap_pixels(image, modules, module_gap, chip_gap=[2, 2]):
 
 
 class JungfrauCalibration:
-    num_gains = 4
-
     def __init__(self, G, P, pixel_mask=None, highgain=False):
         """A class to perform jungfrau detector gain and pedestal corrections
 
@@ -285,7 +297,7 @@ class JungfrauCalibration:
         self.shape = G.shape[1:]
 
         # array to be used for the actual data conversion
-        self._GP = np.empty(shape=[self.shape[0], 2 * self.num_gains * self.shape[1]], dtype=np.float32)
+        self._GP = np.empty(shape=[self.shape[0], 2 * NUM_GAINS * self.shape[1]], dtype=np.float32)
 
         # this will also fill self._GP with values
         self.G = G
@@ -310,8 +322,8 @@ class JungfrauCalibration:
             raise ValueError(f"Expected G shape is {self.shape}, while provided G has {value.shape[1:]}.")
 
         self._G = value
-        for i in range(self.num_gains):
-            self._GP[:, 2 * i::self.num_gains * 2] = value[i]
+        for i in range(NUM_GAINS):
+            self._GP[:, 2 * i::NUM_GAINS * 2] = value[i]
 
     @property
     def P(self):
@@ -329,8 +341,8 @@ class JungfrauCalibration:
             raise ValueError(f"Expected P shape is {self.shape}, while provided P has {value.shape[1:]}.")
 
         self._P = value
-        for i in range(self.num_gains):
-            self._GP[:, (2 * i + 1)::self.num_gains * 2] = value[i]
+        for i in range(NUM_GAINS):
+            self._GP[:, (2 * i + 1)::NUM_GAINS * 2] = value[i]
 
     @property
     def highgain(self):
@@ -340,9 +352,9 @@ class JungfrauCalibration:
     def highgain(self, value):
         self._highgain = value
         if value:
-            self._GP[:, ::self.num_gains * 2] = self._G[3]
+            self._GP[:, ::NUM_GAINS * 2] = self._G[3]
         else:
-            self._GP[:, ::self.num_gains * 2] = self._G[0]
+            self._GP[:, ::NUM_GAINS * 2] = self._G[0]
 
     @property
     def pixel_mask(self):
@@ -370,47 +382,35 @@ class JungfrauCalibration:
 
 
 def apply_geometry(image_in, detector_name):
-    chip_shape_x = 256
-    chip_shape_y = 256
-
-    chip_gap_x = 2
-    chip_gap_y = 2
-
-    chip_num_x = 4
-    chip_num_y = 2
-
-    module_shape_x = 1024
-    module_shape_y = 512
-
     if detector_name in modules_orig:
         modules_orig_y, modules_orig_x = modules_orig[detector_name]
     else:
         return image_in
 
-    image_out_shape_x = max(modules_orig_x) + module_shape_x + (chip_num_x-1)*chip_gap_x
-    image_out_shape_y = max(modules_orig_y) + module_shape_y + (chip_num_y-1)*chip_gap_y
+    image_out_shape_x = max(modules_orig_x) + MODULE_SIZE_X + (CHIP_NUM_X-1)*CHIP_GAP_X
+    image_out_shape_y = max(modules_orig_y) + MODULE_SIZE_Y + (CHIP_NUM_Y-1)*CHIP_GAP_Y
     image_out = np.zeros((image_out_shape_y, image_out_shape_x), dtype=image_in.dtype)
 
     for i, (oy, ox) in enumerate(zip(modules_orig_y, modules_orig_x)):
         if detector_name == 'JF02T09V01':
-            module_in = image_in[:, i*module_shape_x:(i+1)*module_shape_x]
+            module_in = image_in[:, i*MODULE_SIZE_X:(i+1)*MODULE_SIZE_X]
         elif detector_name == 'JF02T09V02' or detector_name == 'JF02T01V02':
-            module_in = np.rot90(image_in[i*module_shape_y:(i+1)*module_shape_y, :], 2)
+            module_in = np.rot90(image_in[i*MODULE_SIZE_Y:(i+1)*MODULE_SIZE_Y, :], 2)
         else:
-            module_in = image_in[i*module_shape_y:(i+1)*module_shape_y, :]
+            module_in = image_in[i*MODULE_SIZE_Y:(i+1)*MODULE_SIZE_Y, :]
 
-        for j in range(chip_num_y):
-            for k in range(chip_num_x):
+        for j in range(CHIP_NUM_Y):
+            for k in range(CHIP_NUM_X):
                 # reading positions
-                ry_s = j*chip_shape_y
-                rx_s = k*chip_shape_x
+                ry_s = j*CHIP_SIZE_Y
+                rx_s = k*CHIP_SIZE_X
 
                 # writing positions
-                wy_s = oy + ry_s + j*chip_gap_y
-                wx_s = ox + rx_s + k*chip_gap_x
+                wy_s = oy + ry_s + j*CHIP_GAP_Y
+                wx_s = ox + rx_s + k*CHIP_GAP_X
 
-                image_out[wy_s:wy_s+chip_shape_y, wx_s:wx_s+chip_shape_x] = \
-                    module_in[ry_s:ry_s+chip_shape_y, rx_s:rx_s+chip_shape_x]
+                image_out[wy_s:wy_s+CHIP_SIZE_Y, wx_s:wx_s+CHIP_SIZE_X] = \
+                    module_in[ry_s:ry_s+CHIP_SIZE_Y, rx_s:rx_s+CHIP_SIZE_X]
 
     # rotate image in case of alvra detector
     if detector_name.startswith('JF06'):
