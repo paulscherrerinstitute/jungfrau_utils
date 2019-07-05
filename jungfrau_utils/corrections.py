@@ -276,9 +276,10 @@ def add_gap_pixels(image, modules, module_gap, chip_gap=[2, 2]):
     return res
 
 
-class JungfrauCalibration:
+class JFDataHandler:
     def __init__(self, G, P, pixel_mask=None, highgain=False):
-        """A class to perform jungfrau detector gain and pedestal corrections
+        """A class to perform jungfrau detector data handling like pedestal correction, gain
+        conversion, pixel mask, module map, etc.
 
         Args:
             G (ndarray): 4d array with gain values
@@ -373,6 +374,14 @@ class JungfrauCalibration:
         self._pixel_mask = value
 
     def apply_gain_pede(self, image):
+        """Apply pedestal correction and gain conversion
+
+        Args:
+            image (ndarray): image to be processed
+
+        Returns:
+            ndarray: resulting image
+        """
         res = np.empty(shape=image.shape, dtype=np.float32)
         if self.module_map is None:
             if self.pixel_mask is None:
@@ -404,6 +413,15 @@ class JungfrauCalibration:
         return res
 
     def apply_geometry(self, image, detector_name):
+        """Rearrange image according to geometry of detector modules.
+
+        Args:
+            image (ndarray): image to be processed
+            detector_name (str): name of detector
+
+        Returns:
+            ndarray: resulting image if detector name is known, otherwise initial image
+        """
         if detector_name in modules_orig:
             modules_orig_y, modules_orig_x = modules_orig[detector_name]
         else:
@@ -504,7 +522,7 @@ def test():
     res2 = apply_gain_pede(data, gain, pede)
     print("Numba", time() - t_i)
 
-    calib = JungfrauCalibration(G=gain, P=pede)
+    calib = JFDataHandler(G=gain, P=pede)
     t_i = time()
     res3 = calib.apply_gain_pede(data)
     print("C", time() - t_i)
