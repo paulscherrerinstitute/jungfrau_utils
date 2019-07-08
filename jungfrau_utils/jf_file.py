@@ -42,9 +42,9 @@ class File():
         # Pedestal file (with a pixel mask)
         if pedestal_file is None:
             # the default processed pedestal files path for a particula p-group is
-            # '/sf/<beamline>/data/<p-group>/res/JF_pedestal/'
+            # '/sf/<beamline>/data/<p-group>/res/JF_pedestals/'
             pedestal_path = Path(*file_path.parts[:5]).joinpath(
-                'res', 'JF_pedestal'
+                'res', 'JF_pedestals'
             )
 
             # find a pedestal file, which was created closest in time to the jungfrau file
