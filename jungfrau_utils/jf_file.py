@@ -79,9 +79,14 @@ class File():
         self.close()
 
     def __getitem__(self, item):
-        if isinstance(item, int):
+        if isinstance(item, str):
+            # metadata entry
+            return self.jf_file['/data/{}/{}'.format(self.detector_name, item)][:]
+        elif isinstance(item, int):
+            # single image index, no roi
             ind, roi = item, ()
         else:
+            # image index and roi
             ind, roi = item[0], item[1:]
 
         jf_data = self.jf_file['/data/{}/data'.format(self.detector_name)][ind]
