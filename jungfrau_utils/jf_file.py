@@ -31,6 +31,7 @@ class File():
             gain_file = Path(*file_path.parts[:3]).joinpath(
                 'config', 'jungfrau', 'gainMaps', self.detector_name, 'gains.h5'
             )
+            print('Gain file: {}'.format(gain_file))
 
         try:
             with h5py.File(gain_file, 'r') as h5gain:
@@ -61,6 +62,7 @@ class File():
             pedestal_file = nearest_pedestal_file
             if pedestal_file is None:
                 raise Exception('No pedestal file in default location: {}'.format(pedestal_path))
+            print('Pedestal file: {}'.format(pedestal_file))
 
         try:
             with h5py.File(pedestal_file, 'r') as h5pedestal:
