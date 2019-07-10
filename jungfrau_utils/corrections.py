@@ -96,10 +96,12 @@ def apply_gain_pede_np(image, G=None, P=None, pixel_mask=None):
         p = ma.array(P[0], mask=m1, dtype=np.float32).filled(0) + ma.array(P[1], mask=m2, dtype=np.float32).filled(0) + ma.array(P[2], mask=m3, dtype=np.float32).filled(0)
     else:
         p = np.zeros(data.shape, dtype=np.float32)
-    if pixel_mask is not None:
-        data = ma.array(data, mask=pixel_mask, dtype=data.dtype).filled(0)
 
     res = np.divide(data - p, g)
+
+    if pixel_mask is not None:
+        res[pixel_mask] = 0
+
     return res
 
 
@@ -514,18 +516,19 @@ def test():
     data = np.random.randint(0, 60000, size=[size_1, size_2], dtype=np.uint16)
     pede = 60000 * np.random.random(size=[4, size_1, size_2]).astype(np.float32)
     gain = 100 * np.random.random(size=[4, size_1, size_2]).astype(np.float32) + 1
+    mask = np.random.randint(2, size=[size_1, size_2], dtype=np.bool)
 
     t_i = time()
-    res1 = apply_gain_pede_np(data, gain, pede)
+    res1 = apply_gain_pede_np(data, gain, pede, mask)
     print("NP", time() - t_i)
     t_i = time()
-    res2 = apply_gain_pede(data, gain, pede)
+    res2 = apply_gain_pede(data, gain, pede, mask)
     print("Numba", time() - t_i)
     t_i = time()
-    res2 = apply_gain_pede(data, gain, pede)
+    res2 = apply_gain_pede(data, gain, pede, mask)
     print("Numba", time() - t_i)
 
-    calib = JFDataHandler(G=gain, P=pede)
+    calib = JFDataHandler(G=gain, P=pede, pixel_mask=mask)
     t_i = time()
     res3 = calib.apply_gain_pede(data)
     print("C", time() - t_i)
