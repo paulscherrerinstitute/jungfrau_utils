@@ -79,14 +79,17 @@ class File():
         self.close()
 
     def __getitem__(self, item):
-        if isinstance(item, int):
+        if isinstance(item, int) or isinstance(item, slice):
             ind, roi = item, ()
         else:
-            ind, roi = item[0], item[1:]
+            ind, *roi = item
+
+        if len(roi) > 2:
+            raise IndexError("too many indices for ROI")
 
         jf_data = self.jf_file['/data/{}/data'.format(self.detector_name)][ind]
 
-        if self.jf_handler.highgain != self.daq_rec[ind] & 0b1:
+        if (self.jf_handler.highgain != self.daq_rec[ind] & 0b1).any():
             self.jf_handler.highgain = self.daq_rec[ind] & 0b1
 
         if self.module_map is not None:
@@ -100,7 +103,10 @@ class File():
             jf_data = self.jf_handler.apply_geometry(jf_data, self.detector_name)
 
         if roi:
-            jf_data = jf_data[roi]
+            if len(roi) == 1:
+                jf_data = jf_data[..., roi[0]]
+            else:
+                jf_data = jf_data[..., roi[0], roi[1]]
 
         return jf_data
 
@@ -114,3 +120,22 @@ class File():
     def close(self):
         if self.jf_file.id:
             self.jf_file.close()
+
+    @property
+    def data(self):
+        return self.jf_file['/data/{}/data'.format(self.detector_name)]
+
+    @property
+    def shape(self):
+        return self.data.shape
+
+    @property
+    def ndim(self):
+        return len(self.shape)
+
+    def __len__(self):
+        return self.shape[0]
+
+
+
+
