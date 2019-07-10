@@ -67,7 +67,7 @@ class File():
         try:
             with h5py.File(pedestal_file, 'r') as h5pedestal:
                 pedestal = h5pedestal['/gains'][:]
-                pixel_mask = h5pedestal['/pixel_mask'][:].astype('int32')
+                pixel_mask = h5pedestal['/pixel_mask'][:]
         except:
             print('Error reading pedestal file:', pedestal_file)
             raise

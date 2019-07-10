@@ -36,7 +36,7 @@ try:
         np.ctypeslib.ndpointer(ctypes.c_uint16, flags="C_CONTIGUOUS"),
         np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),
         np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),
-        np.ctypeslib.ndpointer(ctypes.c_int, flags="C_CONTIGUOUS"),
+        np.ctypeslib.ndpointer(ctypes.c_bool, flags="C_CONTIGUOUS"),
     )
     correct_mask.restype = None
     correct_mask.__doc__ = """Apply gain/pedestal and pixel mask corrections
@@ -364,14 +364,17 @@ class JFDataHandler:
 
     @pixel_mask.setter
     def pixel_mask(self, value):
-        if value is not None:
-            if value.ndim != 2:
-                raise ValueError(f"Pixel mask should have 2 dimensions, provided pixel mask has {value.ndim}.")
+        if value is None:
+            self._pixel_mask = None
+            return
 
-            if value.shape != self.shape:
-                raise ValueError(f"Expected pixel mask shape is {self.shape}, provided pixel mask has {value.shape} shape.")
+        if value.ndim != 2:
+            raise ValueError(f"Pixel mask should have 2 dimensions, provided pixel mask has {value.ndim}.")
 
-        self._pixel_mask = value
+        if value.shape != self.shape:
+            raise ValueError(f"Expected pixel mask shape is {self.shape}, provided pixel mask has {value.shape} shape.")
+
+        self._pixel_mask = value.astype(np.bool)
 
     def apply_gain_pede(self, image):
         """Apply pedestal correction and gain conversion

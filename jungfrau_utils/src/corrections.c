@@ -32,7 +32,7 @@ void jf_apply_pede_gain(uint32_t image_size, uint16_t *image, float *GP, float *
 }
 
 void jf_apply_pede_gain_mask(uint32_t image_size, uint16_t *image, float *GP, float *res,
-                             int *pixel_mask) {
+                             _Bool *pixel_mask) {
     uint16_t gm;
 
     for (uint32_t idx = 0; idx < image_size; idx++) {
