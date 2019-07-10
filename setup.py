@@ -15,6 +15,7 @@ setup(
                 '--std=c99',
                 '-mtune=core-avx2',
                 '-shared',
+                '-O3',
             ],
         ),
     ],
