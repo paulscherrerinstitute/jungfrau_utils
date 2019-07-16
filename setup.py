@@ -1,8 +1,13 @@
+import re
+
 from setuptools import setup, Extension
+
+with open("jungfrau_utils/__init__.py") as f:
+    version = re.search(r'__version__ = "(.*?)"', f.read()).group(1)
 
 setup(
     name='jungfrau_utils',
-    version='0.3.0',
+    version=version,
     description='',
     author='Paul Scherrer Institute',
     license='GNU GPLv3',
