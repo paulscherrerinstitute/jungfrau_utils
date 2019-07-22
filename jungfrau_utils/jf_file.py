@@ -20,7 +20,10 @@ class File():
         self.daq_rec = self.jf_file['/data/{}/daq_rec'.format(self.detector_name)][:]
 
         if 'module_map' in self.jf_file['/data/{}'.format(self.detector_name)]:
-            self.module_map = self.jf_file['/data/{}/module_map'.format(self.detector_name)][:]
+            # Pick only the first row (module_map of the first frame), because it is not expected
+            # that module_map ever changes during a run. In fact, it is forseen in the future that
+            # this data will be saved as a single row for the whole run.
+            self.module_map = self.jf_file['/data/{}/module_map'.format(self.detector_name)][0, :]
         else:
             self.module_map = None
 
@@ -97,8 +100,8 @@ class File():
             self.jf_handler.highgain = self.daq_rec[ind] & 0b1
 
         if self.module_map is not None:
-            if (self.jf_handler.module_map != self.module_map[ind]).any():
-                self.jf_handler.module_map = self.module_map[ind]
+            if (self.jf_handler.module_map != self.module_map).any():
+                self.jf_handler.module_map = self.module_map
 
         if not self.raw:  # apply gain and pedestal corrections
             jf_data = self.jf_handler.apply_gain_pede(jf_data)
