@@ -85,8 +85,9 @@ class File():
 
     def __getitem__(self, item):
         if isinstance(item, str):
-            # metadata entry
-            return self.jf_file['/data/{}/{}'.format(self.detector_name, item)][:]
+            # metadata entry (lazy)
+            return self.jf_file['/data/{}/{}'.format(self.detector_name, item)]
+
         elif isinstance(item, int):
             # single image index, no roi
             ind, roi = item, ()
@@ -126,12 +127,12 @@ class File():
             self.jf_file.close()
 
     @property
-    def data(self):
-        return self.jf_file['/data/{}/data'.format(self.detector_name)]
+    def shape(self):
+        return self['data'].shape
 
     @property
-    def shape(self):
-        return self.data.shape
+    def size(self):
+        return self['data'].size
 
     @property
     def ndim(self):
