@@ -121,3 +121,18 @@ class File():
     def close(self):
         if self.jf_file.id:
             self.jf_file.close()
+
+    @property
+    def data(self):
+        return self.jf_file['/data/{}/data'.format(self.detector_name)]
+
+    @property
+    def shape(self):
+        return self.data.shape
+
+    @property
+    def ndim(self):
+        return len(self.shape)
+
+    def __len__(self):
+        return self.shape[0]

@@ -1,6 +1,7 @@
 import ctypes
 import os
 from time import time
+from functools import wraps
 
 import numpy as np
 from numpy import ma
@@ -22,6 +23,32 @@ CHIP_GAP_X = 2
 CHIP_GAP_Y = 2
 
 is_numba = False
+
+
+def _allow_n_images(method):
+    """Allows any **method** that expects a single image as first argument to accept n images"""
+    @wraps(method)
+    def wrapper(this, images, *args, **kwargs):
+        func = lambda *args, **kwargs: method(this, *args, **kwargs) # hide the self argument
+        if images.ndim == 3:
+            return _apply_to_all_images(func, images, *args, **kwargs)
+        else:
+            return func(images, *args, **kwargs)
+    return wrapper
+
+def _apply_to_all_images(func, images, *args, **kwargs):
+    """Apply func to all images forwarding args and kwargs"""
+    nshots = len(images)
+    one_image = func(images[0], *args, **kwargs)
+    target_dtype = one_image.dtype
+    target_shape = one_image.shape
+    target_shape = [nshots] + list(target_shape)
+    images_result = np.empty(shape=target_shape, dtype=target_dtype)
+    for n, img in enumerate(images):
+        images_result[n] = func(img, *args, **kwargs)
+    return images_result 
+
+
 
 try:
     # TODO: make a proper external package integration
@@ -76,6 +103,10 @@ try:
     """
 except:
     print('Could not load libcorrections.')
+
+    def correct_mask(*args, **kwargs):
+        raise NotImplementedError("libcorrections is needed. python version of jf_apply_pede_gain_mask() missing.")
+
 
 
 def apply_gain_pede_np(image, G=None, P=None, pixel_mask=None):
@@ -201,7 +232,7 @@ def apply_gain_pede(image, G=None, P=None, pixel_mask=None, highgain=False):
     partial_func_to_use = lambda X: func_to_use(X, G=G, P=P, pixel_mask=pixel_mask)
 
     if image.ndim == 3:
-        res = np.stack(partial_func_to_use(i) for i in image)
+        res = _apply_to_all_images(partial_func_to_use, image)
     else:
         res = partial_func_to_use(image)
 
@@ -378,6 +409,7 @@ class JFDataHandler:
 
         self._pixel_mask = value.astype(np.bool)
 
+    @_allow_n_images
     def apply_gain_pede(self, image):
         """Apply pedestal correction and gain conversion
 
@@ -417,6 +449,7 @@ class JFDataHandler:
 
         return res
 
+    @_allow_n_images
     def apply_geometry(self, image, detector_name):
         """Rearrange image according to geometry of detector modules.
 
