@@ -17,7 +17,11 @@ class File():
         self.jf_file = h5py.File(file_path, 'r')
         self.detector_name = self.jf_file['/general/detector_name'][()].decode()  #pylint: disable=E1101
 
-        self.daq_rec = self.jf_file['/data/{}/daq_rec'.format(self.detector_name)][:]
+        # TODO: Here we use daq_rec only of the first pulse within an hdf5 file, however its
+        # value can be different for later pulses and this needs to be taken care of. Currently,
+        # _allow_n_images decorator applies a function in a loop, making it impossible to change
+        # highgain for separate images in a 3D stack.
+        self.daq_rec = self.jf_file['/data/{}/daq_rec'.format(self.detector_name)][0]
 
         if 'module_map' in self.jf_file['/data/{}'.format(self.detector_name)]:
             # Pick only the first row (module_map of the first frame), because it is not expected
@@ -88,17 +92,18 @@ class File():
             # metadata entry (lazy)
             return self.jf_file['/data/{}/{}'.format(self.detector_name, item)]
 
-        elif isinstance(item, int):
-            # single image index, no roi
+        elif isinstance(item, (int, slice)):
+            # single image index or slice, no roi
             ind, roi = item, ()
+
         else:
             # image index and roi
             ind, roi = item[0], item[1:]
 
         jf_data = self.jf_file['/data/{}/data'.format(self.detector_name)][ind]
 
-        if self.jf_handler.highgain != self.daq_rec[ind] & 0b1:
-            self.jf_handler.highgain = self.daq_rec[ind] & 0b1
+        if self.jf_handler.highgain != self.daq_rec & 0b1:
+            self.jf_handler.highgain = self.daq_rec & 0b1
 
         if self.module_map is not None:
             if (self.jf_handler.module_map != self.module_map).any():
