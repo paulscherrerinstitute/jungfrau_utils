@@ -46,7 +46,9 @@ def _apply_to_all_images(func, images, *args, **kwargs):
     images_result = np.empty(shape=target_shape, dtype=target_dtype)
     for n, img in enumerate(images):
         images_result[n] = func(img, *args, **kwargs)
-    return images_result
+    return images_result 
+
+
 
 try:
     # TODO: make a proper external package integration
@@ -54,6 +56,30 @@ try:
     for entry in os.scandir(mod_path):
         if entry.is_file() and entry.name.startswith('libcorrections') and entry.name.endswith('.so'):
             _mod = ctypes.cdll.LoadLibrary(os.path.join(mod_path, entry))
+
+    correct_mask = _mod.jf_apply_pede_gain_mask
+    correct_mask.argtypes = (
+        ctypes.c_uint32,
+        np.ctypeslib.ndpointer(ctypes.c_uint16, flags="C_CONTIGUOUS"),
+        np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),
+        np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),
+        np.ctypeslib.ndpointer(ctypes.c_bool, flags="C_CONTIGUOUS"),
+    )
+    correct_mask.restype = None
+    correct_mask.__doc__ = """Apply gain/pedestal and pixel mask corrections
+    Parameters
+    ----------
+    image_size : c_uint32
+        number of pixels in the image array
+    image : uint16_t array
+        Jungfrau 2D array to be corrected
+    GP : float32 array
+        array containing combined gain and pedestal corrections
+    res : float32 array
+        2D array containing corrected image
+    pixel_mask : array_like, int
+        2D array containing pixels to be masked (tagged with a one)
+    """
 
     correct = _mod.jf_apply_pede_gain
     correct.argtypes = (
@@ -82,6 +108,7 @@ except:
         raise NotImplementedError("libcorrections is needed. python version of jf_apply_pede_gain_mask() missing.")
 
 
+
 def apply_gain_pede_np(image, G=None, P=None, pixel_mask=None):
     mask = int('0b' + 14 * '1', 2)
     mask2 = int('0b' + 2 * '1', 2)
@@ -107,6 +134,7 @@ def apply_gain_pede_np(image, G=None, P=None, pixel_mask=None):
         res[pixel_mask] = 0
 
     return res
+
 
 try:
     from numba import jit
@@ -393,9 +421,10 @@ class JFDataHandler:
         """
         res = np.empty(shape=image.shape, dtype=np.float32)
         if self.module_map is None:
-            correct(np.uint32(image.size), image, self._GP, res)
-            if self.pixel_mask is not None:
-                res[self.pixel_mask] = 0
+            if self.pixel_mask is None:
+                correct(np.uint32(image.size), image, self._GP, res)
+            else:
+                correct_mask(np.uint32(image.size), image, self._GP, res, self.pixel_mask)
 
         else:
             for i, m in enumerate(self.module_map):
@@ -412,11 +441,11 @@ class JFDataHandler:
                 module_GP = self._GP[i*MODULE_SIZE_Y:(i+1)*MODULE_SIZE_Y, :]
                 module_size = np.uint32(module_image.size)
 
-                correct(module_size, module_image, module_GP, module_res)
-
-                if self.pixel_mask is not None:
+                if self.pixel_mask is None:
+                    correct(module_size, module_image, module_GP, module_res)
+                else:
                     mask_module = self.pixel_mask[i*MODULE_SIZE_Y:(i+1)*MODULE_SIZE_Y, :]
-                    module_res[mask_module] = 0
+                    correct_mask(module_size, module_image, module_GP, module_res, mask_module)
 
         return res
 
