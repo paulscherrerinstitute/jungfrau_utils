@@ -2,7 +2,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-// i 2 MSB possono essere 00 01 11 (10 e' escluso)
 #include <time.h>
 
 void pseudo_C(uint16_t m, uint16_t n, uint16_t *image, float *G, float *P, float *res) {

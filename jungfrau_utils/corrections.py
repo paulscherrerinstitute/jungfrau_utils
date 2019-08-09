@@ -22,8 +22,6 @@ MODULE_SIZE_Y = CHIP_NUM_Y * CHIP_SIZE_Y
 CHIP_GAP_X = 2
 CHIP_GAP_Y = 2
 
-is_numba = False
-
 
 def _allow_n_images(method):
     """Allows any **method** that expects a single image as first argument to accept n images"""
@@ -46,9 +44,7 @@ def _apply_to_all_images(func, images, *args, **kwargs):
     images_result = np.empty(shape=target_shape, dtype=target_dtype)
     for n, img in enumerate(images):
         images_result[n] = func(img, *args, **kwargs)
-    return images_result 
-
-
+    return images_result
 
 try:
     # TODO: make a proper external package integration
@@ -103,6 +99,9 @@ try:
     """
 except:
     print('Could not load libcorrections.')
+
+    def correct(*args, **kwargs):
+        raise NotImplementedError("libcorrections is needed. python version of jf_apply_pede_gain() missing.")
 
     def correct_mask(*args, **kwargs):
         raise NotImplementedError("libcorrections is needed. python version of jf_apply_pede_gain_mask() missing.")
@@ -174,9 +173,8 @@ try:
 
     is_numba = True
 
-except:
-    print("[INFO][corrections] Numba not available, reverting to Numpy")
-    #print(sys.exc_info())
+except ImportError:
+    is_numba = False
 
 
 def apply_gain_pede(image, G=None, P=None, pixel_mask=None, highgain=False):
@@ -358,7 +356,7 @@ class JFDataHandler:
 
         self._G = value
         for i in range(NUM_GAINS):
-            self._GP[:, 2 * i::NUM_GAINS * 2] = value[i]
+            self._GP[:, 2 * i::NUM_GAINS * 2] = self._G[i]
 
     @property
     def P(self):
@@ -377,7 +375,7 @@ class JFDataHandler:
 
         self._P = value
         for i in range(NUM_GAINS):
-            self._GP[:, (2 * i + 1)::NUM_GAINS * 2] = value[i]
+            self._GP[:, (2 * i + 1)::NUM_GAINS * 2] = self._P[i]
 
     @property
     def highgain(self):
