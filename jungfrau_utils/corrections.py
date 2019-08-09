@@ -356,7 +356,7 @@ class JFDataHandler:
 
         self._G = value
         for i in range(NUM_GAINS):
-            self._GP[:, 2 * i::NUM_GAINS * 2] = self._G[i]
+            self._GP[:, 2 * i::NUM_GAINS * 2] = 1 / self._G[i]
 
     @property
     def P(self):
@@ -385,9 +385,9 @@ class JFDataHandler:
     def highgain(self, value):
         self._highgain = value
         if value:
-            self._GP[:, ::NUM_GAINS * 2] = self._G[3]
+            self._GP[:, ::NUM_GAINS * 2] = 1 / self._G[3]
         else:
-            self._GP[:, ::NUM_GAINS * 2] = self._G[0]
+            self._GP[:, ::NUM_GAINS * 2] = 1 / self._G[0]
 
     @property
     def pixel_mask(self):

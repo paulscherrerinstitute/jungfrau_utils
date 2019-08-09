@@ -26,7 +26,7 @@ void jf_apply_pede_gain(uint32_t image_size, uint16_t *image, float *GP, float *
         if (gm == 3) gm = 2;
         //     R0 C0                   R0C1
         // g0 p0 g1 p1 g2 p2 g3 p3 | g0 p0 g1 p1 g2 p2 g3 p3
-        res[idx] = ((image[idx] & 0x3FFF) - GP[8 * idx + 2 * gm + 1]) / GP[8 * idx + 2 * gm];
+        res[idx] = ((image[idx] & 0x3FFF) - GP[8 * idx + 2 * gm + 1]) * GP[8 * idx + 2 * gm];
     }
 }
 
@@ -42,7 +42,7 @@ void jf_apply_pede_gain_mask(uint32_t image_size, uint16_t *image, float *GP, fl
             if (gm == 3) gm = 2;
             //     R0 C0                   R0C1
             // g0 p0 g1 p1 g2 p2 g3 p3 | g0 p0 g1 p1 g2 p2 g3 p3
-            res[idx] = ((image[idx] & 0x3FFF) - GP[8 * idx + 2 * gm + 1]) / GP[8 * idx + 2 * gm];
+            res[idx] = ((image[idx] & 0x3FFF) - GP[8 * idx + 2 * gm + 1]) * GP[8 * idx + 2 * gm];
         }
     }
 }
