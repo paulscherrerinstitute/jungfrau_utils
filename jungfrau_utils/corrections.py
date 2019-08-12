@@ -447,12 +447,11 @@ class JFDataHandler:
 
         return res
 
-    @_allow_n_images
     def apply_geometry(self, image, detector_name):
         """Rearrange image according to geometry of detector modules.
 
         Args:
-            image (ndarray): image to be processed
+            image (ndarray): a single image or image stack to be processed
             detector_name (str): name of detector
 
         Returns:
@@ -465,7 +464,13 @@ class JFDataHandler:
 
         res_shape_x = max(modules_orig_x) + MODULE_SIZE_X + (CHIP_NUM_X-1)*CHIP_GAP_X
         res_shape_y = max(modules_orig_y) + MODULE_SIZE_Y + (CHIP_NUM_Y-1)*CHIP_GAP_Y
-        res = np.zeros((res_shape_y, res_shape_x), dtype=image.dtype)
+
+        if image.ndim == 3:
+            res = np.zeros((image.shape[0], res_shape_y, res_shape_x), dtype=image.dtype)
+            rot_axes = (1, 2)
+        else:
+            res = np.zeros((res_shape_y, res_shape_x), dtype=image.dtype)
+            rot_axes = (0, 1)
 
         if self.module_map is None:
             # emulate 'all modules are present'
@@ -477,12 +482,14 @@ class JFDataHandler:
             if m == -1:
                 continue
 
+            # in case of a single image, Ellipsis will be ignored
+            # in case of 3D image stack, Ellipsis will be parsed into slice(None, None)
             if detector_name == 'JF02T09V01':
-                module_in = image[:, m*MODULE_SIZE_X:(m+1)*MODULE_SIZE_X]
+                module_in = image[Ellipsis, :, m*MODULE_SIZE_X:(m+1)*MODULE_SIZE_X]
             elif detector_name in ('JF02T09V02', 'JF02T01V02'):
-                module_in = np.rot90(image[m*MODULE_SIZE_Y:(m+1)*MODULE_SIZE_Y, :], 2)
+                module_in = np.rot90(image[Ellipsis, m*MODULE_SIZE_Y:(m+1)*MODULE_SIZE_Y, :], 2, axes=rot_axes)
             else:
-                module_in = image[m*MODULE_SIZE_Y:(m+1)*MODULE_SIZE_Y, :]
+                module_in = image[Ellipsis, m*MODULE_SIZE_Y:(m+1)*MODULE_SIZE_Y, :]
 
             for j in range(CHIP_NUM_Y):
                 for k in range(CHIP_NUM_X):
@@ -494,12 +501,12 @@ class JFDataHandler:
                     wy_s = oy + ry_s + j*CHIP_GAP_Y
                     wx_s = ox + rx_s + k*CHIP_GAP_X
 
-                    res[wy_s:wy_s+CHIP_SIZE_Y, wx_s:wx_s+CHIP_SIZE_X] = \
-                        module_in[ry_s:ry_s+CHIP_SIZE_Y, rx_s:rx_s+CHIP_SIZE_X]
+                    res[Ellipsis, wy_s:wy_s+CHIP_SIZE_Y, wx_s:wx_s+CHIP_SIZE_X] = \
+                        module_in[Ellipsis, ry_s:ry_s+CHIP_SIZE_Y, rx_s:rx_s+CHIP_SIZE_X]
 
         # rotate image in case of alvra detector
         if detector_name.startswith('JF06'):
-            res = np.rot90(res)
+            res = np.rot90(res, axes=rot_axes)
 
         return res
 
