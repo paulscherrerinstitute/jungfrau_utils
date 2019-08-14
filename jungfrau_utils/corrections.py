@@ -1,7 +1,9 @@
 import ctypes
 import os
-from time import time
+import re
+from collections import namedtuple
 from functools import wraps
+from time import time
 
 import numpy as np
 from numpy import ma
@@ -351,6 +353,35 @@ class JFDataHandler:
             self._detector_name = value
         else:
             raise KeyError(f"Geometry for '{value}' detector is not present.")
+
+    @property
+    def _detector(self):
+        det = namedtuple('Detector', ['id', 'n_modules', 'version'])
+        return det(*(int(d) for d in re.findall(r'\d+', self.detector_name)))
+
+    @property
+    def _raw_shape(self):
+        if self.detector_name is None:
+            return None, None
+
+        n_modules = self._detector.n_modules
+        if self.detector_name == 'JF02T09V01':  # a special case
+            shape_y, shape_x = MODULE_SIZE_Y, MODULE_SIZE_X * n_modules
+        else:
+            shape_y, shape_x = MODULE_SIZE_Y * n_modules, MODULE_SIZE_X
+
+        return shape_y, shape_x
+
+    @property
+    def _shape(self):
+        if self.detector_name is None:
+            return None, None
+
+        modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
+        shape_x = max(modules_orig_x) + MODULE_SIZE_X + (CHIP_NUM_X-1)*CHIP_GAP_X
+        shape_y = max(modules_orig_y) + MODULE_SIZE_Y + (CHIP_NUM_Y-1)*CHIP_GAP_Y
+
+        return shape_y, shape_x
 
     @property
     def G(self):
