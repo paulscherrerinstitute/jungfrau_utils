@@ -324,8 +324,8 @@ class JFDataHandler:
         """
         self.detector_name = detector_name
 
-        G = G.astype(np.float32)
-        P = P.astype(np.float32)
+        G = G.astype(np.float32, copy=False)
+        P = P.astype(np.float32, copy=False)
 
         if G.shape != P.shape:
             raise ValueError(f"Shape mismatch: provided G has shape {G.shape}, while P has shape {P.shape}.")
@@ -449,7 +449,7 @@ class JFDataHandler:
         if value.shape != self.shape:
             raise ValueError(f"Expected pixel mask shape is {self.shape}, provided pixel mask has {value.shape} shape.")
 
-        self._pixel_mask = value.astype(np.bool)
+        self._pixel_mask = value.astype(np.bool, copy=False)
 
     @_allow_n_images
     def apply_gain_pede(self, image):
