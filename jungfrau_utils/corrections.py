@@ -310,49 +310,46 @@ def add_gap_pixels(image, modules, module_gap, chip_gap=[2, 2]):
 
 
 class JFDataHandler:
-    def __init__(self, G, P, detector_name=None, pixel_mask=None, highgain=False):
+    def __init__(self, detector_name, G=None, P=None, pixel_mask=None, highgain=False):
         """A class to perform jungfrau detector data handling like pedestal correction, gain
         conversion, pixel mask, module map, etc.
 
         Args:
-            G (ndarray): 4d array with gain values
-            P (ndarray): 4d array with pedestal values
             detector_name (str): name of a detector
+            G (ndarray, optional): 4d array with gain values
+            P (ndarray, optional): 4d array with pedestal values
             pixel_mask (ndarray, optional): 2d array with non-zero values referring to bad pixels.
                 When None, all pixels assumed to be good. Defaults to None.
             highgain (bool, optional): Highgain mode where G[3] is used for G[0]. Defaults to False.
         """
-        self.detector_name = detector_name
-
-        G = G.astype(np.float32, copy=False)
-        P = P.astype(np.float32, copy=False)
-
-        if G.shape != P.shape:
-            raise ValueError(f"Shape mismatch: provided G has shape {G.shape}, while P has shape {P.shape}.")
-
-        self.shape = G.shape[1:]
+        # detector_name needs to be a valid name
+        if detector_name in modules_orig:
+            self._detector_name = detector_name
+        else:
+            raise KeyError(f"Geometry for '{detector_name}' detector is not present.")
 
         # array to be used for the actual data conversion
-        self._GP = np.empty(shape=[self.shape[0], 2 * NUM_GAINS * self.shape[1]], dtype=np.float32)
+        # G and P values are interleaved for better CPU cache utilization
+        self._GP = np.empty((self.raw_shape[0], 2 * NUM_GAINS * self.raw_shape[1]), dtype=np.float32)
 
-        # this will also fill self._GP with values
+        # make sure that G and P have type float32
+        if G is not None:
+            G = G.astype(np.float32, copy=False)
+
+        if P is not None:
+            P = P.astype(np.float32, copy=False)
+
+        # this will also fill self._GP array with G and P values if they are not None
         self.G = G
         self.P = P
-        self.highgain = highgain
 
         self.pixel_mask = pixel_mask
+        self.highgain = highgain
         self.module_map = None
 
     @property
     def detector_name(self):
         return self._detector_name
-
-    @detector_name.setter
-    def detector_name(self, value):
-        if value is None or value in modules_orig:
-            self._detector_name = value
-        else:
-            raise KeyError(f"Geometry for '{value}' detector is not present.")
 
     @property
     def _detector(self):
@@ -360,10 +357,7 @@ class JFDataHandler:
         return det(*(int(d) for d in re.findall(r'\d+', self.detector_name)))
 
     @property
-    def _raw_shape(self):
-        if self.detector_name is None:
-            return None, None
-
+    def raw_shape(self):
         n_modules = self._detector.n_modules
         if self.detector_name == 'JF02T09V01':  # a special case
             shape_y, shape_x = MODULE_SIZE_Y, MODULE_SIZE_X * n_modules
@@ -373,10 +367,7 @@ class JFDataHandler:
         return shape_y, shape_x
 
     @property
-    def _shape(self):
-        if self.detector_name is None:
-            return None, None
-
+    def shape(self):
         modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
         shape_x = max(modules_orig_x) + MODULE_SIZE_X + (CHIP_NUM_X-1)*CHIP_GAP_X
         shape_y = max(modules_orig_y) + MODULE_SIZE_Y + (CHIP_NUM_Y-1)*CHIP_GAP_Y
@@ -389,14 +380,18 @@ class JFDataHandler:
 
     @G.setter
     def G(self, value):
+        if value is None:
+            self._G = None
+            return
+
         if value.ndim != 3:
             raise ValueError(f"G should have 3 dimensions, provided G has {value.ndim} dimensions.")
 
         if value.shape[0] != 4:
             raise ValueError(f"First dimension of G should have length 4, provided G has {value.shape[0]}.")
 
-        if self.shape != value.shape[1:]:
-            raise ValueError(f"Expected G shape is {self.shape}, while provided G has {value.shape[1:]}.")
+        if value.shape[1:] != self.raw_shape:
+            raise ValueError(f"Expected G shape is {self.raw_shape}, while provided G has {value.shape[1:]}.")
 
         self._G = value
         for i in range(NUM_GAINS):
@@ -408,14 +403,18 @@ class JFDataHandler:
 
     @P.setter
     def P(self, value):
+        if value is None:
+            self._P = None
+            return
+
         if value.ndim != 3:
             raise ValueError(f"P should have 3 dimensions, provided P has {value.ndim} dimensions.")
 
         if value.shape[0] != 4:
             raise ValueError(f"First dimension of P should have length 4, provided P has {value.shape[0]}.")
 
-        if self.shape != value.shape[1:]:
-            raise ValueError(f"Expected P shape is {self.shape}, while provided P has {value.shape[1:]}.")
+        if value.shape[1:] != self.raw_shape:
+            raise ValueError(f"Expected P shape is {self.raw_shape}, while provided P has {value.shape[1:]}.")
 
         self._P = value
         for i in range(NUM_GAINS):
@@ -427,11 +426,15 @@ class JFDataHandler:
 
     @highgain.setter
     def highgain(self, value):
+        if value is True and self.G is None:
+            raise ValueError(f"Gains are not defined.")
+
         self._highgain = value
-        if value:
-            self._GP[:, ::NUM_GAINS * 2] = 1 / self._G[3]
-        else:
-            self._GP[:, ::NUM_GAINS * 2] = 1 / self._G[0]
+        if self.G is not None:
+            if value:
+                self._GP[:, ::NUM_GAINS * 2] = 1 / self._G[3]
+            else:
+                self._GP[:, ::NUM_GAINS * 2] = 1 / self._G[0]
 
     @property
     def pixel_mask(self):
@@ -446,8 +449,8 @@ class JFDataHandler:
         if value.ndim != 2:
             raise ValueError(f"Pixel mask should have 2 dimensions, provided pixel mask has {value.ndim}.")
 
-        if value.shape != self.shape:
-            raise ValueError(f"Expected pixel mask shape is {self.shape}, provided pixel mask has {value.shape} shape.")
+        if value.shape != self.raw_shape:
+            raise ValueError(f"Expected pixel mask shape is {self.raw_shape}, provided pixel mask has {value.shape} shape.")
 
         self._pixel_mask = value.astype(np.bool, copy=False)
 
@@ -461,6 +464,9 @@ class JFDataHandler:
         Returns:
             ndarray: resulting image
         """
+        if image.shape != self.raw_shape:
+            raise ValueError(f"Expected image shape {self.raw_shape}, provided image shape {image.shape}")
+
         res = np.empty(shape=image.shape, dtype=np.float32)
         if self.module_map is None:
             if self.pixel_mask is None:
@@ -473,8 +479,7 @@ class JFDataHandler:
                 if m == -1:
                     continue
 
-                if image.shape[0] == 512 and image.shape[1] != 1024:
-                    # old JF02T09V01 format
+                if self.detector_name == 'JF02T09V01':
                     module_image = image[:, m*MODULE_SIZE_X:(m+1)*MODULE_SIZE_X]
                 else:
                     module_image = image[m*MODULE_SIZE_Y:(m+1)*MODULE_SIZE_Y, :]
@@ -498,21 +503,18 @@ class JFDataHandler:
             image (ndarray): a single image or image stack to be processed
 
         Returns:
-            ndarray: resulting image if detector_name is not None, otherwise initial image
+            ndarray: image with modules on their actual places
         """
-        if self.detector_name is None:
-            return image
+        if image.shape != self.raw_shape:
+            raise ValueError(f"Expected image shape {self.raw_shape}, provided image shape {image.shape}")
 
         modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
 
-        res_shape_x = max(modules_orig_x) + MODULE_SIZE_X + (CHIP_NUM_X-1)*CHIP_GAP_X
-        res_shape_y = max(modules_orig_y) + MODULE_SIZE_Y + (CHIP_NUM_Y-1)*CHIP_GAP_Y
-
         if image.ndim == 3:
-            res = np.zeros((image.shape[0], res_shape_y, res_shape_x), dtype=image.dtype)
+            res = np.zeros((image.shape[0], *self.shape), dtype=image.dtype)
             rot_axes = (1, 2)
         else:
-            res = np.zeros((res_shape_y, res_shape_x), dtype=image.dtype)
+            res = np.zeros(self.shape, dtype=image.dtype)
             rot_axes = (0, 1)
 
         if self.module_map is None:
@@ -592,7 +594,7 @@ def apply_geometry(image_in, detector_name):
 
 
 def test():
-    size_1 = 1536
+    size_1 = 16384
     size_2 = 1024
     data = np.random.randint(0, 60000, size=[size_1, size_2], dtype=np.uint16)
     pede = 60000 * np.random.random(size=[4, size_1, size_2]).astype(np.float32)
@@ -609,7 +611,7 @@ def test():
     res2 = apply_gain_pede(data, gain, pede, mask)
     print("Numba", time() - t_i)
 
-    calib = JFDataHandler(G=gain, P=pede, pixel_mask=mask)
+    calib = JFDataHandler('JF06T32V01', G=gain, P=pede, pixel_mask=mask)
     t_i = time()
     res3 = calib.apply_gain_pede(data)
     print("C", time() - t_i)

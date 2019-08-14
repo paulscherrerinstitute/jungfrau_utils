@@ -79,7 +79,7 @@ class File():
             print('Error reading pedestal file:', pedestal_file)
             raise
 
-        self.jf_handler = JFDataHandler(gain, pedestal, pixel_mask=pixel_mask)
+        self.jf_handler = JFDataHandler(self.detector_name, gain, pedestal, pixel_mask)
 
     def __enter__(self):
         return self
