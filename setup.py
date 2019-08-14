@@ -16,12 +16,7 @@ setup(
         Extension(
             'libcorrections',
             sources=['jungfrau_utils/src/corrections.c'],
-            extra_compile_args=[
-                '--std=c99',
-                '-mtune=core-avx2',
-                '-shared',
-                '-O3',
-            ],
-        ),
+            extra_compile_args=['--std=c99', '-mtune=core-avx2', '-shared', '-O3'],
+        )
     ],
 )

@@ -8,7 +8,7 @@ from time import time
 import numpy as np
 from numpy import ma
 
-from jungfrau_utils.geometry import modules_orig
+from .geometry import modules_orig
 
 NUM_GAINS = 4
 
@@ -27,14 +27,17 @@ CHIP_GAP_Y = 2
 
 def _allow_n_images(method):
     """Allows any **method** that expects a single image as first argument to accept n images"""
+
     @wraps(method)
     def wrapper(this, images, *args, **kwargs):
-        func = lambda *args, **kwargs: method(this, *args, **kwargs) # hide the self argument
+        func = lambda *args, **kwargs: method(this, *args, **kwargs)  # hide the self argument
         if images.ndim == 3:
             return _apply_to_all_images(func, images, *args, **kwargs)
         else:
             return func(images, *args, **kwargs)
+
     return wrapper
+
 
 def _apply_to_all_images(func, images, *args, **kwargs):
     """Apply func to all images forwarding args and kwargs"""
@@ -48,11 +51,16 @@ def _apply_to_all_images(func, images, *args, **kwargs):
         images_result[n] = func(img, *args, **kwargs)
     return images_result
 
+
 try:
     # TODO: make a proper external package integration
     mod_path = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
     for entry in os.scandir(mod_path):
-        if entry.is_file() and entry.name.startswith('libcorrections') and entry.name.endswith('.so'):
+        if (
+            entry.is_file()
+            and entry.name.startswith('libcorrections')
+            and entry.name.endswith('.so')
+        ):
             _mod = ctypes.cdll.LoadLibrary(os.path.join(mod_path, entry))
 
     correct_mask = _mod.jf_apply_pede_gain_mask
@@ -103,11 +111,14 @@ except:
     print('Could not load libcorrections.')
 
     def correct(*args, **kwargs):
-        raise NotImplementedError("libcorrections is needed. python version of jf_apply_pede_gain() missing.")
+        raise NotImplementedError(
+            "libcorrections is needed. python version of jf_apply_pede_gain() missing."
+        )
 
     def correct_mask(*args, **kwargs):
-        raise NotImplementedError("libcorrections is needed. python version of jf_apply_pede_gain_mask() missing.")
-
+        raise NotImplementedError(
+            "libcorrections is needed. python version of jf_apply_pede_gain_mask() missing."
+        )
 
 
 def apply_gain_pede_np(image, G=None, P=None, pixel_mask=None):
@@ -121,11 +132,19 @@ def apply_gain_pede_np(image, G=None, P=None, pixel_mask=None):
     m2 = gain_mask != 1
     m3 = gain_mask < 2
     if G is not None:
-        g = ma.array(G[0], mask=m1, dtype=np.float32).filled(0) + ma.array(G[1], mask=m2, dtype=np.float32).filled(0) + ma.array(G[2], mask=m3, dtype=np.float32).filled(0)
+        g = (
+            ma.array(G[0], mask=m1, dtype=np.float32).filled(0)
+            + ma.array(G[1], mask=m2, dtype=np.float32).filled(0)
+            + ma.array(G[2], mask=m3, dtype=np.float32).filled(0)
+        )
     else:
         g = np.ones(data.shape, dtype=np.float32)
     if P is not None:
-        p = ma.array(P[0], mask=m1, dtype=np.float32).filled(0) + ma.array(P[1], mask=m2, dtype=np.float32).filled(0) + ma.array(P[2], mask=m3, dtype=np.float32).filled(0)
+        p = (
+            ma.array(P[0], mask=m1, dtype=np.float32).filled(0)
+            + ma.array(P[1], mask=m2, dtype=np.float32).filled(0)
+            + ma.array(P[2], mask=m3, dtype=np.float32).filled(0)
+        )
     else:
         p = np.zeros(data.shape, dtype=np.float32)
 
@@ -171,7 +190,9 @@ try:
         if pixel_mask is None:
             pixel_mask = np.zeros(image.shape, dtype=np.int)
 
-        return apply_gain_pede_corrections_numba(image.shape[0], image.shape[1], image, G, P, mask, mask2, pixel_mask, gain_mask)
+        return apply_gain_pede_corrections_numba(
+            image.shape[0], image.shape[1], image, G, P, mask, mask2, pixel_mask, gain_mask
+        )
 
     is_numba = True
 
@@ -294,17 +315,25 @@ def add_gap_pixels(image, modules, module_gap, chip_gap=[2, 2]):
     chips = [2, 4]
     shape = image.shape
     mod_size = [256, 256]  # this is the chip size
-    new_shape = [shape[i] + (module_gap[i]) * (modules[i] - 1) + (chips[i] - 1) * chip_gap[i] * modules[i] for i in range(2)]
+    new_shape = [
+        shape[i] + (module_gap[i]) * (modules[i] - 1) + (chips[i] - 1) * chip_gap[i] * modules[i]
+        for i in range(2)
+    ]
 
     res = np.zeros(new_shape)
     m = [module_gap[i] - chip_gap[i] for i in range(2)]
 
     for i in range(modules[0] * chips[0]):
         for j in range(modules[1] * chips[1]):
-            disp = [int(i / chips[0]) * m[0] + i * chip_gap[0], int(j / chips[1]) * m[1] + j * chip_gap[1]]
+            disp = [
+                int(i / chips[0]) * m[0] + i * chip_gap[0],
+                int(j / chips[1]) * m[1] + j * chip_gap[1],
+            ]
             init = [i * mod_size[0], j * mod_size[1]]
             end = [(1 + i) * mod_size[0], (1 + j) * mod_size[1]]
-            res[disp[0] + init[0]: disp[0] + end[0], disp[1] + init[1]:disp[1] + end[1]] = image[init[0]:end[0], init[1]:end[1]]
+            res[disp[0] + init[0] : disp[0] + end[0], disp[1] + init[1] : disp[1] + end[1]] = image[
+                init[0] : end[0], init[1] : end[1]
+            ]
 
     return res
 
@@ -330,7 +359,9 @@ class JFDataHandler:
 
         # array to be used for the actual data conversion
         # G and P values are interleaved for better CPU cache utilization
-        self._GP = np.empty((self.raw_shape[0], 2 * NUM_GAINS * self.raw_shape[1]), dtype=np.float32)
+        self._GP = np.empty(
+            (self.raw_shape[0], 2 * NUM_GAINS * self.raw_shape[1]), dtype=np.float32
+        )
 
         # make sure that G and P have type float32
         if G is not None:
@@ -369,8 +400,8 @@ class JFDataHandler:
     @property
     def shape(self):
         modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
-        shape_x = max(modules_orig_x) + MODULE_SIZE_X + (CHIP_NUM_X-1)*CHIP_GAP_X
-        shape_y = max(modules_orig_y) + MODULE_SIZE_Y + (CHIP_NUM_Y-1)*CHIP_GAP_Y
+        shape_x = max(modules_orig_x) + MODULE_SIZE_X + (CHIP_NUM_X - 1) * CHIP_GAP_X
+        shape_y = max(modules_orig_y) + MODULE_SIZE_Y + (CHIP_NUM_Y - 1) * CHIP_GAP_Y
 
         return shape_y, shape_x
 
@@ -388,14 +419,18 @@ class JFDataHandler:
             raise ValueError(f"G should have 3 dimensions, provided G has {value.ndim} dimensions.")
 
         if value.shape[0] != 4:
-            raise ValueError(f"First dimension of G should have length 4, provided G has {value.shape[0]}.")
+            raise ValueError(
+                f"First dimension of G should have length 4, provided G has {value.shape[0]}."
+            )
 
         if value.shape[1:] != self.raw_shape:
-            raise ValueError(f"Expected G shape is {self.raw_shape}, while provided G has {value.shape[1:]}.")
+            raise ValueError(
+                f"Expected G shape is {self.raw_shape}, while provided G has {value.shape[1:]}."
+            )
 
         self._G = value
         for i in range(NUM_GAINS):
-            self._GP[:, 2 * i::NUM_GAINS * 2] = 1 / self._G[i]
+            self._GP[:, 2 * i :: NUM_GAINS * 2] = 1 / self._G[i]
 
     @property
     def P(self):
@@ -411,14 +446,18 @@ class JFDataHandler:
             raise ValueError(f"P should have 3 dimensions, provided P has {value.ndim} dimensions.")
 
         if value.shape[0] != 4:
-            raise ValueError(f"First dimension of P should have length 4, provided P has {value.shape[0]}.")
+            raise ValueError(
+                f"First dimension of P should have length 4, provided P has {value.shape[0]}."
+            )
 
         if value.shape[1:] != self.raw_shape:
-            raise ValueError(f"Expected P shape is {self.raw_shape}, while provided P has {value.shape[1:]}.")
+            raise ValueError(
+                f"Expected P shape is {self.raw_shape}, while provided P has {value.shape[1:]}."
+            )
 
         self._P = value
         for i in range(NUM_GAINS):
-            self._GP[:, (2 * i + 1)::NUM_GAINS * 2] = self._P[i]
+            self._GP[:, (2 * i + 1) :: NUM_GAINS * 2] = self._P[i]
 
     @property
     def highgain(self):
@@ -432,9 +471,9 @@ class JFDataHandler:
         self._highgain = value
         if self.G is not None:
             if value:
-                self._GP[:, ::NUM_GAINS * 2] = 1 / self._G[3]
+                self._GP[:, :: NUM_GAINS * 2] = 1 / self._G[3]
             else:
-                self._GP[:, ::NUM_GAINS * 2] = 1 / self._G[0]
+                self._GP[:, :: NUM_GAINS * 2] = 1 / self._G[0]
 
     @property
     def pixel_mask(self):
@@ -447,10 +486,14 @@ class JFDataHandler:
             return
 
         if value.ndim != 2:
-            raise ValueError(f"Pixel mask should have 2 dimensions, provided pixel mask has {value.ndim}.")
+            raise ValueError(
+                f"Pixel mask should have 2 dimensions, provided pixel mask has {value.ndim}."
+            )
 
         if value.shape != self.raw_shape:
-            raise ValueError(f"Expected pixel mask shape is {self.raw_shape}, provided pixel mask has {value.shape} shape.")
+            raise ValueError(
+                f"Expected pixel mask shape is {self.raw_shape}, provided pixel mask has {value.shape} shape."
+            )
 
         self._pixel_mask = value.astype(np.bool, copy=False)
 
@@ -465,7 +508,9 @@ class JFDataHandler:
             ndarray: resulting image
         """
         if image.shape != self.raw_shape:
-            raise ValueError(f"Expected image shape {self.raw_shape}, provided image shape {image.shape}")
+            raise ValueError(
+                f"Expected image shape {self.raw_shape}, provided image shape {image.shape}"
+            )
 
         res = np.empty(shape=image.shape, dtype=np.float32)
         if self.module_map is None:
@@ -480,18 +525,18 @@ class JFDataHandler:
                     continue
 
                 if self.detector_name == 'JF02T09V01':
-                    module_image = image[:, m*MODULE_SIZE_X:(m+1)*MODULE_SIZE_X]
+                    module_image = image[:, m * MODULE_SIZE_X : (m + 1) * MODULE_SIZE_X]
                 else:
-                    module_image = image[m*MODULE_SIZE_Y:(m+1)*MODULE_SIZE_Y, :]
+                    module_image = image[m * MODULE_SIZE_Y : (m + 1) * MODULE_SIZE_Y, :]
 
-                module_res = res[m*MODULE_SIZE_Y:(m+1)*MODULE_SIZE_Y, :]
-                module_GP = self._GP[i*MODULE_SIZE_Y:(i+1)*MODULE_SIZE_Y, :]
+                module_res = res[m * MODULE_SIZE_Y : (m + 1) * MODULE_SIZE_Y, :]
+                module_GP = self._GP[i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
                 module_size = np.uint32(module_image.size)
 
                 if self.pixel_mask is None:
                     correct(module_size, module_image, module_GP, module_res)
                 else:
-                    mask_module = self.pixel_mask[i*MODULE_SIZE_Y:(i+1)*MODULE_SIZE_Y, :]
+                    mask_module = self.pixel_mask[i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
                     correct_mask(module_size, module_image, module_GP, module_res, mask_module)
 
         return res
@@ -506,7 +551,9 @@ class JFDataHandler:
             ndarray: image with modules on their actual places
         """
         if image.shape != self.raw_shape:
-            raise ValueError(f"Expected image shape {self.raw_shape}, provided image shape {image.shape}")
+            raise ValueError(
+                f"Expected image shape {self.raw_shape}, provided image shape {image.shape}"
+            )
 
         modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
 
@@ -530,24 +577,29 @@ class JFDataHandler:
             # in case of a single image, Ellipsis will be ignored
             # in case of 3D image stack, Ellipsis will be parsed into slice(None, None)
             if self.detector_name == 'JF02T09V01':
-                module_in = image[Ellipsis, :, m*MODULE_SIZE_X:(m+1)*MODULE_SIZE_X]
+                module_in = image[Ellipsis, :, m * MODULE_SIZE_X : (m + 1) * MODULE_SIZE_X]
             elif self.detector_name in ('JF02T09V02', 'JF02T01V02'):
-                module_in = np.rot90(image[Ellipsis, m*MODULE_SIZE_Y:(m+1)*MODULE_SIZE_Y, :], 2, axes=rot_axes)
+                module_in = np.rot90(
+                    image[Ellipsis, m * MODULE_SIZE_Y : (m + 1) * MODULE_SIZE_Y, :],
+                    2,
+                    axes=rot_axes,
+                )
             else:
-                module_in = image[Ellipsis, m*MODULE_SIZE_Y:(m+1)*MODULE_SIZE_Y, :]
+                module_in = image[Ellipsis, m * MODULE_SIZE_Y : (m + 1) * MODULE_SIZE_Y, :]
 
             for j in range(CHIP_NUM_Y):
                 for k in range(CHIP_NUM_X):
                     # reading positions
-                    ry_s = j*CHIP_SIZE_Y
-                    rx_s = k*CHIP_SIZE_X
+                    ry_s = j * CHIP_SIZE_Y
+                    rx_s = k * CHIP_SIZE_X
 
                     # writing positions
-                    wy_s = oy + ry_s + j*CHIP_GAP_Y
-                    wx_s = ox + rx_s + k*CHIP_GAP_X
+                    wy_s = oy + ry_s + j * CHIP_GAP_Y
+                    wx_s = ox + rx_s + k * CHIP_GAP_X
 
-                    res[Ellipsis, wy_s:wy_s+CHIP_SIZE_Y, wx_s:wx_s+CHIP_SIZE_X] = \
-                        module_in[Ellipsis, ry_s:ry_s+CHIP_SIZE_Y, rx_s:rx_s+CHIP_SIZE_X]
+                    res[Ellipsis, wy_s : wy_s + CHIP_SIZE_Y, wx_s : wx_s + CHIP_SIZE_X] = module_in[
+                        Ellipsis, ry_s : ry_s + CHIP_SIZE_Y, rx_s : rx_s + CHIP_SIZE_X
+                    ]
 
         # rotate image in case of alvra detector
         if self.detector_name.startswith('JF06'):
@@ -555,36 +607,38 @@ class JFDataHandler:
 
         return res
 
+
 def apply_geometry(image_in, detector_name):
     if detector_name in modules_orig:
         modules_orig_y, modules_orig_x = modules_orig[detector_name]
     else:
         return image_in
 
-    image_out_shape_x = max(modules_orig_x) + MODULE_SIZE_X + (CHIP_NUM_X-1)*CHIP_GAP_X
-    image_out_shape_y = max(modules_orig_y) + MODULE_SIZE_Y + (CHIP_NUM_Y-1)*CHIP_GAP_Y
+    image_out_shape_x = max(modules_orig_x) + MODULE_SIZE_X + (CHIP_NUM_X - 1) * CHIP_GAP_X
+    image_out_shape_y = max(modules_orig_y) + MODULE_SIZE_Y + (CHIP_NUM_Y - 1) * CHIP_GAP_Y
     image_out = np.zeros((image_out_shape_y, image_out_shape_x), dtype=image_in.dtype)
 
     for i, (oy, ox) in enumerate(zip(modules_orig_y, modules_orig_x)):
         if detector_name == 'JF02T09V01':
-            module_in = image_in[:, i*MODULE_SIZE_X:(i+1)*MODULE_SIZE_X]
+            module_in = image_in[:, i * MODULE_SIZE_X : (i + 1) * MODULE_SIZE_X]
         elif detector_name == 'JF02T09V02' or detector_name == 'JF02T01V02':
-            module_in = np.rot90(image_in[i*MODULE_SIZE_Y:(i+1)*MODULE_SIZE_Y, :], 2)
+            module_in = np.rot90(image_in[i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :], 2)
         else:
-            module_in = image_in[i*MODULE_SIZE_Y:(i+1)*MODULE_SIZE_Y, :]
+            module_in = image_in[i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
 
         for j in range(CHIP_NUM_Y):
             for k in range(CHIP_NUM_X):
                 # reading positions
-                ry_s = j*CHIP_SIZE_Y
-                rx_s = k*CHIP_SIZE_X
+                ry_s = j * CHIP_SIZE_Y
+                rx_s = k * CHIP_SIZE_X
 
                 # writing positions
-                wy_s = oy + ry_s + j*CHIP_GAP_Y
-                wx_s = ox + rx_s + k*CHIP_GAP_X
+                wy_s = oy + ry_s + j * CHIP_GAP_Y
+                wx_s = ox + rx_s + k * CHIP_GAP_X
 
-                image_out[wy_s:wy_s+CHIP_SIZE_Y, wx_s:wx_s+CHIP_SIZE_X] = \
-                    module_in[ry_s:ry_s+CHIP_SIZE_Y, rx_s:rx_s+CHIP_SIZE_X]
+                image_out[wy_s : wy_s + CHIP_SIZE_Y, wx_s : wx_s + CHIP_SIZE_X] = module_in[
+                    ry_s : ry_s + CHIP_SIZE_Y, rx_s : rx_s + CHIP_SIZE_X
+                ]
 
     # rotate image in case of alvra detector
     if detector_name.startswith('JF06'):

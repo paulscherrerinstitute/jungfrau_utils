@@ -9,10 +9,8 @@ complevel = 9
 shuffle = shuffles.index('bitshuffle')
 complib = compressors.index('lz4')
 
-compargs = {
-    'compression': 32001,
-    'compression_opts': (0, 0, 0, 0, complevel, shuffle, complib),
-}
+compargs = {'compression': 32001, 'compression_opts': (0, 0, 0, 0, complevel, shuffle, complib)}
+
 
 def compress_dataset(f_source, f_dest, dataset, factor=None, dtype=None):
     """Create a new file with a specified dataset being compressed.
@@ -25,6 +23,7 @@ def compress_dataset(f_source, f_dest, dataset, factor=None, dtype=None):
             compressed_value = np.round(original_value / factor)
         dtype (optional): Defaults to None. Resulting data type for the compressed dataset
     """
+
     def copy_objects(name, obj):
         if isinstance(obj, h5py.Group):
             h5_dest.create_group(name)

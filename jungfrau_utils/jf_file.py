@@ -2,11 +2,12 @@ from pathlib import Path
 
 import h5py
 
-from jungfrau_utils.corrections import JFDataHandler
+from .corrections import JFDataHandler
 
 
-class File():
+class File:
     """ Jungfrau file """
+
     def __init__(self, file_path, gain_file=None, pedestal_file=None, raw=False, geometry=True):
         self.raw = raw
         self.geometry = geometry
@@ -15,7 +16,7 @@ class File():
         self.file_path = file_path
 
         self.jf_file = h5py.File(file_path, 'r')
-        self.detector_name = self.jf_file['/general/detector_name'][()].decode()  #pylint: disable=E1101
+        self.detector_name = self.jf_file['/general/detector_name'][()].decode()
 
         # TODO: Here we use daq_rec only of the first pulse within an hdf5 file, however its
         # value can be different for later pulses and this needs to be taken care of. Currently,
@@ -51,9 +52,7 @@ class File():
         if pedestal_file is None:
             # the default processed pedestal files path for a particula p-group is
             # '/sf/<beamline>/data/<p-group>/res/JF_pedestals/'
-            pedestal_path = Path(*file_path.parts[:5]).joinpath(
-                'res', 'JF_pedestals'
-            )
+            pedestal_path = Path(*file_path.parts[:5]).joinpath('res', 'JF_pedestals')
 
             # find a pedestal file, which was created closest in time to the jungfrau file
             jf_file_mtime = file_path.stat().st_mtime
