@@ -524,20 +524,17 @@ class JFDataHandler:
                 if m == -1:
                     continue
 
-                if self.detector_name == 'JF02T09V01':
-                    module_image = image[:, m * MODULE_SIZE_X : (m + 1) * MODULE_SIZE_X]
-                else:
-                    module_image = image[m * MODULE_SIZE_Y : (m + 1) * MODULE_SIZE_Y, :]
+                module = self._get_module(image, m)
 
                 module_res = res[m * MODULE_SIZE_Y : (m + 1) * MODULE_SIZE_Y, :]
                 module_GP = self._GP[i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
-                module_size = np.uint32(module_image.size)
+                module_size = np.uint32(module.size)
 
                 if self.pixel_mask is None:
-                    correct(module_size, module_image, module_GP, module_res)
+                    correct(module_size, module, module_GP, module_res)
                 else:
                     mask_module = self.pixel_mask[i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
-                    correct_mask(module_size, module_image, module_GP, module_res, mask_module)
+                    correct_mask(module_size, module, module_GP, module_res, mask_module)
 
         return res
 
@@ -574,18 +571,10 @@ class JFDataHandler:
             if m == -1:
                 continue
 
-            # in case of a single image, Ellipsis will be ignored
-            # in case of 3D image stack, Ellipsis will be parsed into slice(None, None)
-            if self.detector_name == 'JF02T09V01':
-                module_in = image[Ellipsis, :, m * MODULE_SIZE_X : (m + 1) * MODULE_SIZE_X]
-            elif self.detector_name in ('JF02T09V02', 'JF02T01V02'):
-                module_in = np.rot90(
-                    image[Ellipsis, m * MODULE_SIZE_Y : (m + 1) * MODULE_SIZE_Y, :],
-                    2,
-                    axes=rot_axes,
-                )
-            else:
-                module_in = image[Ellipsis, m * MODULE_SIZE_Y : (m + 1) * MODULE_SIZE_Y, :]
+            module = self._get_module(image, m)
+
+            if self.detector_name in ('JF02T09V02', 'JF02T01V02'):
+                module = np.rot90(module, axes=rot_axes)
 
             for j in range(CHIP_NUM_Y):
                 for k in range(CHIP_NUM_X):
@@ -597,7 +586,7 @@ class JFDataHandler:
                     wy_s = oy + ry_s + j * CHIP_GAP_Y
                     wx_s = ox + rx_s + k * CHIP_GAP_X
 
-                    res[Ellipsis, wy_s : wy_s + CHIP_SIZE_Y, wx_s : wx_s + CHIP_SIZE_X] = module_in[
+                    res[Ellipsis, wy_s : wy_s + CHIP_SIZE_Y, wx_s : wx_s + CHIP_SIZE_X] = module[
                         Ellipsis, ry_s : ry_s + CHIP_SIZE_Y, rx_s : rx_s + CHIP_SIZE_X
                     ]
 
@@ -606,6 +595,16 @@ class JFDataHandler:
             res = np.rot90(res, axes=rot_axes)
 
         return res
+
+    def _get_module(self, image, index):
+        # in case of a single image, Ellipsis will be ignored
+        # in case of 3D image stack, Ellipsis will be parsed into slice(None, None)
+        if self.detector_name == 'JF02T09V01':
+            module = image[Ellipsis, :, index * MODULE_SIZE_X : (index + 1) * MODULE_SIZE_X]
+        else:
+            module = image[Ellipsis, index * MODULE_SIZE_Y : (index + 1) * MODULE_SIZE_Y, :]
+
+        return module
 
 
 def apply_geometry(image_in, detector_name):
