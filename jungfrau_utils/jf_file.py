@@ -113,7 +113,7 @@ class File():
             jf_data = self.jf_handler.apply_gain_pede(jf_data)
 
         if self.geometry:  # apply detector geometry corrections
-            jf_data = self.jf_handler.apply_geometry(jf_data, self.detector_name)
+            jf_data = self.jf_handler.apply_geometry(jf_data)
 
         if roi:
             jf_data = jf_data[roi]

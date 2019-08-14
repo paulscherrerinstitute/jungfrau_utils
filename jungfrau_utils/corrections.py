@@ -308,17 +308,19 @@ def add_gap_pixels(image, modules, module_gap, chip_gap=[2, 2]):
 
 
 class JFDataHandler:
-    def __init__(self, G, P, pixel_mask=None, highgain=False):
+    def __init__(self, G, P, detector_name=None, pixel_mask=None, highgain=False):
         """A class to perform jungfrau detector data handling like pedestal correction, gain
         conversion, pixel mask, module map, etc.
 
         Args:
             G (ndarray): 4d array with gain values
             P (ndarray): 4d array with pedestal values
+            detector_name (str): name of a detector
             pixel_mask (ndarray, optional): 2d array with non-zero values referring to bad pixels.
                 When None, all pixels assumed to be good. Defaults to None.
             highgain (bool, optional): Highgain mode where G[3] is used for G[0]. Defaults to False.
         """
+        self.detector_name = detector_name
 
         G = G.astype(np.float32)
         P = P.astype(np.float32)
@@ -338,6 +340,17 @@ class JFDataHandler:
 
         self.pixel_mask = pixel_mask
         self.module_map = None
+
+    @property
+    def detector_name(self):
+        return self._detector_name
+
+    @detector_name.setter
+    def detector_name(self, value):
+        if value is None or value in modules_orig:
+            self._detector_name = value
+        else:
+            raise KeyError(f"Geometry for '{value}' detector is not present.")
 
     @property
     def G(self):
@@ -447,20 +460,19 @@ class JFDataHandler:
 
         return res
 
-    def apply_geometry(self, image, detector_name):
+    def apply_geometry(self, image):
         """Rearrange image according to geometry of detector modules.
 
         Args:
             image (ndarray): a single image or image stack to be processed
-            detector_name (str): name of detector
 
         Returns:
-            ndarray: resulting image if detector name is known, otherwise initial image
+            ndarray: resulting image if detector_name is not None, otherwise initial image
         """
-        if detector_name in modules_orig:
-            modules_orig_y, modules_orig_x = modules_orig[detector_name]
-        else:
+        if self.detector_name is None:
             return image
+
+        modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
 
         res_shape_x = max(modules_orig_x) + MODULE_SIZE_X + (CHIP_NUM_X-1)*CHIP_GAP_X
         res_shape_y = max(modules_orig_y) + MODULE_SIZE_Y + (CHIP_NUM_Y-1)*CHIP_GAP_Y
@@ -484,9 +496,9 @@ class JFDataHandler:
 
             # in case of a single image, Ellipsis will be ignored
             # in case of 3D image stack, Ellipsis will be parsed into slice(None, None)
-            if detector_name == 'JF02T09V01':
+            if self.detector_name == 'JF02T09V01':
                 module_in = image[Ellipsis, :, m*MODULE_SIZE_X:(m+1)*MODULE_SIZE_X]
-            elif detector_name in ('JF02T09V02', 'JF02T01V02'):
+            elif self.detector_name in ('JF02T09V02', 'JF02T01V02'):
                 module_in = np.rot90(image[Ellipsis, m*MODULE_SIZE_Y:(m+1)*MODULE_SIZE_Y, :], 2, axes=rot_axes)
             else:
                 module_in = image[Ellipsis, m*MODULE_SIZE_Y:(m+1)*MODULE_SIZE_Y, :]
@@ -505,7 +517,7 @@ class JFDataHandler:
                         module_in[Ellipsis, ry_s:ry_s+CHIP_SIZE_Y, rx_s:rx_s+CHIP_SIZE_X]
 
         # rotate image in case of alvra detector
-        if detector_name.startswith('JF06'):
+        if self.detector_name.startswith('JF06'):
             res = np.rot90(res, axes=rot_axes)
 
         return res
