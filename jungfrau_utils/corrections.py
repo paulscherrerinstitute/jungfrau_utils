@@ -547,9 +547,9 @@ class JFDataHandler:
         Returns:
             ndarray: image with modules on their actual places
         """
-        if image.shape != self.raw_shape:
+        if image.shape[-2:] != self.raw_shape:
             raise ValueError(
-                f"Expected image shape {self.raw_shape}, provided image shape {image.shape}"
+                f"Expected image shape {self.raw_shape}, provided image shape {image.shape[-2:]}"
             )
 
         modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
