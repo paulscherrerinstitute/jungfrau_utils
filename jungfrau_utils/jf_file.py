@@ -39,7 +39,7 @@ class File:
             gain_file = Path(*file_path.parts[:3]).joinpath(
                 'config', 'jungfrau', 'gainMaps', self.detector_name, 'gains.h5'
             )
-            print(f'Gain file: {gain_file}')
+            print(f'Trying gain file: {gain_file}')
 
         try:
             with h5py.File(gain_file, 'r') as h5gain:
@@ -47,6 +47,8 @@ class File:
         except:
             print('Error reading gain file:', gain_file)
             raise
+        else:
+            self.gain_file = gain_file
 
         # Pedestal file (with a pixel mask)
         if pedestal_file is None:
@@ -68,7 +70,7 @@ class File:
             pedestal_file = nearest_pedestal_file
             if pedestal_file is None:
                 raise Exception(f'No pedestal file in default location: {pedestal_path}')
-            print(f'Pedestal file: {pedestal_file}')
+            print(f'Trying pedestal file: {pedestal_file}')
 
         try:
             with h5py.File(pedestal_file, 'r') as h5pedestal:
@@ -77,6 +79,8 @@ class File:
         except:
             print('Error reading pedestal file:', pedestal_file)
             raise
+        else:
+            self.pedestal_file = pedestal_file
 
         self.jf_handler = JFDataHandler(self.detector_name, gain, pedestal, pixel_mask)
 
