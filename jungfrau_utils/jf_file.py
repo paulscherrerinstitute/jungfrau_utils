@@ -22,13 +22,13 @@ class File:
         # value can be different for later pulses and this needs to be taken care of. Currently,
         # _allow_n_images decorator applies a function in a loop, making it impossible to change
         # highgain for separate images in a 3D stack.
-        self.daq_rec = self.jf_file['/data/{}/daq_rec'.format(self.detector_name)][0]
+        self.daq_rec = self.jf_file[f'/data/{self.detector_name}/daq_rec'][0]
 
-        if 'module_map' in self.jf_file['/data/{}'.format(self.detector_name)]:
+        if 'module_map' in self.jf_file[f'/data/{self.detector_name}']:
             # Pick only the first row (module_map of the first frame), because it is not expected
             # that module_map ever changes during a run. In fact, it is forseen in the future that
             # this data will be saved as a single row for the whole run.
-            self.module_map = self.jf_file['/data/{}/module_map'.format(self.detector_name)][0, :]
+            self.module_map = self.jf_file[f'/data/{self.detector_name}/module_map'][0, :]
         else:
             self.module_map = None
 
@@ -39,7 +39,7 @@ class File:
             gain_file = Path(*file_path.parts[:3]).joinpath(
                 'config', 'jungfrau', 'gainMaps', self.detector_name, 'gains.h5'
             )
-            print('Gain file: {}'.format(gain_file))
+            print(f'Gain file: {gain_file}')
 
         try:
             with h5py.File(gain_file, 'r') as h5gain:
@@ -67,8 +67,8 @@ class File:
 
             pedestal_file = nearest_pedestal_file
             if pedestal_file is None:
-                raise Exception('No pedestal file in default location: {}'.format(pedestal_path))
-            print('Pedestal file: {}'.format(pedestal_file))
+                raise Exception(f'No pedestal file in default location: {pedestal_path}')
+            print(f'Pedestal file: {pedestal_file}')
 
         try:
             with h5py.File(pedestal_file, 'r') as h5pedestal:
@@ -89,7 +89,7 @@ class File:
     def __getitem__(self, item):
         if isinstance(item, str):
             # metadata entry (lazy)
-            return self.jf_file['/data/{}/{}'.format(self.detector_name, item)]
+            return self.jf_file[f'/data/{self.detector_name}/{item}']
 
         elif isinstance(item, (int, slice)):
             # single image index or slice, no roi
@@ -99,7 +99,7 @@ class File:
             # image index and roi
             ind, roi = item[0], item[1:]
 
-        jf_data = self.jf_file['/data/{}/data'.format(self.detector_name)][ind]
+        jf_data = self.jf_file[f'/data/{self.detector_name}/data'][ind]
 
         if self.jf_handler.highgain != self.daq_rec & 0b1:
             self.jf_handler.highgain = self.daq_rec & 0b1
@@ -121,7 +121,7 @@ class File:
 
     def __repr__(self):
         if self.jf_file.id:
-            r = '<Jungfrau file "{}">'.format(self.file_path.name)
+            r = f'<Jungfrau file "{self.file_path.name}">'
         else:
             r = '<Closed Jungfrau file>'
         return r
