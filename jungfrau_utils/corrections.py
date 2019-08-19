@@ -475,6 +475,12 @@ class JFDataHandler:
             else:
                 self._GP[:, :: NUM_GAINS * 2] = 1 / self._G[0]
 
+        if self.P is not None:
+            if value:
+                self._GP[:, 1 :: NUM_GAINS * 2] = self._P[3]
+            else:
+                self._GP[:, 1 :: NUM_GAINS * 2] = self._P[0]
+
     @property
     def pixel_mask(self):
         return self._pixel_mask
