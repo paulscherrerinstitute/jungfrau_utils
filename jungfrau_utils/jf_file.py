@@ -12,10 +12,9 @@ class File:
         self.raw = raw
         self.geometry = geometry
 
-        file_path = Path(file_path)
-        self.file_path = file_path
+        self.file_path = Path(file_path)
 
-        self.jf_file = h5py.File(file_path, 'r')
+        self.jf_file = h5py.File(self.file_path, 'r')
         self.detector_name = self.jf_file['/general/detector_name'][()].decode()
 
         # TODO: Here we use daq_rec only of the first pulse within an hdf5 file, however its
@@ -34,12 +33,8 @@ class File:
 
         # Gain file
         if gain_file is None:
-            # the default gain file location is
-            # '/sf/<beamline>/config/jungfrau/gainMaps/<detector>/gains.h5'
-            gain_file = Path(*file_path.parts[:3]).joinpath(
-                'config', 'jungfrau', 'gainMaps', self.detector_name, 'gains.h5'
-            )
-            print(f'Trying gain file: {gain_file}')
+            gain_file = self._locate_gain_file()
+            print(f'Auto-located gain file: {gain_file}')
 
         try:
             with h5py.File(gain_file, 'r') as h5gain:
@@ -52,25 +47,8 @@ class File:
 
         # Pedestal file (with a pixel mask)
         if pedestal_file is None:
-            # the default processed pedestal files path for a particula p-group is
-            # '/sf/<beamline>/data/<p-group>/res/JF_pedestals/'
-            pedestal_path = Path(*file_path.parts[:5]).joinpath('res', 'JF_pedestals')
-
-            # find a pedestal file, which was created closest in time to the jungfrau file
-            jf_file_mtime = file_path.stat().st_mtime
-            nearest_pedestal_file = None
-            min_time_diff = float('inf')
-            for entry in pedestal_path.iterdir():
-                if entry.is_file() and self.detector_name in entry.name:
-                    time_diff = abs(entry.stat().st_mtime - jf_file_mtime)
-                    if time_diff < min_time_diff:
-                        min_time_diff = time_diff
-                        nearest_pedestal_file = entry
-
-            pedestal_file = nearest_pedestal_file
-            if pedestal_file is None:
-                raise Exception(f'No pedestal file in default location: {pedestal_path}')
-            print(f'Trying pedestal file: {pedestal_file}')
+            pedestal_file = self._locate_pedestal_file()
+            print(f'Auto-located pedestal file: {pedestal_file}')
 
         try:
             with h5py.File(pedestal_file, 'r') as h5pedestal:
@@ -83,6 +61,40 @@ class File:
             self.pedestal_file = pedestal_file
 
         self.jf_handler = JFDataHandler(self.detector_name, gain, pedestal, pixel_mask)
+
+    def _locate_gain_file(self):
+        # the default gain file location is
+        # '/sf/<beamline>/config/jungfrau/gainMaps/<detector>/gains.h5'
+        gain_path = Path(*self.file_path.parts[:3]).joinpath('config', 'jungfrau', 'gainMaps')
+        gain_file = gain_path.joinpath(self.detector_name, 'gains.h5')
+
+        if not gain_file.is_file():
+            raise Exception(f'No gain file in default location: {gain_path}')
+
+        return gain_file
+
+    def _locate_pedestal_file(self):
+        # the default processed pedestal files path for a particula p-group is
+        # '/sf/<beamline>/data/<p-group>/res/JF_pedestals/'
+        pedestal_path = Path(*self.file_path.parts[:5]).joinpath('res', 'JF_pedestals')
+
+        # find a pedestal file, which was created closest in time to the jungfrau file
+        jf_file_mtime = self.file_path.stat().st_mtime
+        nearest_pedestal_file = None
+        min_time_diff = float('inf')
+        for entry in pedestal_path.iterdir():
+            if entry.is_file() and self.detector_name in entry.name:
+                time_diff = abs(entry.stat().st_mtime - jf_file_mtime)
+                if time_diff < min_time_diff:
+                    min_time_diff = time_diff
+                    nearest_pedestal_file = entry
+
+        pedestal_file = nearest_pedestal_file
+
+        if pedestal_file is None:
+            raise Exception(f'No pedestal file in default location: {pedestal_path}')
+
+        return pedestal_file
 
     def __enter__(self):
         return self
