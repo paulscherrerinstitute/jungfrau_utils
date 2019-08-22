@@ -513,6 +513,12 @@ class JFDataHandler:
                 f"Expected image shape {self.raw_shape}, provided image shape {image.shape}"
             )
 
+        if self.G is None:
+            raise ValueError(f"Gains are not set")
+
+        if self.P is None:
+            raise ValueError(f"Pedestal values are not set")
+
         res = np.empty(shape=image.shape, dtype=np.float32)
         if self.module_map is None:
             if self.pixel_mask is None:
