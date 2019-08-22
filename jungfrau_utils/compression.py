@@ -1,15 +1,10 @@
 import h5py
 import numpy as np
+from bitshuffle.h5 import H5FILTER, H5_COMPRESS_LZ4
 
-# see http://python-blosc.blosc.org/reference.html for meaning of numbers
-shuffles = ('noshuffle', 'shuffle', 'bitshuffle')
-compressors = ('blosclz', 'lz4', 'lz4hc', 'snappy', 'zlib', 'zstd')
 
-complevel = 9
-shuffle = shuffles.index('bitshuffle')
-complib = compressors.index('lz4')
-
-compargs = {'compression': 32001, 'compression_opts': (0, 0, 0, 0, complevel, shuffle, complib)}
+BLOCK_SIZE = 0
+compargs = {'compression': H5FILTER, 'compression_opts': (BLOCK_SIZE, H5_COMPRESS_LZ4)}
 
 
 def compress_dataset(f_source, f_dest, dataset, factor=None, dtype=None):
