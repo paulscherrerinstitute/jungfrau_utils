@@ -119,6 +119,8 @@ class File:
             jf_data = self.jf_handler.apply_geometry(jf_data)
 
         if roi:
+            if jf_data.ndim == 3:
+                roi = (slice(None), *roi)
             jf_data = jf_data[roi]
 
         return jf_data
