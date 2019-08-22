@@ -8,8 +8,8 @@ from .corrections import JFDataHandler
 class File:
     """ Jungfrau file """
 
-    def __init__(self, file_path, gain_file=None, pedestal_file=None, raw=False, geometry=True):
-        self.raw = raw
+    def __init__(self, file_path, gain_file=None, pedestal_file=None, convert=True, geometry=True):
+        self.convert = convert
         self.geometry = geometry
 
         self.file_path = Path(file_path)
@@ -130,7 +130,7 @@ class File:
             if (self.jf_handler.module_map != self.module_map).any():
                 self.jf_handler.module_map = self.module_map
 
-        if not self.raw:  # apply gain and pedestal corrections
+        if self.convert:  # convert to keV (apply gain and pedestal corrections)
             jf_data = self.jf_handler.apply_gain_pede(jf_data)
 
         if self.geometry:  # apply detector geometry corrections
