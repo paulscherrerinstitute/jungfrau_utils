@@ -363,13 +363,6 @@ class JFDataHandler:
             (self.raw_shape[0], 2 * NUM_GAINS * self.raw_shape[1]), dtype=np.float32
         )
 
-        # make sure that G and P have type float32
-        if G is not None:
-            G = G.astype(np.float32, copy=False)
-
-        if P is not None:
-            P = P.astype(np.float32, copy=False)
-
         # this will also fill self._GP array with G and P values if they are not None
         self.G = G
         self.P = P
@@ -428,7 +421,8 @@ class JFDataHandler:
                 f"Expected G shape is {self.raw_shape}, while provided G has {value.shape[1:]}."
             )
 
-        self._G = value
+        # make sure _G has type float32
+        self._G = value.astype(np.float32, copy=False)
         for i in range(NUM_GAINS):
             self._GP[:, 2 * i :: NUM_GAINS * 2] = 1 / self._G[i]
 
@@ -455,7 +449,8 @@ class JFDataHandler:
                 f"Expected P shape is {self.raw_shape}, while provided P has {value.shape[1:]}."
             )
 
-        self._P = value
+        # make sure _P has type float32
+        self._P = value.astype(np.float32, copy=False)
         for i in range(NUM_GAINS):
             self._GP[:, (2 * i + 1) :: NUM_GAINS * 2] = self._P[i]
 
