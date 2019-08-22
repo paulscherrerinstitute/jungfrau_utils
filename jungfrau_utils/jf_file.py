@@ -65,6 +65,9 @@ class File:
     def _locate_gain_file(self):
         # the default gain file location is
         # '/sf/<beamline>/config/jungfrau/gainMaps/<detector>/gains.h5'
+        if self.file_path.parts[1] != 'sf':
+            raise Exception(f'Gain file needs to be specified explicitly.')
+
         gain_path = Path(*self.file_path.parts[:3]).joinpath('config', 'jungfrau', 'gainMaps')
         gain_file = gain_path.joinpath(self.detector_name, 'gains.h5')
 
@@ -76,6 +79,9 @@ class File:
     def _locate_pedestal_file(self):
         # the default processed pedestal files path for a particula p-group is
         # '/sf/<beamline>/data/<p-group>/res/JF_pedestals/'
+        if self.file_path.parts[1] != 'sf':
+            raise Exception(f'Pedestal file needs to be specified explicitly.')
+
         pedestal_path = Path(*self.file_path.parts[:5]).joinpath('res', 'JF_pedestals')
 
         # find a pedestal file, which was created closest in time to the jungfrau file
