@@ -581,7 +581,7 @@ class JFDataHandler:
             module = self._get_module(image, m)
 
             if self.detector_name in ('JF02T09V02', 'JF02T01V02'):
-                module = np.rot90(module, axes=rot_axes)
+                module = np.rot90(module, 2, axes=rot_axes)
 
             for j in range(CHIP_NUM_Y):
                 for k in range(CHIP_NUM_X):
