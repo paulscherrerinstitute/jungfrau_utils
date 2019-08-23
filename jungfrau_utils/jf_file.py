@@ -1,8 +1,14 @@
 from pathlib import Path
 
 import h5py
+import numpy as np
+from bitshuffle.h5 import H5_COMPRESS_LZ4, H5FILTER
 
 from .corrections import JFDataHandler
+
+# bitshuffle hdf5 filter params
+BLOCK_SIZE = 0
+compargs = {'compression': H5FILTER, 'compression_opts': (BLOCK_SIZE, H5_COMPRESS_LZ4)}
 
 
 class File:
@@ -61,6 +67,69 @@ class File:
             self.pedestal_file = pedestal_file
 
         self.jf_handler = JFDataHandler(self.detector_name, gain, pedestal, pixel_mask)
+
+    def save_as(self, dest, roi_x=(None,), roi_y=(None,), compress=True, factor=None, dtype=None):
+        def copy_objects(name, obj):
+            if isinstance(obj, h5py.Group):
+                h5_dest.create_group(name)
+
+            elif isinstance(obj, h5py.Dataset):
+                dset_source = self.jf_file[name]
+
+                args = {
+                    k: getattr(dset_source, k)
+                    for k in (
+                        'shape',
+                        'dtype',
+                        'chunks',
+                        'compression',
+                        'compression_opts',
+                        'scaleoffset',
+                        'shuffle',
+                        'fletcher32',
+                        'fillvalue',
+                    )
+                }
+
+                if dset_source.shape != dset_source.maxshape:
+                    args['maxshape'] = dset_source.maxshape
+
+                if name == f'data/{self.detector_name}/data':  # compress and copy
+                    data = self[:, roi_y, roi_x]
+                    if factor:
+                        data = np.round(data / factor)
+
+                    args['shape'] = data.shape
+                    args['maxshape'] = data.shape
+
+                    if data.ndim == 3:
+                        args['chunks'] = (1, *data.shape[1:])
+                    else:
+                        args['chunks'] = data.shape
+
+                    if dtype is None:
+                        args['dtype'] = data.dtype
+                    else:
+                        args['dtype'] = dtype
+
+                    if compress:
+                        args.update(compargs)
+
+                    dset_dest = h5_dest.create_dataset(name, **args)
+                    dset_dest[:] = data
+
+                else:  # copy
+                    h5_dest.create_dataset(name, data=dset_source, **args)
+
+            # copy attributes
+            for key, value in self.jf_file[name].attrs.items():
+                h5_dest[name].attrs[key] = value
+
+        roi_x = slice(*roi_x)
+        roi_y = slice(*roi_y)
+
+        with h5py.File(dest, 'w') as h5_dest:
+            self.jf_file.visititems(copy_objects)
 
     def _locate_gain_file(self):
         # the default gain file location is
