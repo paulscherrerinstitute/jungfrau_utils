@@ -15,8 +15,9 @@ requirements:
         - python
         - pyzmq
         - h5py
+        - hdf5<1.9
         - numpy
-        - conda-forge::bitshuffle=0.3.5
+        - paulscherrerinstitute::bitshuffle
 
 build:
   number: 1

@@ -10,6 +10,13 @@ from numpy import ma
 
 from .geometry import modules_orig
 
+try:
+    import mkl
+except ImportError:
+    pass
+else:
+    mkl.set_num_threads(1)
+
 NUM_GAINS = 4
 
 CHIP_SIZE_X = 256
