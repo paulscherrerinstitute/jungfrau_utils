@@ -15,13 +15,13 @@ class File:
     """ Jungfrau file """
 
     def __init__(self, file_path, gain_file=None, pedestal_file=None, convert=True, geometry=True):
-        self.convert = convert
-        self.geometry = geometry
-
         self.file_path = Path(file_path)
 
         self.jf_file = h5py.File(self.file_path, 'r')
         self.detector_name = self.jf_file['/general/detector_name'][()].decode()
+
+        self.convert = convert
+        self.geometry = geometry
 
         # TODO: Here we use daq_rec only of the first pulse within an hdf5 file, however its
         # value can be different for later pulses and this needs to be taken care of. Currently,
@@ -67,6 +67,35 @@ class File:
             self.pedestal_file = pedestal_file
 
         self.jf_handler = JFDataHandler(self.detector_name, gain, pedestal, pixel_mask)
+
+    @property
+    def convert(self):
+        return self._convert
+
+    @convert.setter
+    def convert(self, value):
+        if self._processed and value:
+            print("The file is already processed, setting 'convert' to False")
+            self._convert = False
+        else:
+            self._convert = value
+
+    @property
+    def geometry(self):
+        return self._geometry
+
+    @geometry.setter
+    def geometry(self, value):
+        if self._processed and value:
+            print("The file is already processed, setting 'geometry' to False")
+            self._geometry = False
+        else:
+            self._geometry = value
+
+    @property
+    def _processed(self):
+        # TODO: generalize this check for data reduction case, where dtype can be different
+        return self.jf_file[f'/data/{self.detector_name}/data'].dtype == np.float32
 
     def save_as(self, dest, roi_x=(None,), roi_y=(None,), compress=True, factor=None, dtype=None):
         def copy_objects(name, obj):
