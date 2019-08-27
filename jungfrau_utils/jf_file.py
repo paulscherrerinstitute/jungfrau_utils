@@ -23,20 +23,6 @@ class File:
         self.convert = convert
         self.geometry = geometry
 
-        # TODO: Here we use daq_rec only of the first pulse within an hdf5 file, however its
-        # value can be different for later pulses and this needs to be taken care of. Currently,
-        # _allow_n_images decorator applies a function in a loop, making it impossible to change
-        # highgain for separate images in a 3D stack.
-        self.daq_rec = self.jf_file[f'/data/{self.detector_name}/daq_rec'][0]
-
-        if 'module_map' in self.jf_file[f'/data/{self.detector_name}']:
-            # Pick only the first row (module_map of the first frame), because it is not expected
-            # that module_map ever changes during a run. In fact, it is forseen in the future that
-            # this data will be saved as a single row for the whole run.
-            self.module_map = self.jf_file[f'/data/{self.detector_name}/module_map'][0, :]
-        else:
-            self.module_map = None
-
         # Gain file
         if gain_file is None:
             gain_file = self._locate_gain_file()
@@ -67,6 +53,24 @@ class File:
             self.pedestal_file = pedestal_file
 
         self.jf_handler = JFDataHandler(self.detector_name, gain, pedestal, pixel_mask)
+
+        if 'module_map' in self.jf_file[f'/data/{self.detector_name}']:
+            # Pick only the first row (module_map of the first frame), because it is not expected
+            # that module_map ever changes during a run. In fact, it is forseen in the future that
+            # this data will be saved as a single row for the whole run.
+            module_map = self.jf_file[f'/data/{self.detector_name}/module_map'][0, :]
+        else:
+            module_map = None
+
+        self.jf_handler.module_map = module_map
+
+        # TODO: Here we use daq_rec only of the first pulse within an hdf5 file, however its
+        # value can be different for later pulses and this needs to be taken care of. Currently,
+        # _allow_n_images decorator applies a function in a loop, making it impossible to change
+        # highgain for separate images in a 3D stack.
+        daq_rec = self.jf_file[f'/data/{self.detector_name}/daq_rec'][0]
+
+        self.jf_handler.highgain = daq_rec & 0b1
 
     @property
     def detector_name(self):
@@ -224,13 +228,6 @@ class File:
             ind, roi = item[0], item[1:]
 
         jf_data = self.jf_file[f'/data/{self.detector_name}/data'][ind]
-
-        if self.jf_handler.highgain != self.daq_rec & 0b1:
-            self.jf_handler.highgain = self.daq_rec & 0b1
-
-        if self.module_map is not None:
-            if (self.jf_handler.module_map != self.module_map).any():
-                self.jf_handler.module_map = self.module_map
 
         if self.convert:  # convert to keV (apply gain and pedestal corrections)
             jf_data = self.jf_handler.apply_gain_pede(jf_data)
