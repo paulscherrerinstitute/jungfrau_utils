@@ -1,3 +1,4 @@
+from datetime import timedelta
 from pathlib import Path
 
 import h5py
@@ -50,8 +51,15 @@ class File:
 
         # Pedestal file (with a pixel mask)
         if pedestal_file is None:
-            pedestal_file = self._locate_pedestal_file()
+            pedestal_file, mtime_diff = self._locate_pedestal_file()
             print(f'Auto-located pedestal file: {pedestal_file}')
+            if mtime_diff < 0:
+                # timedelta doesn't work nicely with negative values
+                # https://docs.python.org/3/library/datetime.html#datetime.timedelta.resolution
+                tdelta_str = '-' + str(timedelta(seconds=-mtime_diff))
+            else:
+                tdelta_str = str(timedelta(seconds=mtime_diff))
+            print('    mtime difference: ' + tdelta_str)
 
         try:
             with h5py.File(pedestal_file, 'r') as h5pedestal:
@@ -231,8 +239,8 @@ class File:
         min_time_diff = float('inf')
         for entry in pedestal_path.iterdir():
             if entry.is_file() and self.detector_name in entry.name:
-                time_diff = abs(entry.stat().st_mtime - jf_file_mtime)
-                if time_diff < min_time_diff:
+                time_diff = jf_file_mtime - entry.stat().st_mtime
+                if abs(time_diff) < abs(min_time_diff):
                     min_time_diff = time_diff
                     nearest_pedestal_file = entry
 
@@ -241,7 +249,7 @@ class File:
         if pedestal_file is None:
             raise Exception(f'No pedestal file in default location: {pedestal_path}')
 
-        return pedestal_file
+        return pedestal_file, min_time_diff
 
     def __enter__(self):
         return self
