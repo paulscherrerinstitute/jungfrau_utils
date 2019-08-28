@@ -46,7 +46,7 @@ class File:
             print('Error reading gain file:', gain_file)
             raise
         else:
-            self.gain_file = gain_file
+            self._gain_file = gain_file
 
         # Pedestal file (with a pixel mask)
         if pedestal_file is None:
@@ -61,7 +61,7 @@ class File:
             print('Error reading pedestal file:', pedestal_file)
             raise
         else:
-            self.pedestal_file = pedestal_file
+            self._pedestal_file = pedestal_file
 
         self.jf_handler = JFDataHandler(self.detector_name, gain, pedestal, pixel_mask)
 
@@ -87,6 +87,16 @@ class File:
     def detector_name(self):
         """Detector name (readonly)"""
         return self._detector_name
+
+    @property
+    def gain_file(self):
+        """Gain file path (readonly)"""
+        return str(self._gain_file)
+
+    @property
+    def pedestal_file(self):
+        """Pedestal file path (readonly)"""
+        return str(self._pedestal_file)
 
     @property
     def convert(self):
