@@ -367,7 +367,7 @@ class JFDataHandler:
         # array to be used for the actual data conversion
         # G and P values are interleaved for better CPU cache utilization
         self._GP = np.empty(
-            (self.raw_shape[0], 2 * NUM_GAINS * self.raw_shape[1]), dtype=np.float32
+            (self._GP_shape[0], 2 * NUM_GAINS * self._GP_shape[1]), dtype=np.float32
         )
 
         # this will also fill self._GP array with G and P values if they are not None
@@ -387,15 +387,26 @@ class JFDataHandler:
         det = namedtuple('Detector', ['id', 'n_modules', 'version'])
         return det(*(int(d) for d in re.findall(r'\d+', self.detector_name)))
 
-    @property
-    def raw_shape(self):
-        n_modules = self._detector.n_modules
+    def _get_n_modules_shape(self, n_modules):
         if self.detector_name == 'JF02T09V01':  # a special case
             shape_y, shape_x = MODULE_SIZE_Y, MODULE_SIZE_X * n_modules
         else:
             shape_y, shape_x = MODULE_SIZE_Y * n_modules, MODULE_SIZE_X
 
         return shape_y, shape_x
+
+    @property
+    def _GP_shape(self):
+        n_modules = self._detector.n_modules
+        return self._get_n_modules_shape(n_modules)
+
+    @property
+    def _raw_shape(self):
+        if self.module_map is None:
+            return self._GP_shape
+
+        n_active_modules = np.sum(self.module_map != -1)
+        return self._get_n_modules_shape(n_active_modules)
 
     @property
     def shape(self):
@@ -423,9 +434,9 @@ class JFDataHandler:
                 f"First dimension of G should have length 4, provided G has {value.shape[0]}."
             )
 
-        if value.shape[1:] != self.raw_shape:
+        if value.shape[1:] != self._GP_shape:
             raise ValueError(
-                f"Expected G shape is {self.raw_shape}, while provided G has {value.shape[1:]}."
+                f"Expected G shape is {self._GP_shape}, while provided G has {value.shape[1:]}."
             )
 
         # make sure _G has type float32
@@ -451,9 +462,9 @@ class JFDataHandler:
                 f"First dimension of P should have length 4, provided P has {value.shape[0]}."
             )
 
-        if value.shape[1:] != self.raw_shape:
+        if value.shape[1:] != self._GP_shape:
             raise ValueError(
-                f"Expected P shape is {self.raw_shape}, while provided P has {value.shape[1:]}."
+                f"Expected P shape is {self._GP_shape}, while provided P has {value.shape[1:]}."
             )
 
         # make sure _P has type float32
@@ -498,9 +509,9 @@ class JFDataHandler:
                 f"Pixel mask should have 2 dimensions, provided pixel mask has {value.ndim}."
             )
 
-        if value.shape != self.raw_shape:
+        if value.shape != self._GP_shape:
             raise ValueError(
-                f"Expected pixel mask shape is {self.raw_shape}, provided pixel mask has {value.shape} shape."
+                f"Expected pixel mask shape is {self._GP_shape}, provided pixel mask has {value.shape} shape."
             )
 
         self._pixel_mask = value.astype(np.bool, copy=False)
@@ -515,9 +526,9 @@ class JFDataHandler:
         Returns:
             ndarray: resulting image
         """
-        if image.shape != self.raw_shape:
+        if image.shape != self._raw_shape:
             raise ValueError(
-                f"Expected image shape {self.raw_shape}, provided image shape {image.shape}"
+                f"Expected image shape {self._raw_shape}, provided image shape {image.shape}"
             )
 
         if self.G is None:
@@ -561,9 +572,9 @@ class JFDataHandler:
         Returns:
             ndarray: image with modules on their actual places
         """
-        if image.shape[-2:] != self.raw_shape:
+        if image.shape[-2:] != self._raw_shape:
             raise ValueError(
-                f"Expected image shape {self.raw_shape}, provided image shape {image.shape[-2:]}"
+                f"Expected image shape {self._raw_shape}, provided image shape {image.shape[-2:]}"
             )
 
         modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
