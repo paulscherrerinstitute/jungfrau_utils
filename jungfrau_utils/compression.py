@@ -1,6 +1,6 @@
 import h5py
 import numpy as np
-from bitshuffle.h5 import H5FILTER, H5_COMPRESS_LZ4
+from bitshuffle.h5 import H5FILTER, H5_COMPRESS_LZ4  # pylint: disable=no-name-in-module
 
 
 BLOCK_SIZE = 0

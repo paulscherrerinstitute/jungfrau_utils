@@ -2,7 +2,7 @@ from pathlib import Path
 
 import h5py
 import numpy as np
-from bitshuffle.h5 import H5_COMPRESS_LZ4, H5FILTER
+from bitshuffle.h5 import H5_COMPRESS_LZ4, H5FILTER  # pylint: disable=no-name-in-module
 
 from .corrections import JFDataHandler
 
@@ -12,9 +12,20 @@ compargs = {'compression': H5FILTER, 'compression_opts': (BLOCK_SIZE, H5_COMPRES
 
 
 class File:
-    """ Jungfrau file """
+    """Jungfrau file"""
 
     def __init__(self, file_path, gain_file=None, pedestal_file=None, convert=True, geometry=True):
+        """Create a new Jungfrau file wrapper
+
+        Args:
+            file_path (str): path to Jungfrau file
+            gain_file (str, optional): path to gain file. Auto-locate if None. Defaults to None.
+            pedestal_file (str, optional): path to pedestal file. Auto-locate if None.
+                Defaults to None.
+            convert (bool, optional): Apply gain conversion and pedestal correction.
+                Defaults to True.
+            geometry (bool, optional): Apply geometry correction. Defaults to True.
+        """
         self.file_path = Path(file_path)
 
         self.jf_file = h5py.File(self.file_path, 'r')
@@ -74,10 +85,12 @@ class File:
 
     @property
     def detector_name(self):
+        """Detector name (readonly)"""
         return self._detector_name
 
     @property
     def convert(self):
+        """A flag for applying pedestal correction and gain conversion"""
         return self._convert
 
     @convert.setter
@@ -90,6 +103,7 @@ class File:
 
     @property
     def geometry(self):
+        """A flag for applying geometry"""
         return self._geometry
 
     @geometry.setter
@@ -106,6 +120,17 @@ class File:
         return self.jf_file[f'/data/{self.detector_name}/data'].dtype == np.float32
 
     def save_as(self, dest, roi_x=(None,), roi_y=(None,), compress=True, factor=None, dtype=None):
+        """Save data in a separate hdf5 file
+
+        Args:
+            dest (str): Destination file path
+            roi_x (tuple, optional): ROI to save along x axis. Defaults to (None,).
+            roi_y (tuple, optional): ROI to save along y axis. Defaults to (None,).
+            compress (bool, optional): Apply bitshuffle+lz4 compression. Defaults to True.
+            factor (float, optional): Divide all values by a factor. Defaults to None.
+            dtype (np.dtype, optional): Resulting image data type. Defaults to None.
+        """
+
         def copy_objects(name, obj):
             if isinstance(obj, h5py.Group):
                 h5_dest.create_group(name)
@@ -250,20 +275,25 @@ class File:
         return r
 
     def close(self):
+        """Close Jungfrau file"""
         if self.jf_file.id:
             self.jf_file.close()
 
     @property
     def shape(self):
+        """Data shape in Jungfrau file"""
         return self['data'].shape
 
     @property
     def size(self):
+        """Size of data in Jungfrau file"""
         return self['data'].size
 
     @property
     def ndim(self):
+        """Number of dimensions of data in Jungfrau file"""
         return len(self.shape)
 
     def __len__(self):
+        """Number of images in Jungfrau file"""
         return self.shape[0]

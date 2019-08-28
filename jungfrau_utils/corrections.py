@@ -15,7 +15,7 @@ try:
 except ImportError:
     pass
 else:
-    mkl.set_num_threads(1)
+    mkl.set_num_threads(1)  # pylint: disable=no-member
 
 NUM_GAINS = 4
 
@@ -231,16 +231,6 @@ def apply_gain_pede(image, G=None, P=None, pixel_mask=None, highgain=False):
     -------
     res : NDArray
         Corrected image
-
-    Notes
-    -----
-    Performances for correcting a random image as of 2017-11-23, shape [1500, 1000]
-
-    Numpy
-    60 ms +- 72.7 us per loop (mean +- std. dev. of 7 runs, 10 loops each)
-
-    Numba
-    6.23 ms +- 7.22 us per loop (mean +- std. dev. of 7 runs, 100 loops each)
     """
 
     if G is not None:
@@ -312,12 +302,6 @@ def add_gap_pixels(image, modules, module_gap, chip_gap=[2, 2]):
     -------
     res : NDArray
         Corrected image
-
-    Notes
-    -----
-    Performances for correcting a random image as of 2017-11-28, shape [3*512, 1024]
-
-    4.47 ms ± 734 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
     """
     chips = [2, 4]
     shape = image.shape
@@ -347,16 +331,17 @@ def add_gap_pixels(image, modules, module_gap, chip_gap=[2, 2]):
 
 class JFDataHandler:
     def __init__(self, detector_name, G=None, P=None, pixel_mask=None, highgain=False):
-        """A class to perform jungfrau detector data handling like pedestal correction, gain
-        conversion, pixel mask, module map, etc.
+        """Create an object to perform jungfrau detector data handling like pedestal correction,
+        gain conversion, pixel mask, module map, etc.
 
         Args:
-            detector_name (str): name of a detector
+            detector_name (str): name of a detector in the form JF<id>T<nmod>V<version>
             G (ndarray, optional): 4d array with gain values
             P (ndarray, optional): 4d array with pedestal values
             pixel_mask (ndarray, optional): 2d array with non-zero values referring to bad pixels.
                 When None, all pixels assumed to be good. Defaults to None.
-            highgain (bool, optional): Highgain mode where G[3] is used for G[0]. Defaults to False.
+            highgain (bool, optional): Highgain mode where G[3] and P[3] are used for G[0] and P[0]
+                respectively. Defaults to False.
         """
         # detector_name needs to be a valid name
         if detector_name in modules_orig:
@@ -380,6 +365,7 @@ class JFDataHandler:
 
     @property
     def detector_name(self):
+        """Detector name (readonly)"""
         return self._detector_name
 
     @property
@@ -410,6 +396,7 @@ class JFDataHandler:
 
     @property
     def shape(self):
+        """Shape of image after geometry correction"""
         modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
         shape_x = max(modules_orig_x) + MODULE_SIZE_X + (CHIP_NUM_X - 1) * CHIP_GAP_X
         shape_y = max(modules_orig_y) + MODULE_SIZE_Y + (CHIP_NUM_Y - 1) * CHIP_GAP_Y
@@ -418,6 +405,7 @@ class JFDataHandler:
 
     @property
     def G(self):
+        """Current gain values"""
         return self._G
 
     @G.setter
@@ -446,6 +434,7 @@ class JFDataHandler:
 
     @property
     def P(self):
+        """Current pedestal values"""
         return self._P
 
     @P.setter
@@ -474,6 +463,7 @@ class JFDataHandler:
 
     @property
     def highgain(self):
+        """Current flag for highgain"""
         return self._highgain
 
     @highgain.setter
@@ -496,6 +486,7 @@ class JFDataHandler:
 
     @property
     def pixel_mask(self):
+        """Current pixel mask"""
         return self._pixel_mask
 
     @pixel_mask.setter
@@ -564,7 +555,7 @@ class JFDataHandler:
         return res
 
     def apply_geometry(self, image):
-        """Rearrange image according to geometry of detector modules.
+        """Rearrange image according to geometry of detector modules
 
         Args:
             image (ndarray): a single image or image stack to be processed
