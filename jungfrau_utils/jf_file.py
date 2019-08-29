@@ -137,14 +137,14 @@ class File:
         # TODO: generalize this check for data reduction case, where dtype can be different
         return self.jf_file[f'/data/{self.detector_name}/data'].dtype == np.float32
 
-    def save_as(self, dest, roi_x=(None,), roi_y=(None,), compress=True, factor=None, dtype=None):
+    def save_as(self, dest, roi_x=(None,), roi_y=(None,), compress=False, factor=None, dtype=None):
         """Save data in a separate hdf5 file
 
         Args:
             dest (str): Destination file path
             roi_x (tuple, optional): ROI to save along x axis. Defaults to (None,).
             roi_y (tuple, optional): ROI to save along y axis. Defaults to (None,).
-            compress (bool, optional): Apply bitshuffle+lz4 compression. Defaults to True.
+            compress (bool, optional): Apply bitshuffle+lz4 compression. Defaults to False.
             factor (float, optional): Divide all values by a factor. Defaults to None.
             dtype (np.dtype, optional): Resulting image data type. Defaults to None.
         """
