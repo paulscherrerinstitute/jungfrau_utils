@@ -17,7 +17,7 @@ except ImportError:
 else:
     mkl.set_num_threads(1)  # pylint: disable=no-member
 
-NUM_GAINS = 4
+NUM_GAINS = 3
 
 CHIP_SIZE_X = 256
 CHIP_SIZE_Y = 256
@@ -459,7 +459,7 @@ class JFDataHandler:
         # make sure _P has type float32
         self._P = value.astype(np.float32, copy=False)
         for i in range(NUM_GAINS):
-            self._GP[:, (2 * i + 1) :: NUM_GAINS * 2] = self._P[i]
+            self._GP[:, 2 * i + 1 :: NUM_GAINS * 2] = self._P[i]
 
     @property
     def highgain(self):
