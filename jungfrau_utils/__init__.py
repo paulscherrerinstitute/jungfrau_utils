@@ -4,4 +4,4 @@ from jungfrau_utils.compression import compress_dataset
 from jungfrau_utils.corrections import JFDataHandler, apply_gain_pede, apply_geometry
 from jungfrau_utils.jf_file import File
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
