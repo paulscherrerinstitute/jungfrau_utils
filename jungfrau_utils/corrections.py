@@ -6,6 +6,7 @@ from functools import wraps
 from time import time
 
 import numpy as np
+from numba import jit
 from numpy import ma
 
 from .geometry import modules_orig
@@ -30,6 +31,11 @@ MODULE_SIZE_Y = CHIP_NUM_Y * CHIP_SIZE_Y
 
 CHIP_GAP_X = 2
 CHIP_GAP_Y = 2
+
+# 256 not divisible by 3, so we round up to 86
+# 18 since we have 6 more pixels in H per gap
+STRIPSEL_MODULE_SIZE_X = 1024 * 3 + 18  # = 3090
+STRIPSEL_MODULE_SIZE_Y = 86
 
 
 def _allow_n_images(method):
@@ -164,7 +170,6 @@ def apply_gain_pede_np(image, G=None, P=None, pixel_mask=None):
 
 
 try:
-    from numba import jit
 
     @jit(nopython=True, nogil=True, cache=False)
     def apply_gain_pede_corrections_numba(m, n, image, G, P, mask, mask2, pede_mask, gain_mask):
@@ -368,6 +373,10 @@ class JFDataHandler:
         """Detector name (readonly)"""
         return self._detector_name
 
+    def is_stripsel(self):
+        """Return true if detector is a stripsel"""
+        return self.detector_name.startswith(("JF05", "JF11"))
+
     @property
     def _detector(self):
         det = namedtuple('Detector', ['id', 'n_modules', 'version'])
@@ -398,8 +407,12 @@ class JFDataHandler:
     def shape(self):
         """Shape of image after geometry correction"""
         modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
-        shape_x = max(modules_orig_x) + MODULE_SIZE_X + (CHIP_NUM_X - 1) * CHIP_GAP_X
-        shape_y = max(modules_orig_y) + MODULE_SIZE_Y + (CHIP_NUM_Y - 1) * CHIP_GAP_Y
+        if self.is_stripsel():
+            shape_x = max(modules_orig_x) + STRIPSEL_MODULE_SIZE_X
+            shape_y = max(modules_orig_y) + STRIPSEL_MODULE_SIZE_Y
+        else:
+            shape_x = max(modules_orig_x) + MODULE_SIZE_X + (CHIP_NUM_X - 1) * CHIP_GAP_X
+            shape_y = max(modules_orig_y) + MODULE_SIZE_Y + (CHIP_NUM_Y - 1) * CHIP_GAP_Y
 
         return shape_y, shape_x
 
@@ -589,6 +602,18 @@ class JFDataHandler:
 
             module = self._get_module(image, m)
 
+            if self.is_stripsel():
+                if module.ndim == 3:
+                    for ind in range(module.shape[0]):
+                        res[
+                            ind, oy : oy + STRIPSEL_MODULE_SIZE_Y, ox : ox + STRIPSEL_MODULE_SIZE_X
+                        ] = reshape_stripsel(module[ind])
+                else:
+                    res[
+                        oy : oy + STRIPSEL_MODULE_SIZE_Y, ox : ox + STRIPSEL_MODULE_SIZE_X
+                    ] = reshape_stripsel(module)
+                continue
+
             if self.detector_name in ('JF02T09V02', 'JF02T01V02'):
                 module = np.rot90(module, 2, axes=rot_axes)
 
@@ -660,6 +685,42 @@ def apply_geometry(image_in, detector_name):
         image_out = np.rot90(image_out)  # check .copy()
 
     return image_out
+
+
+@jit(nopython=True)
+def reshape_stripsel(image):
+    res = np.zeros((STRIPSEL_MODULE_SIZE_Y, STRIPSEL_MODULE_SIZE_X), dtype=image.dtype)
+
+    # first we fill the normal pixels, the gap ones will be overwritten later
+    for yin in range(256):
+        for xin in range(1024):
+            ichip = xin // 256
+            xout = (ichip * 774) + (xin % 256) * 3 + yin % 3
+            # 774 is the chip period, 256*3+6
+            yout = yin // 3
+            res[yout, xout] = image[yin, xin]
+
+    # now the gap pixels
+    for igap in range(3):
+        for yin in range(256):
+            yout = (yin // 6) * 2
+
+            # first the left side of gap
+            xin = igap * 64 + 63
+            xout = igap * 774 + 765 + yin % 6
+            res[yout, xout] = image[yin, xin]
+            res[yout + 1, xout] = image[yin, xin]
+
+            # then the right side is mirrored
+            xin = igap * 64 + 63 + 1
+            xout = igap * 774 + 765 + 11 - yin % 6
+            res[yout, xout] = image[yin, xin]
+            res[yout + 1, xout] = image[yin, xin]
+            # if we want a proper normalization (the area of those pixels is double, so they see 2x
+            # the signal)
+            # res[yout,xout] = res[yout,xout]/2
+
+    return res
 
 
 def test():
