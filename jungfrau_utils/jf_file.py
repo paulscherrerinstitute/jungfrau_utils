@@ -71,7 +71,10 @@ class File:
         else:
             self._pedestal_file = pedestal_file
 
-        self.jf_handler = JFDataHandler(self.detector_name, gain, pedestal, pixel_mask)
+        self.jf_handler = JFDataHandler(self.detector_name)
+        self.jf_handler.G = gain
+        self.jf_handler.P = pedestal
+        self.jf_handler.pixel_mask = pixel_mask
 
         if 'module_map' in self.jf_file[f'/data/{self.detector_name}']:
             # Pick only the first row (module_map of the first frame), because it is not expected

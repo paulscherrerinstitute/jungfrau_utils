@@ -335,18 +335,12 @@ def add_gap_pixels(image, modules, module_gap, chip_gap=[2, 2]):
 
 
 class JFDataHandler:
-    def __init__(self, detector_name, G=None, P=None, pixel_mask=None, highgain=False):
+    def __init__(self, detector_name):
         """Create an object to perform jungfrau detector data handling like pedestal correction,
         gain conversion, pixel mask, module map, etc.
 
         Args:
             detector_name (str): name of a detector in the form JF<id>T<nmod>V<version>
-            G (ndarray, optional): 4d array with gain values
-            P (ndarray, optional): 4d array with pedestal values
-            pixel_mask (ndarray, optional): 2d array with non-zero values referring to bad pixels.
-                When None, all pixels assumed to be good. Defaults to None.
-            highgain (bool, optional): Highgain mode where G[3] and P[3] are used for G[0] and P[0]
-                respectively. Defaults to False.
         """
         # detector_name needs to be a valid name
         if detector_name in modules_orig:
@@ -360,12 +354,11 @@ class JFDataHandler:
             (self._GP_shape[0], 2 * NUM_GAINS * self._GP_shape[1]), dtype=np.float32
         )
 
-        # this will also fill self._GP array with G and P values if they are not None
-        self.G = G
-        self.P = P
-
-        self.pixel_mask = pixel_mask
-        self.highgain = highgain
+        # values that define processing pipeline
+        self.G = None
+        self.P = None
+        self.pixel_mask = None
+        self.highgain = False
         self.module_map = None
 
     @property
