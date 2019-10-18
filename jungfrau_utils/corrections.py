@@ -5,6 +5,7 @@ from collections import namedtuple
 from functools import wraps
 from time import time
 
+import h5py
 import numpy as np
 from numba import jit
 from numpy import ma
@@ -355,9 +356,13 @@ class JFDataHandler:
         )
 
         # values that define processing pipeline
+        self.gain_file = None
+        self.pedestal_file = None
+
         self.G = None
         self.P = None
         self.pixel_mask = None
+
         self.highgain = False
         self.module_map = None
 
@@ -410,6 +415,27 @@ class JFDataHandler:
         return shape_y, shape_x
 
     @property
+    def gain_file(self):
+        """Return gain filepath"""
+        return self._gain_file
+
+    @gain_file.setter
+    def gain_file(self, filepath):
+        if filepath is None:
+            self._gain_file = None
+            self.G = None
+            return
+
+        if filepath == self._gain_file:
+            return
+
+        with h5py.File(filepath, 'r') as h5f:
+            gains = h5f['/gains'][:]
+
+        self._gain_file = filepath
+        self.G = gains
+
+    @property
     def G(self):
         """Current gain values"""
         return self._G
@@ -437,6 +463,30 @@ class JFDataHandler:
         self._G = value.astype(np.float32, copy=False)
         for i in range(NUM_GAINS):
             self._GP[:, 2 * i :: NUM_GAINS * 2] = 1 / self._G[i]
+
+    @property
+    def pedestal_file(self):
+        """Return pedestal filepath"""
+        return self._pedestal_file
+
+    @pedestal_file.setter
+    def pedestal_file(self, filepath):
+        if filepath is None:
+            self._pedestal_file = None
+            self.P = None
+            self.pixel_mask = None
+            return
+
+        if filepath == self._pedestal_file:
+            return
+
+        with h5py.File(filepath, 'r') as h5f:
+            pedestal = h5f['/gains'][:]
+            pixel_mask = h5f['/pixel_mask'][:]
+
+        self._pedestal_file = filepath
+        self.P = pedestal
+        self.pixel_mask = pixel_mask
 
     @property
     def P(self):
