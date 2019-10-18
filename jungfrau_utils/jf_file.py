@@ -35,19 +35,14 @@ class File:
         self.convert = convert
         self.geometry = geometry
 
+        self.jf_handler = JFDataHandler(self.detector_name)
+
         # Gain file
         if gain_file is None:
             gain_file = self._locate_gain_file()
             print(f'Auto-located gain file: {gain_file}')
 
-        try:
-            with h5py.File(gain_file, 'r') as h5gain:
-                gain = h5gain['/gains'][:]
-        except:
-            print('Error reading gain file:', gain_file)
-            raise
-        else:
-            self._gain_file = gain_file
+        self.jf_handler.gain_file = gain_file.as_posix()
 
         # Pedestal file (with a pixel mask)
         if pedestal_file is None:
@@ -61,20 +56,7 @@ class File:
                 tdelta_str = str(timedelta(seconds=mtime_diff))
             print('    mtime difference: ' + tdelta_str)
 
-        try:
-            with h5py.File(pedestal_file, 'r') as h5pedestal:
-                pedestal = h5pedestal['/gains'][:]
-                pixel_mask = h5pedestal['/pixel_mask'][:]
-        except:
-            print('Error reading pedestal file:', pedestal_file)
-            raise
-        else:
-            self._pedestal_file = pedestal_file
-
-        self.jf_handler = JFDataHandler(self.detector_name)
-        self.jf_handler.G = gain
-        self.jf_handler.P = pedestal
-        self.jf_handler.pixel_mask = pixel_mask
+        self.jf_handler.pedestal_file = pedestal_file.as_posix()
 
         if 'module_map' in self.jf_file[f'/data/{self.detector_name}']:
             # Pick only the first row (module_map of the first frame), because it is not expected
@@ -102,12 +84,12 @@ class File:
     @property
     def gain_file(self):
         """Gain file path (readonly)"""
-        return str(self._gain_file)
+        return self.jf_handler.gain_file
 
     @property
     def pedestal_file(self):
         """Pedestal file path (readonly)"""
-        return str(self._pedestal_file)
+        return self.jf_handler.pedestal_file
 
     @property
     def convert(self):
