@@ -356,15 +356,15 @@ class JFDataHandler:
         )
 
         # values that define processing pipeline
-        self.gain_file = None
-        self.pedestal_file = None
+        self._gain_file = None
+        self._pedestal_file = None
 
-        self.G = None
-        self.P = None
-        self.pixel_mask = None
+        self._G = None
+        self._P = None
+        self._pixel_mask = None
 
-        self.highgain = False
-        self.module_map = None
+        self._highgain = False
+        self._module_map = None
 
     @property
     def detector_name(self):
@@ -582,7 +582,7 @@ class JFDataHandler:
         if min(value) < -1 or self._detector.n_modules <= max(value):
             raise ValueError(
                 f"Valid module_map values are integers between -1 and {self._detector.n_modules-1}"
-        )
+            )
 
         self._module_map = value
 
