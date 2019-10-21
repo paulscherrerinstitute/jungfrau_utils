@@ -563,6 +563,29 @@ class JFDataHandler:
 
         self._pixel_mask = value.astype(np.bool, copy=False)
 
+    @property
+    def module_map(self):
+        """Current module map"""
+        return self._module_map
+
+    @module_map.setter
+    def module_map(self, value):
+        if value is None:
+            self._module_map = None
+            return
+
+        if len(value) != self._detector.n_modules:
+            raise ValueError(
+                f"Expected module_map length is {self._detector.n_modules}, provided value length is {len(value)}"
+            )
+
+        if min(value) < -1 or self._detector.n_modules <= max(value):
+            raise ValueError(
+                f"Valid module_map values are integers between -1 and {self._detector.n_modules-1}"
+        )
+
+        self._module_map = value
+
     @_allow_n_images
     def apply_gain_pede(self, image):
         """Apply pedestal correction and gain conversion
