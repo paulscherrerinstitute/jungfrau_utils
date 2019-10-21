@@ -20,6 +20,7 @@ else:
     mkl.set_num_threads(1)  # pylint: disable=no-member
 
 NUM_GAINS = 3
+HIGHGAIN_ORDER = {True: (3, 1, 2), False: (0, 1, 2)}
 
 CHIP_SIZE_X = 256
 CHIP_SIZE_Y = 256
@@ -461,8 +462,8 @@ class JFDataHandler:
 
         # make sure _G has type float32
         self._G = value.astype(np.float32, copy=False)
-        for i in range(NUM_GAINS):
-            self._GP[:, 2 * i :: NUM_GAINS * 2] = 1 / self._G[i]
+        for i, g in zip(range(NUM_GAINS), HIGHGAIN_ORDER[self.highgain]):
+            self._GP[:, 2 * i :: NUM_GAINS * 2] = 1 / self._G[g]
 
     @property
     def pedestal_file(self):
@@ -514,8 +515,8 @@ class JFDataHandler:
 
         # make sure _P has type float32
         self._P = value.astype(np.float32, copy=False)
-        for i in range(NUM_GAINS):
-            self._GP[:, 2 * i + 1 :: NUM_GAINS * 2] = self._P[i]
+        for i, g in zip(range(NUM_GAINS), HIGHGAIN_ORDER[self.highgain]):
+            self._GP[:, 2 * i + 1 :: NUM_GAINS * 2] = self._P[g]
 
     @property
     def highgain(self):
@@ -524,21 +525,17 @@ class JFDataHandler:
 
     @highgain.setter
     def highgain(self, value):
-        if value is True and self.G is None:
-            raise ValueError(f"Gains are not defined.")
+        if self._highgain == value:
+            return
 
         self._highgain = value
+        first_gain = HIGHGAIN_ORDER[value][0]
+
         if self.G is not None:
-            if value:
-                self._GP[:, :: NUM_GAINS * 2] = 1 / self._G[3]
-            else:
-                self._GP[:, :: NUM_GAINS * 2] = 1 / self._G[0]
+            self._GP[:, :: NUM_GAINS * 2] = 1 / self._G[first_gain]
 
         if self.P is not None:
-            if value:
-                self._GP[:, 1 :: NUM_GAINS * 2] = self._P[3]
-            else:
-                self._GP[:, 1 :: NUM_GAINS * 2] = self._P[0]
+            self._GP[:, 1 :: NUM_GAINS * 2] = self._P[first_gain]
 
     @property
     def pixel_mask(self):
