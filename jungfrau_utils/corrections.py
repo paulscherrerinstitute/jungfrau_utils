@@ -396,9 +396,6 @@ class JFDataHandler:
 
     @property
     def _raw_shape(self):
-        if self.module_map is None:
-            return self._GP_shape
-
         n_active_modules = np.sum(self.module_map != -1)
         return self._get_n_modules_shape(n_active_modules)
 
@@ -563,6 +560,9 @@ class JFDataHandler:
     @property
     def module_map(self):
         """Current module map"""
+        if self._module_map is None:
+            # support legacy data by emulating 'all modules are present'
+            return np.arange(self._detector.n_modules)
         return self._module_map
 
     @module_map.setter
@@ -605,28 +605,21 @@ class JFDataHandler:
             raise ValueError(f"Pedestal values are not set")
 
         res = np.empty(shape=image.shape, dtype=np.float32)
-        if self.module_map is None:
+        for i, m in enumerate(self.module_map):
+            if m == -1:
+                continue
+
+            module = self._get_module(image, m)
+
+            module_res = res[m * MODULE_SIZE_Y : (m + 1) * MODULE_SIZE_Y, :]
+            module_GP = self._GP[i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
+            module_size = np.uint32(module.size)
+
             if self.pixel_mask is None:
-                correct(np.uint32(image.size), image, self._GP, res)
+                correct(module_size, module, module_GP, module_res)
             else:
-                correct_mask(np.uint32(image.size), image, self._GP, res, self.pixel_mask)
-
-        else:
-            for i, m in enumerate(self.module_map):
-                if m == -1:
-                    continue
-
-                module = self._get_module(image, m)
-
-                module_res = res[m * MODULE_SIZE_Y : (m + 1) * MODULE_SIZE_Y, :]
-                module_GP = self._GP[i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
-                module_size = np.uint32(module.size)
-
-                if self.pixel_mask is None:
-                    correct(module_size, module, module_GP, module_res)
-                else:
-                    mask_module = self.pixel_mask[i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
-                    correct_mask(module_size, module, module_GP, module_res, mask_module)
+                mask_module = self.pixel_mask[i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
+                correct_mask(module_size, module, module_GP, module_res, mask_module)
 
         return res
 
@@ -653,13 +646,7 @@ class JFDataHandler:
             res = np.zeros(self.shape, dtype=image.dtype)
             rot_axes = (0, 1)
 
-        if self.module_map is None:
-            # emulate 'all modules are present'
-            module_map = range(len(modules_orig_y))
-        else:
-            module_map = self.module_map
-
-        for m, oy, ox in zip(module_map, modules_orig_y, modules_orig_x):
+        for m, oy, ox in zip(self.module_map, modules_orig_y, modules_orig_x):
             if m == -1:
                 continue
 
