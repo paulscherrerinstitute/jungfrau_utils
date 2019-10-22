@@ -32,8 +32,7 @@ class File:
         self.file_path = Path(file_path)
 
         self.jf_file = h5py.File(self.file_path, 'r')
-        self._detector_name = self.jf_file['/general/detector_name'][()].decode()
-        self.jf_handler = JFDataHandler(self.detector_name)
+        self.jf_handler = JFDataHandler(self.jf_file['/general/detector_name'][()].decode())
 
         self.convertion = convertion
         self.geometry = geometry
@@ -80,7 +79,7 @@ class File:
     @property
     def detector_name(self):
         """Detector name (readonly)"""
-        return self._detector_name
+        return self.jf_handler.detector_name
 
     @property
     def gain_file(self):
