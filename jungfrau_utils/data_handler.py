@@ -373,7 +373,7 @@ class JFDataHandler:
             remove_first_dim = False
 
         if self.convertion:
-            images = self._apply_gain_pede(images)
+            images = self._convert(images)
 
         if self.geometry:
             images = self._apply_geometry(images)
@@ -383,7 +383,7 @@ class JFDataHandler:
 
         return images
 
-    def _apply_gain_pede(self, image_stack):
+    def _convert(self, image_stack):
         """Apply pedestal correction and gain conversion
 
         Args:
@@ -409,7 +409,7 @@ class JFDataHandler:
             if m == -1:
                 continue
 
-            module = self._get_module(image_stack, m)
+            module = self._get_module_slice(image_stack, m)
             module_res = res[:, m * MODULE_SIZE_Y : (m + 1) * MODULE_SIZE_Y, :]
             module_GP = self._GP[i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
 
@@ -444,7 +444,7 @@ class JFDataHandler:
             if m == -1:
                 continue
 
-            module = self._get_module(image_stack, m)
+            module = self._get_module_slice(image_stack, m)
 
             if self.is_stripsel():
                 for ind in range(module.shape[0]):
@@ -476,13 +476,13 @@ class JFDataHandler:
 
         return res
 
-    def _get_module(self, image, index):
+    def _get_module_slice(self, images, index):
         # in case of a single image, Ellipsis will be ignored
         # in case of 3D image stack, Ellipsis will be parsed into slice(None, None)
         if self.detector_name == 'JF02T09V01':
-            module = image[Ellipsis, :, index * MODULE_SIZE_X : (index + 1) * MODULE_SIZE_X]
+            module = images[Ellipsis, :, index * MODULE_SIZE_X : (index + 1) * MODULE_SIZE_X]
         else:
-            module = image[Ellipsis, index * MODULE_SIZE_Y : (index + 1) * MODULE_SIZE_Y, :]
+            module = images[Ellipsis, index * MODULE_SIZE_Y : (index + 1) * MODULE_SIZE_Y, :]
 
         return module
 

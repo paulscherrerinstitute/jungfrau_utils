@@ -255,15 +255,15 @@ class File:
             # image index and roi
             ind, roi = item[0], item[1:]
 
-        jf_data = self._file[f'/data/{self.detector_name}/data'][ind]
-        jf_data = self._handler.process(jf_data)
+        data = self._file[f'/data/{self.detector_name}/data'][ind]
+        data = self._handler.process(data)
 
         if roi:
-            if jf_data.ndim == 3:
+            if data.ndim == 3:
                 roi = (slice(None), *roi)
-            jf_data = jf_data[roi]
+            data = data[roi]
 
-        return jf_data
+        return data
 
     def __repr__(self):
         if self._file.id:
