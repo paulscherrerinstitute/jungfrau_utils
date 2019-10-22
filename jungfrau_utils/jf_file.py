@@ -15,7 +15,9 @@ compargs = {'compression': H5FILTER, 'compression_opts': (BLOCK_SIZE, H5_COMPRES
 class File:
     """Jungfrau file"""
 
-    def __init__(self, file_path, gain_file=None, pedestal_file=None, convert=True, geometry=True):
+    def __init__(
+        self, file_path, gain_file=None, pedestal_file=None, convertion=True, geometry=True
+    ):
         """Create a new Jungfrau file wrapper
 
         Args:
@@ -23,7 +25,7 @@ class File:
             gain_file (str, optional): path to gain file. Auto-locate if None. Defaults to None.
             pedestal_file (str, optional): path to pedestal file. Auto-locate if None.
                 Defaults to None.
-            convert (bool, optional): Apply gain conversion and pedestal correction.
+            convertion (bool, optional): Apply gain conversion and pedestal correction.
                 Defaults to True.
             geometry (bool, optional): Apply geometry correction. Defaults to True.
         """
@@ -32,7 +34,7 @@ class File:
         self.jf_file = h5py.File(self.file_path, 'r')
         self._detector_name = self.jf_file['/general/detector_name'][()].decode()
 
-        self.convert = convert
+        self.convertion = convertion
         self.geometry = geometry
 
         self.jf_handler = JFDataHandler(self.detector_name)
@@ -92,17 +94,17 @@ class File:
         return self.jf_handler.pedestal_file
 
     @property
-    def convert(self):
+    def convertion(self):
         """A flag for applying pedestal correction and gain conversion"""
-        return self._convert
+        return self._convertion
 
-    @convert.setter
-    def convert(self, value):
+    @convertion.setter
+    def convertion(self, value):
         if self._processed and value:
-            print("The file is already processed, setting 'convert' to False")
-            self._convert = False
+            print("The file is already processed, setting 'convertion' to False")
+            self._convertion = False
         else:
-            self._convert = value
+            self._convertion = value
 
     @property
     def geometry(self):
@@ -257,7 +259,7 @@ class File:
 
         jf_data = self.jf_file[f'/data/{self.detector_name}/data'][ind]
 
-        if self.convert:  # convert to keV (apply gain and pedestal corrections)
+        if self.convertion:  # convert to keV (apply gain and pedestal corrections)
             jf_data = self.jf_handler.apply_gain_pede(jf_data)
 
         if self.geometry:  # apply detector geometry corrections
