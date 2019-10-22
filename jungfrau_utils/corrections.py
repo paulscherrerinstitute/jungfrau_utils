@@ -582,19 +582,24 @@ class JFDataHandler:
 
         self._module_map = value
 
-    @_allow_n_images
     def apply_gain_pede(self, image):
         """Apply pedestal correction and gain conversion
 
         Args:
-            image (ndarray): image to be processed
+            image (ndarray): an image stack or a single image to be processed
 
         Returns:
-            ndarray: resulting image
+            ndarray: resulting image stack or a single image
         """
-        if image.shape != self._raw_shape:
+        if image.ndim == 2:
+            remove_first_dim = True
+            image = image[np.newaxis]
+        else:
+            remove_first_dim = False
+
+        if image.shape[-2:] != self._raw_shape:
             raise ValueError(
-                f"Expected image shape {self._raw_shape}, provided image shape {image.shape}"
+                f"Expected image shape {self._raw_shape}, provided image shape {image.shape[-2:]}"
             )
 
         if self.G is None:
@@ -604,21 +609,25 @@ class JFDataHandler:
             raise ValueError(f"Pedestal values are not set")
 
         res = np.empty(shape=image.shape, dtype=np.float32)
+        module_size = np.uint32(MODULE_SIZE_X * MODULE_SIZE_Y)
         for i, m in enumerate(self.module_map):
             if m == -1:
                 continue
 
             module = self._get_module(image, m)
-
-            module_res = res[m * MODULE_SIZE_Y : (m + 1) * MODULE_SIZE_Y, :]
+            module_res = res[:, m * MODULE_SIZE_Y : (m + 1) * MODULE_SIZE_Y, :]
             module_GP = self._GP[i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
-            module_size = np.uint32(module.size)
 
             if self.pixel_mask is None:
-                correct(module_size, module, module_GP, module_res)
+                for mod, mod_res in zip(module, module_res):
+                    correct(module_size, mod, module_GP, mod_res)
             else:
                 mask_module = self.pixel_mask[i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
-                correct_mask(module_size, module, module_GP, module_res, mask_module)
+                for mod, mod_res in zip(module, module_res):
+                    correct_mask(module_size, mod, module_GP, mod_res, mask_module)
+
+        if remove_first_dim:
+            res = res[0]
 
         return res
 
