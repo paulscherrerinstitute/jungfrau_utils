@@ -33,11 +33,10 @@ class File:
 
         self.jf_file = h5py.File(self.file_path, 'r')
         self._detector_name = self.jf_file['/general/detector_name'][()].decode()
+        self.jf_handler = JFDataHandler(self.detector_name)
 
         self.convertion = convertion
         self.geometry = geometry
-
-        self.jf_handler = JFDataHandler(self.detector_name)
 
         # Gain file
         if gain_file is None:
@@ -96,28 +95,28 @@ class File:
     @property
     def convertion(self):
         """A flag for applying pedestal correction and gain conversion"""
-        return self._convertion
+        return self.jf_handler.convertion
 
     @convertion.setter
     def convertion(self, value):
-        if self._processed and value:
+        if self._processed:
             print("The file is already processed, setting 'convertion' to False")
-            self._convertion = False
-        else:
-            self._convertion = value
+            value = False
+
+        self.jf_handler.convertion = value
 
     @property
     def geometry(self):
         """A flag for applying geometry"""
-        return self._geometry
+        return self.jf_handler.geometry
 
     @geometry.setter
     def geometry(self, value):
-        if self._processed and value:
+        if self._processed:
             print("The file is already processed, setting 'geometry' to False")
-            self._geometry = False
-        else:
-            self._geometry = value
+            value = False
+
+        self.jf_handler.geometry = value
 
     @property
     def _processed(self):
@@ -258,12 +257,7 @@ class File:
             ind, roi = item[0], item[1:]
 
         jf_data = self.jf_file[f'/data/{self.detector_name}/data'][ind]
-
-        if self.convertion:  # convert to keV (apply gain and pedestal corrections)
-            jf_data = self.jf_handler.apply_gain_pede(jf_data)
-
-        if self.geometry:  # apply detector geometry corrections
-            jf_data = self.jf_handler.apply_geometry(jf_data)
+        jf_data = self.jf_handler.process(jf_data)
 
         if roi:
             if jf_data.ndim == 3:

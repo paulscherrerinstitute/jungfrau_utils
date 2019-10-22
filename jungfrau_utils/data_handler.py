@@ -127,6 +127,9 @@ class JFDataHandler:
         )
 
         # values that define processing pipeline
+        self.convertion = True  # convert to keV (apply gain and pedestal corrections)
+        self.geometry = True  # apply detector geometry corrections
+
         self._gain_file = None
         self._pedestal_file = None
 
@@ -353,24 +356,45 @@ class JFDataHandler:
 
         self._module_map = value
 
-    def apply_gain_pede(self, image):
+    def process(self, images):
+        """Perform jungfrau detector data processing like pedestal correction, gain conversion,
+        pixel mask, module map, etc.
+
+        Args:
+            images (ndarray): image stack or single image to be processed
+
+        Returns:
+            ndarray: resulting image stack or single image
+        """
+        if images.ndim == 2:
+            remove_first_dim = True
+            images = images[np.newaxis]
+        else:
+            remove_first_dim = False
+
+        if self.convertion:
+            images = self._apply_gain_pede(images)
+
+        if self.geometry:
+            images = self._apply_geometry(images)
+
+        if remove_first_dim:
+            images = images[0]
+
+        return images
+
+    def _apply_gain_pede(self, image_stack):
         """Apply pedestal correction and gain conversion
 
         Args:
-            image (ndarray): an image stack or a single image to be processed
+            image_stack (ndarray): image stack to be processed
 
         Returns:
             ndarray: resulting image stack or a single image
         """
-        if image.ndim == 2:
-            remove_first_dim = True
-            image = image[np.newaxis]
-        else:
-            remove_first_dim = False
-
-        if image.shape[-2:] != self._raw_shape:
+        if image_stack.shape[-2:] != self._raw_shape:
             raise ValueError(
-                f"Expected image shape {self._raw_shape}, provided image shape {image.shape[-2:]}"
+                f"Expected image shape {self._raw_shape}, provided image shape {image_stack.shape[-2:]}"
             )
 
         if self.G is None:
@@ -379,13 +403,13 @@ class JFDataHandler:
         if self.P is None:
             raise ValueError(f"Pedestal values are not set")
 
-        res = np.empty(shape=image.shape, dtype=np.float32)
+        res = np.empty(shape=image_stack.shape, dtype=np.float32)
         module_size = np.uint32(MODULE_SIZE_X * MODULE_SIZE_Y)
         for i, m in enumerate(self.module_map):
             if m == -1:
                 continue
 
-            module = self._get_module(image, m)
+            module = self._get_module(image_stack, m)
             module_res = res[:, m * MODULE_SIZE_Y : (m + 1) * MODULE_SIZE_Y, :]
             module_GP = self._GP[i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
 
@@ -397,39 +421,30 @@ class JFDataHandler:
                 for mod, mod_res in zip(module, module_res):
                     correct_mask(module_size, mod, module_GP, mod_res, mask_module)
 
-        if remove_first_dim:
-            res = res[0]
-
         return res
 
-    def apply_geometry(self, image):
+    def _apply_geometry(self, image_stack):
         """Rearrange image according to geometry of detector modules
 
         Args:
-            image (ndarray): a single image or image stack to be processed
+            image_stack (ndarray): image stack to be processed
 
         Returns:
-            ndarray: image with modules on their actual places
+            ndarray: resulting image_stack with modules on their actual places
         """
-        if image.ndim == 2:
-            remove_first_dim = True
-            image = image[np.newaxis]
-        else:
-            remove_first_dim = False
-
-        if image.shape[-2:] != self._raw_shape:
+        if image_stack.shape[-2:] != self._raw_shape:
             raise ValueError(
-                f"Expected image shape {self._raw_shape}, provided image shape {image.shape[-2:]}"
+                f"Expected image shape {self._raw_shape}, provided image shape {image_stack.shape[-2:]}"
             )
 
         modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
 
-        res = np.zeros((image.shape[0], *self.shape), dtype=image.dtype)
+        res = np.zeros((image_stack.shape[0], *self.shape), dtype=image_stack.dtype)
         for m, oy, ox in zip(self.module_map, modules_orig_y, modules_orig_x):
             if m == -1:
                 continue
 
-            module = self._get_module(image, m)
+            module = self._get_module(image_stack, m)
 
             if self.is_stripsel():
                 for ind in range(module.shape[0]):
@@ -455,12 +470,9 @@ class JFDataHandler:
                         :, ry_s : ry_s + CHIP_SIZE_Y, rx_s : rx_s + CHIP_SIZE_X
                     ]
 
-        # rotate image in case of alvra detector
+        # rotate image stack in case of alvra detector
         if self.detector_name.startswith('JF06'):
             res = np.rot90(res, axes=(1, 2))
-
-        if remove_first_dim:
-            res = res[0]
 
         return res
 
