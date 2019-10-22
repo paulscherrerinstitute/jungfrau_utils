@@ -411,6 +411,12 @@ class JFDataHandler:
         Returns:
             ndarray: image with modules on their actual places
         """
+        if image.ndim == 2:
+            remove_first_dim = True
+            image = image[np.newaxis]
+        else:
+            remove_first_dim = False
+
         if image.shape[-2:] != self._raw_shape:
             raise ValueError(
                 f"Expected image shape {self._raw_shape}, provided image shape {image.shape[-2:]}"
@@ -418,13 +424,7 @@ class JFDataHandler:
 
         modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
 
-        if image.ndim == 3:
-            res = np.zeros((image.shape[0], *self.shape), dtype=image.dtype)
-            rot_axes = (1, 2)
-        else:
-            res = np.zeros(self.shape, dtype=image.dtype)
-            rot_axes = (0, 1)
-
+        res = np.zeros((image.shape[0], *self.shape), dtype=image.dtype)
         for m, oy, ox in zip(self.module_map, modules_orig_y, modules_orig_x):
             if m == -1:
                 continue
@@ -432,19 +432,14 @@ class JFDataHandler:
             module = self._get_module(image, m)
 
             if self.is_stripsel():
-                if module.ndim == 3:
-                    for ind in range(module.shape[0]):
-                        res[
-                            ind, oy : oy + STRIPSEL_MODULE_SIZE_Y, ox : ox + STRIPSEL_MODULE_SIZE_X
-                        ] = reshape_stripsel(module[ind])
-                else:
+                for ind in range(module.shape[0]):
                     res[
-                        oy : oy + STRIPSEL_MODULE_SIZE_Y, ox : ox + STRIPSEL_MODULE_SIZE_X
-                    ] = reshape_stripsel(module)
+                        ind, oy : oy + STRIPSEL_MODULE_SIZE_Y, ox : ox + STRIPSEL_MODULE_SIZE_X
+                    ] = reshape_stripsel(module[ind])
                 continue
 
             if self.detector_name in ('JF02T09V02', 'JF02T01V02'):
-                module = np.rot90(module, 2, axes=rot_axes)
+                module = np.rot90(module, 2, axes=(1, 2))
 
             for j in range(CHIP_NUM_Y):
                 for k in range(CHIP_NUM_X):
@@ -456,13 +451,16 @@ class JFDataHandler:
                     wy_s = oy + ry_s + j * CHIP_GAP_Y
                     wx_s = ox + rx_s + k * CHIP_GAP_X
 
-                    res[Ellipsis, wy_s : wy_s + CHIP_SIZE_Y, wx_s : wx_s + CHIP_SIZE_X] = module[
-                        Ellipsis, ry_s : ry_s + CHIP_SIZE_Y, rx_s : rx_s + CHIP_SIZE_X
+                    res[:, wy_s : wy_s + CHIP_SIZE_Y, wx_s : wx_s + CHIP_SIZE_X] = module[
+                        :, ry_s : ry_s + CHIP_SIZE_Y, rx_s : rx_s + CHIP_SIZE_X
                     ]
 
         # rotate image in case of alvra detector
         if self.detector_name.startswith('JF06'):
-            res = np.rot90(res, axes=rot_axes)
+            res = np.rot90(res, axes=(1, 2))
+
+        if remove_first_dim:
+            res = res[0]
 
         return res
 
