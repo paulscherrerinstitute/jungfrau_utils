@@ -383,6 +383,9 @@ class JFDataHandler:
 
         return images
 
+    def can_convert(self):
+        return (self.G is not None) and (self.P is not None)
+
     def _convert(self, image_stack):
         """Apply pedestal correction and gain conversion
 
@@ -397,11 +400,8 @@ class JFDataHandler:
                 f"Expected image shape {self._raw_shape}, provided image shape {image_stack.shape[-2:]}"
             )
 
-        if self.G is None:
-            raise ValueError(f"Gains are not set")
-
-        if self.P is None:
-            raise ValueError(f"Pedestal values are not set")
+        if not self.can_convert():
+            raise RuntimeError("Gain and/or pedestal values are not set")
 
         res = np.empty(shape=image_stack.shape, dtype=np.float32)
         module_size = np.uint32(MODULE_SIZE_X * MODULE_SIZE_Y)
