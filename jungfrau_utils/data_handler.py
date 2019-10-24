@@ -395,10 +395,7 @@ class JFDataHandler:
         Returns:
             ndarray: resulting image stack or a single image
         """
-        if image_stack.shape[-2:] != self._raw_shape:
-            raise ValueError(
-                f"Expected image shape {self._raw_shape}, provided image shape {image_stack.shape[-2:]}"
-            )
+        self._check_image_stack_shape(image_stack)
 
         if not self.can_convert():
             raise RuntimeError("Gain and/or pedestal values are not set")
@@ -432,10 +429,7 @@ class JFDataHandler:
         Returns:
             ndarray: resulting image_stack with modules on their actual places
         """
-        if image_stack.shape[-2:] != self._raw_shape:
-            raise ValueError(
-                f"Expected image shape {self._raw_shape}, provided image shape {image_stack.shape[-2:]}"
-            )
+        self._check_image_stack_shape(image_stack)
 
         modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
 
@@ -475,6 +469,13 @@ class JFDataHandler:
             res = np.rot90(res, axes=(1, 2))
 
         return res
+
+    def _check_image_stack_shape(self, image_stack):
+        image_shape = image_stack.shape[-2:]
+        if image_shape != self._raw_shape:
+            raise ValueError(
+                f"Expected image shape {self._raw_shape}, provided image shape {image_shape}"
+            )
 
     def _get_module_slice(self, images, index):
         # in case of a single image, Ellipsis will be ignored
