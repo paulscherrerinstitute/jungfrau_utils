@@ -128,6 +128,7 @@ class JFDataHandler:
 
         # values that define processing pipeline
         self.convertion = True  # convert to keV (apply gain and pedestal corrections)
+        self.gap_pixels = True  # add gap pixels between detector submodules
         self.geometry = True  # apply detector geometry corrections
 
         self._gain_file = None
@@ -189,11 +190,22 @@ class JFDataHandler:
         if self.is_stripsel():
             return self._stripsel_shape
 
-        if self.geometry:
+        if self.geometry and self.gap_pixels:
             modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
             shape_x = max(modules_orig_x) + MODULE_SIZE_X + (CHIP_NUM_X - 1) * CHIP_GAP_X
             shape_y = max(modules_orig_y) + MODULE_SIZE_Y + (CHIP_NUM_Y - 1) * CHIP_GAP_Y
-        else:
+
+        elif self.geometry and not self.gap_pixels:
+            modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
+            shape_x = max(modules_orig_x) + MODULE_SIZE_X
+            shape_y = max(modules_orig_y) + MODULE_SIZE_Y
+
+        elif not self.geometry and self.gap_pixels:
+            shape_y, shape_x = self._raw_shape
+            shape_x += (CHIP_NUM_X - 1) * CHIP_GAP_X
+            shape_y += (CHIP_NUM_Y - 1) * CHIP_GAP_Y * self._detector.n_modules
+
+        elif not self.geometry and not self.gap_pixels:
             shape_y, shape_x = self._raw_shape
 
         return shape_y, shape_x
@@ -388,11 +400,15 @@ class JFDataHandler:
         if self.convertion:
             images = self._convert(images)
 
-        if self.geometry:
-            if self.is_stripsel():
+        if self.is_stripsel():
+            if self.geometry:
                 images = self._apply_geometry_stripsel(images)
-            else:
+        else:
+            if self.geometry:
+                # this will also handle self.gap_pixels
                 images = self._apply_geometry(images)
+            elif self.gap_pixels:
+                images = self._add_gap_pixels(images)
 
         if remove_first_dim:
             images = images[0]
@@ -459,6 +475,36 @@ class JFDataHandler:
             if self.detector_name in ('JF02T09V02', 'JF02T01V02'):
                 module = np.rot90(module, 2, axes=(1, 2))
 
+            if self.gap_pixels:
+                for j in range(CHIP_NUM_Y):
+                    for k in range(CHIP_NUM_X):
+                        # reading positions
+                        ry_s = j * CHIP_SIZE_Y
+                        rx_s = k * CHIP_SIZE_X
+
+                        # writing positions
+                        wy_s = oy + ry_s + j * CHIP_GAP_Y
+                        wx_s = ox + rx_s + k * CHIP_GAP_X
+
+                        res[:, wy_s : wy_s + CHIP_SIZE_Y, wx_s : wx_s + CHIP_SIZE_X] = module[
+                            :, ry_s : ry_s + CHIP_SIZE_Y, rx_s : rx_s + CHIP_SIZE_X
+                        ]
+            else:
+                res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X] = module
+
+        # rotate image stack in case of alvra detector
+        if self.detector_name.startswith('JF06'):
+            res = np.rot90(res, axes=(1, 2))
+
+        return res
+
+    def _add_gap_pixels(self, image_stack):
+        self._check_image_stack_shape(image_stack)
+
+        res = np.zeros((image_stack.shape[0], *self.shape), dtype=image_stack.dtype)
+
+        for m in range(np.sum(self.module_map != -1)):
+            module = self._get_module_slice(image_stack, m)
             for j in range(CHIP_NUM_Y):
                 for k in range(CHIP_NUM_X):
                     # reading positions
@@ -466,16 +512,12 @@ class JFDataHandler:
                     rx_s = k * CHIP_SIZE_X
 
                     # writing positions
-                    wy_s = oy + ry_s + j * CHIP_GAP_Y
-                    wx_s = ox + rx_s + k * CHIP_GAP_X
+                    wy_s = m * MODULE_SIZE_Y + ry_s + j * CHIP_GAP_Y
+                    wx_s = rx_s + k * CHIP_GAP_X
 
                     res[:, wy_s : wy_s + CHIP_SIZE_Y, wx_s : wx_s + CHIP_SIZE_X] = module[
                         :, ry_s : ry_s + CHIP_SIZE_Y, rx_s : rx_s + CHIP_SIZE_X
                     ]
-
-        # rotate image stack in case of alvra detector
-        if self.detector_name.startswith('JF06'):
-            res = np.rot90(res, axes=(1, 2))
 
         return res
 
