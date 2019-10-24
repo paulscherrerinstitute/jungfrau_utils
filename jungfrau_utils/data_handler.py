@@ -389,7 +389,10 @@ class JFDataHandler:
             images = self._convert(images)
 
         if self.geometry:
-            images = self._apply_geometry(images)
+            if self.is_stripsel():
+                images = self._apply_geometry_stripsel(images)
+            else:
+                images = self._apply_geometry(images)
 
         if remove_first_dim:
             images = images[0]
@@ -453,13 +456,6 @@ class JFDataHandler:
 
             module = self._get_module_slice(image_stack, m)
 
-            if self.is_stripsel():
-                for ind in range(module.shape[0]):
-                    res[
-                        ind, oy : oy + STRIPSEL_MODULE_SIZE_Y, ox : ox + STRIPSEL_MODULE_SIZE_X
-                    ] = reshape_stripsel(module[ind])
-                continue
-
             if self.detector_name in ('JF02T09V02', 'JF02T01V02'):
                 module = np.rot90(module, 2, axes=(1, 2))
 
@@ -480,6 +476,33 @@ class JFDataHandler:
         # rotate image stack in case of alvra detector
         if self.detector_name.startswith('JF06'):
             res = np.rot90(res, axes=(1, 2))
+
+        return res
+
+    def _apply_geometry_stripsel(self, image_stack):
+        """Rearrange stripsel image according to geometry of detector modules
+
+        Args:
+            image_stack (ndarray): image stack to be processed
+
+        Returns:
+            ndarray: resulting image_stack with modules on their actual places
+        """
+        self._check_image_stack_shape(image_stack)
+
+        modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
+
+        res = np.zeros((image_stack.shape[0], *self.shape), dtype=image_stack.dtype)
+        for m, oy, ox in zip(self.module_map, modules_orig_y, modules_orig_x):
+            if m == -1:
+                continue
+
+            module = self._get_module_slice(image_stack, m)
+
+            for ind in range(module.shape[0]):
+                res[
+                    ind, oy : oy + STRIPSEL_MODULE_SIZE_Y, ox : ox + STRIPSEL_MODULE_SIZE_X
+                ] = reshape_stripsel(module[ind])
 
         return res
 
