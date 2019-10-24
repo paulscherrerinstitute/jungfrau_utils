@@ -174,9 +174,12 @@ class JFDataHandler:
 
     @property
     def _stripsel_shape(self):
-        modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
-        shape_x = max(modules_orig_x) + STRIPSEL_MODULE_SIZE_X
-        shape_y = max(modules_orig_y) + STRIPSEL_MODULE_SIZE_Y
+        if self.geometry:
+            modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
+            shape_x = max(modules_orig_x) + STRIPSEL_MODULE_SIZE_X
+            shape_y = max(modules_orig_y) + STRIPSEL_MODULE_SIZE_Y
+        else:
+            shape_y, shape_x = self._raw_shape
 
         return shape_y, shape_x
 
@@ -186,9 +189,12 @@ class JFDataHandler:
         if self.is_stripsel():
             return self._stripsel_shape
 
-        modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
-        shape_x = max(modules_orig_x) + MODULE_SIZE_X + (CHIP_NUM_X - 1) * CHIP_GAP_X
-        shape_y = max(modules_orig_y) + MODULE_SIZE_Y + (CHIP_NUM_Y - 1) * CHIP_GAP_Y
+        if self.geometry:
+            modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
+            shape_x = max(modules_orig_x) + MODULE_SIZE_X + (CHIP_NUM_X - 1) * CHIP_GAP_X
+            shape_y = max(modules_orig_y) + MODULE_SIZE_Y + (CHIP_NUM_Y - 1) * CHIP_GAP_Y
+        else:
+            shape_y, shape_x = self._raw_shape
 
         return shape_y, shape_x
 
