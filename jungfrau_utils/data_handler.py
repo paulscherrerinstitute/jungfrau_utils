@@ -173,15 +173,22 @@ class JFDataHandler:
         return self._get_n_modules_shape(n_active_modules)
 
     @property
+    def _stripsel_shape(self):
+        modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
+        shape_x = max(modules_orig_x) + STRIPSEL_MODULE_SIZE_X
+        shape_y = max(modules_orig_y) + STRIPSEL_MODULE_SIZE_Y
+
+        return shape_y, shape_x
+
+    @property
     def shape(self):
         """Shape of image after geometry correction"""
-        modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
         if self.is_stripsel():
-            shape_x = max(modules_orig_x) + STRIPSEL_MODULE_SIZE_X
-            shape_y = max(modules_orig_y) + STRIPSEL_MODULE_SIZE_Y
-        else:
-            shape_x = max(modules_orig_x) + MODULE_SIZE_X + (CHIP_NUM_X - 1) * CHIP_GAP_X
-            shape_y = max(modules_orig_y) + MODULE_SIZE_Y + (CHIP_NUM_Y - 1) * CHIP_GAP_Y
+            return self._stripsel_shape
+
+        modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
+        shape_x = max(modules_orig_x) + MODULE_SIZE_X + (CHIP_NUM_X - 1) * CHIP_GAP_X
+        shape_y = max(modules_orig_y) + MODULE_SIZE_Y + (CHIP_NUM_Y - 1) * CHIP_GAP_Y
 
         return shape_y, shape_x
 
