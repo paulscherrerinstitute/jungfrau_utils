@@ -1,4 +1,4 @@
-import imp
+import importlib
 import os
 from sys import exc_info
 
@@ -20,7 +20,7 @@ def load_matplotlib_style(name="default"):
     try:
         if name == "default":
             mpl.rcParams = mpl.rc_params_from_file(module_dir + "/matplotlibrc")
-        imp.reload(plt)
+        importlib.reload(plt)
         #reload(gridspec)
     except:
         print(exc_info())
