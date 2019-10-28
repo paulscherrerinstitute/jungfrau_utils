@@ -16,7 +16,13 @@ class File:
     """Jungfrau file"""
 
     def __init__(
-        self, file_path, gain_file=None, pedestal_file=None, convertion=True, geometry=True
+        self,
+        file_path,
+        gain_file=None,
+        pedestal_file=None,
+        convertion=True,
+        gap_pixels=True,
+        geometry=True,
     ):
         """Create a new Jungfrau file wrapper
 
@@ -27,6 +33,8 @@ class File:
                 Defaults to None.
             convertion (bool, optional): Apply gain conversion and pedestal correction.
                 Defaults to True.
+            gap_pixels (bool, optional): Add gap pixels between detector submodules.
+                Defaults to True.
             geometry (bool, optional): Apply geometry correction. Defaults to True.
         """
         self.file_path = Path(file_path)
@@ -35,6 +43,7 @@ class File:
         self.handler = JFDataHandler(self.file['/general/detector_name'][()].decode())
 
         self.convertion = convertion
+        self.gap_pixels = gap_pixels
         self.geometry = geometry
 
         # Gain file
@@ -103,6 +112,19 @@ class File:
             value = False
 
         self.handler.convertion = value
+
+    @property
+    def gap_pixels(self):
+        """A flag for adding gap pixels"""
+        return self.handler.gap_pixels
+
+    @gap_pixels.setter
+    def gap_pixels(self, value):
+        if self._processed:
+            print("The file is already processed, setting 'gap_pixels' to False")
+            value = False
+
+        self.handler.gap_pixels = value
 
     @property
     def geometry(self):
