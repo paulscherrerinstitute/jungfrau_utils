@@ -301,13 +301,8 @@ class File:
 
     @property
     def shape(self):
-        """Data shape in Jungfrau file"""
-        return self['data'].shape
-
-    @property
-    def size(self):
-        """Size of data in Jungfrau file"""
-        return self['data'].size
+        """Image shape of Jungfrau file based on gap_pixels/geometry flags"""
+        return self.handler.shape
 
     @property
     def ndim(self):
