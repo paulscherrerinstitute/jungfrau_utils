@@ -1,10 +1,13 @@
 from functools import wraps
+import warnings
 
 import numpy as np
 from numba import jit
 from numpy import ma
 
 from .geometry import modules_orig
+
+warnings.filterwarnings("default", category=DeprecationWarning)
 
 CHIP_SIZE_X = 256
 CHIP_SIZE_Y = 256
@@ -149,7 +152,11 @@ def apply_gain_pede(image, G=None, P=None, pixel_mask=None, highgain=False):
     res : NDArray
         Corrected image
     """
-
+    warnings.warn(
+        "The function apply_gain_pede is deprecated and will be removed in jungfrau_utils/1.0. " \
+        "Use JFDataHandler to perform gain/pedestal corrections instead.",
+        DeprecationWarning,
+    )
     if G is not None:
         G = G.astype(np.float32)
 
@@ -247,6 +254,11 @@ def add_gap_pixels(image, modules, module_gap, chip_gap=[2, 2]):
 
 
 def apply_geometry(image_in, detector_name):
+    warnings.warn(
+        "The function apply_geometry is deprecated and will be removed in jungfrau_utils/1.0. " \
+        "Use JFDataHandler to perform geometry corrections instead.",
+        DeprecationWarning,
+    )
     if detector_name in modules_orig:
         modules_orig_y, modules_orig_x = modules_orig[detector_name]
     else:
