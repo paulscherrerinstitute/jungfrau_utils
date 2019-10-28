@@ -356,6 +356,26 @@ class JFDataHandler:
         self._pixel_mask = value.astype(np.bool, copy=False)
 
     @property
+    def shaped_pixel_mask(self):
+        """Pixel mask with geometry/gap pixels based on the corresponding flags (readonly)"""
+        if self.pixel_mask is None:
+            return None
+
+        # currently, it requeires a hack of cleaning convertion and module_map values for shaping
+        _module_map = self._module_map
+        conversion = self.convertion
+
+        self._module_map = None
+        self.convertion = False
+        res = np.invert(self.process(np.invert(self.pixel_mask)))
+
+        # restore module_map and convertion values
+        self._module_map = _module_map
+        self.convertion = conversion
+
+        return res
+
+    @property
     def module_map(self):
         """Current module map"""
         if self._module_map is None:

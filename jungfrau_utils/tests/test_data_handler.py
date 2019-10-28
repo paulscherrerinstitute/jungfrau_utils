@@ -218,3 +218,26 @@ def test_handler_process_no_gaps_no_geom(handler):
     assert res.dtype == np.float32
     assert res.ndim == 2
     assert res.shape == DATA_SHAPE
+
+
+@pytest.mark.parametrize("gap_pixels", [True, False])
+@pytest.mark.parametrize("geometry", [True, False])
+@pytest.mark.parametrize("module_mask", [None, np.array([0, -1, 1])])
+def test_handler_shaped_pixel_mask(handler, gap_pixels, geometry, module_mask):
+    handler.gap_pixels = gap_pixels
+    handler.geometry = geometry
+    handler.module_map = module_mask
+
+    res = handler.shaped_pixel_mask
+
+    assert res.ndim == 2
+    assert res.dtype == np.bool
+
+    if gap_pixels and geometry:
+        assert res.shape == DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY
+    elif not gap_pixels and geometry:
+        assert res.shape == DATA_SHAPE_WITH_GEOMETRY
+    elif gap_pixels and not geometry:
+        assert res.shape == DATA_SHAPE_WITH_GAPS
+    elif not gap_pixels and not geometry:
+        assert res.shape == DATA_SHAPE
