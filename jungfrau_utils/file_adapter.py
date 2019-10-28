@@ -31,8 +31,8 @@ class File:
         """
         self.file_path = Path(file_path)
 
-        self._file = h5py.File(self.file_path, 'r')
-        self._handler = JFDataHandler(self._file['/general/detector_name'][()].decode())
+        self.file = h5py.File(self.file_path, 'r')
+        self.handler = JFDataHandler(self.file['/general/detector_name'][()].decode())
 
         self.convertion = convertion
         self.geometry = geometry
@@ -42,7 +42,7 @@ class File:
             gain_file = self._locate_gain_file()
             print(f'Auto-located gain file: {gain_file}')
 
-        self._handler.gain_file = gain_file.as_posix()
+        self.handler.gain_file = gain_file.as_posix()
 
         # Pedestal file (with a pixel mask)
         if pedestal_file is None:
@@ -56,45 +56,45 @@ class File:
                 tdelta_str = str(timedelta(seconds=mtime_diff))
             print('    mtime difference: ' + tdelta_str)
 
-        self._handler.pedestal_file = pedestal_file.as_posix()
+        self.handler.pedestal_file = pedestal_file.as_posix()
 
-        if 'module_map' in self._file[f'/data/{self.detector_name}']:
+        if 'module_map' in self.file[f'/data/{self.detector_name}']:
             # Pick only the first row (module_map of the first frame), because it is not expected
             # that module_map ever changes during a run. In fact, it is forseen in the future that
             # this data will be saved as a single row for the whole run.
-            module_map = self._file[f'/data/{self.detector_name}/module_map'][0, :]
+            module_map = self.file[f'/data/{self.detector_name}/module_map'][0, :]
         else:
             module_map = None
 
-        self._handler.module_map = module_map
+        self.handler.module_map = module_map
 
         # TODO: Here we use daq_rec only of the first pulse within an hdf5 file, however its
         # value can be different for later pulses and this needs to be taken care of. Currently,
         # _allow_n_images decorator applies a function in a loop, making it impossible to change
         # highgain for separate images in a 3D stack.
-        daq_rec = self._file[f'/data/{self.detector_name}/daq_rec'][0]
+        daq_rec = self.file[f'/data/{self.detector_name}/daq_rec'][0]
 
-        self._handler.highgain = daq_rec & 0b1
+        self.handler.highgain = daq_rec & 0b1
 
     @property
     def detector_name(self):
         """Detector name (readonly)"""
-        return self._handler.detector_name
+        return self.handler.detector_name
 
     @property
     def gain_file(self):
         """Gain file path (readonly)"""
-        return self._handler.gain_file
+        return self.handler.gain_file
 
     @property
     def pedestal_file(self):
         """Pedestal file path (readonly)"""
-        return self._handler.pedestal_file
+        return self.handler.pedestal_file
 
     @property
     def convertion(self):
         """A flag for applying pedestal correction and gain conversion"""
-        return self._handler.convertion
+        return self.handler.convertion
 
     @convertion.setter
     def convertion(self, value):
@@ -102,12 +102,12 @@ class File:
             print("The file is already processed, setting 'convertion' to False")
             value = False
 
-        self._handler.convertion = value
+        self.handler.convertion = value
 
     @property
     def geometry(self):
         """A flag for applying geometry"""
-        return self._handler.geometry
+        return self.handler.geometry
 
     @geometry.setter
     def geometry(self, value):
@@ -115,12 +115,12 @@ class File:
             print("The file is already processed, setting 'geometry' to False")
             value = False
 
-        self._handler.geometry = value
+        self.handler.geometry = value
 
     @property
     def _processed(self):
         # TODO: generalize this check for data reduction case, where dtype can be different
-        return self._file[f'/data/{self.detector_name}/data'].dtype == np.float32
+        return self.file[f'/data/{self.detector_name}/data'].dtype == np.float32
 
     def save_as(self, dest, roi_x=(None,), roi_y=(None,), compress=False, factor=None, dtype=None):
         """Save data in a separate hdf5 file
@@ -139,7 +139,7 @@ class File:
                 h5_dest.create_group(name)
 
             elif isinstance(obj, h5py.Dataset):
-                dset_source = self._file[name]
+                dset_source = self.file[name]
 
                 args = {
                     k: getattr(dset_source, k)
@@ -187,14 +187,14 @@ class File:
                     h5_dest.create_dataset(name, data=dset_source, **args)
 
             # copy attributes
-            for key, value in self._file[name].attrs.items():
+            for key, value in self.file[name].attrs.items():
                 h5_dest[name].attrs[key] = value
 
         roi_x = slice(*roi_x)
         roi_y = slice(*roi_y)
 
         with h5py.File(dest, 'w') as h5_dest:
-            self._file.visititems(copy_objects)
+            self.file.visititems(copy_objects)
 
     def _locate_gain_file(self):
         # the default gain file location is
@@ -245,7 +245,7 @@ class File:
     def __getitem__(self, item):
         if isinstance(item, str):
             # metadata entry (lazy)
-            return self._file[f'/data/{self.detector_name}/{item}']
+            return self.file[f'/data/{self.detector_name}/{item}']
 
         elif isinstance(item, (int, slice)):
             # single image index or slice, no roi
@@ -255,8 +255,8 @@ class File:
             # image index and roi
             ind, roi = item[0], item[1:]
 
-        data = self._file[f'/data/{self.detector_name}/data'][ind]
-        data = self._handler.process(data)
+        data = self.file[f'/data/{self.detector_name}/data'][ind]
+        data = self.handler.process(data)
 
         if roi:
             if data.ndim == 3:
@@ -266,7 +266,7 @@ class File:
         return data
 
     def __repr__(self):
-        if self._file.id:
+        if self.file.id:
             r = f'<Jungfrau file "{self.file_path.name}">'
         else:
             r = '<Closed Jungfrau file>'
@@ -274,8 +274,8 @@ class File:
 
     def close(self):
         """Close Jungfrau file"""
-        if self._file.id:
-            self._file.close()
+        if self.file.id:
+            self.file.close()
 
     @property
     def shape(self):
