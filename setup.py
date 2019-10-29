@@ -11,7 +11,7 @@ setup(
     description='',
     author='Paul Scherrer Institute',
     license='GNU GPLv3',
-    packages=['jungfrau_utils', 'jungfrau_utils.scripts', 'jungfrau_utils.plot'],
+    packages=['jungfrau_utils', 'jungfrau_utils.scripts'],
     ext_modules=[
         Extension(
             'libcorrections',
