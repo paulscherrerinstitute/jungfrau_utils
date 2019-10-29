@@ -93,17 +93,7 @@ try:
         2D array containing corrected image
     """
 except:
-    print('Could not load libcorrections.')
-
-    def correct(*args, **kwargs):
-        raise NotImplementedError(
-            "libcorrections is needed. python version of jf_apply_pede_gain() missing."
-        )
-
-    def correct_mask(*args, **kwargs):
-        raise NotImplementedError(
-            "libcorrections is needed. python version of jf_apply_pede_gain_mask() missing."
-        )
+    raise ImportError('Could not load libcorrections.')
 
 
 class JFDataHandler:
