@@ -218,6 +218,74 @@ class File:
         with h5py.File(dest, 'w') as h5_dest:
             self.file.visititems(copy_objects)
 
+    def export_plain_data(
+        self, dest, index=slice(None, None), compress=False, factor=None, dtype=None
+    ):
+        """Export data in a separate plain hdf5 file
+
+        Args:
+            dest (str): Destination file path
+            index (list, slice): List of image indexes to save. Defaults to slice(None, None).
+            compress (bool, optional): Apply bitshuffle+lz4 compression. Defaults to False.
+            factor (float, optional): Divide all values by a factor. Defaults to None.
+            dtype (np.dtype, optional): Resulting image data type. Defaults to None.
+        """
+        if isinstance(index, int):
+            index = [index]
+
+        data_group = self.file[f'/data/{self.detector_name}']
+
+        def export_objects(name):
+            dset_source = data_group[name]
+
+            args = {
+                k: getattr(dset_source, k)
+                for k in (
+                    'shape',
+                    'dtype',
+                    'chunks',
+                    'compression',
+                    'compression_opts',
+                    'scaleoffset',
+                    'shuffle',
+                    'fletcher32',
+                    'fillvalue',
+                )
+            }
+
+            if dset_source.shape != dset_source.maxshape:
+                args['maxshape'] = dset_source.maxshape
+
+            if name == 'data':  # compress and copy
+                data = self[index, :, :]
+                if factor:
+                    data = np.round(data / factor)
+
+                args['shape'] = data.shape
+                args['maxshape'] = data.shape
+                args['chunks'] = (1, *data.shape[1:])
+
+                if dtype is None:
+                    args['dtype'] = data.dtype
+                else:
+                    args['dtype'] = dtype
+
+                if compress:
+                    args.update(compargs)
+
+                dset_dest = h5_dest.create_dataset(f"/data/{name}", **args)
+                dset_dest[:] = data
+
+            else:  # copy
+                data = dset_source[index, :]
+                args['shape'] = data.shape
+                args['maxshape'] = data.shape
+                h5_dest.create_dataset(f"/data/{name}", data=data, **args)
+
+        with h5py.File(dest, 'w') as h5_dest:
+            h5_dest.create_group('/data')
+            data_group.visit(export_objects)
+
     def _locate_gain_file(self):
         # the default gain file location is
         # '/sf/<beamline>/config/jungfrau/gainMaps/<detector>/gains.h5'
