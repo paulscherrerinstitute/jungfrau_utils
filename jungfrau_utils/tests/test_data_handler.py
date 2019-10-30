@@ -15,15 +15,15 @@ pixel_mask = np.random.randint(2, size=DATA_SHAPE, dtype=np.bool)
 data = np.zeros(DATA_SHAPE, dtype=np.uint16)
 
 
-@pytest.fixture(scope='function')
-def empty_handler():
+@pytest.fixture(name='empty_handler', scope='function')
+def _empty_handler():
     empty_handler = JFDataHandler(DETECTOR_NAME)
 
     yield empty_handler
 
 
-@pytest.fixture(scope='function')
-def handler(empty_handler):
+@pytest.fixture(name='handler', scope='function')
+def _handler(empty_handler):
     empty_handler.G = gain
     empty_handler.P = pedestal
     empty_handler.pixel_mask = pixel_mask
@@ -33,8 +33,8 @@ def handler(empty_handler):
     yield prepared_handler
 
 
-@pytest.fixture(scope='function')
-def handler_no_mask(empty_handler):
+@pytest.fixture(name='handler_no_mask', scope='function')
+def _handler_no_mask(empty_handler):
     empty_handler.G = gain
     empty_handler.P = pedestal
 
