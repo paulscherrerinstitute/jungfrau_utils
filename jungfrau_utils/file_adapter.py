@@ -50,6 +50,8 @@ class File:
         if gain_file is None:
             gain_file = self._locate_gain_file()
             print(f'Auto-located gain file: {gain_file}')
+        else:
+            gain_file = Path(gain_file)
 
         self.handler.gain_file = gain_file.as_posix()
 
@@ -64,6 +66,8 @@ class File:
             else:
                 tdelta_str = str(timedelta(seconds=mtime_diff))
             print('    mtime difference: ' + tdelta_str)
+        else:
+            pedestal_file = Path(pedestal_file)
 
         self.handler.pedestal_file = pedestal_file.as_posix()
 
