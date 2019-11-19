@@ -371,16 +371,8 @@ class File:
         if self.file.id:
             self.file.close()
 
-    @property
-    def shape(self):
-        """Image shape of Jungfrau file based on gap_pixels/geometry flags"""
-        return self.handler.shape
-
-    @property
-    def ndim(self):
-        """Number of dimensions of data in Jungfrau file"""
-        return len(self.shape)
-
     def __len__(self):
-        """Number of images in Jungfrau file"""
-        return self.shape[0]
+        return len(self.file)
+
+    def __getattr__(self, name):
+        return getattr(self.file, name)
