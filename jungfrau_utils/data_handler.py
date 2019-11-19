@@ -141,7 +141,7 @@ class JFDataHandler:
         return self.detector_name.startswith(("JF05", "JF11"))
 
     @property
-    def _detector(self):
+    def detector(self):
         det = namedtuple('Detector', ['id', 'n_modules', 'version'])
         return det(*(int(d) for d in re.findall(r'\d+', self.detector_name)))
 
@@ -155,7 +155,7 @@ class JFDataHandler:
 
     @property
     def _GP_shape(self):
-        n_modules = self._detector.n_modules
+        n_modules = self.detector.n_modules
         return self._get_n_modules_shape(n_modules)
 
     @property
@@ -193,7 +193,7 @@ class JFDataHandler:
         elif not self.geometry and self.gap_pixels:
             shape_y, shape_x = self._raw_shape
             shape_x += (CHIP_NUM_X - 1) * CHIP_GAP_X
-            shape_y += (CHIP_NUM_Y - 1) * CHIP_GAP_Y * self._detector.n_modules
+            shape_y += (CHIP_NUM_Y - 1) * CHIP_GAP_Y * self.detector.n_modules
 
         elif not self.geometry and not self.gap_pixels:
             shape_y, shape_x = self._raw_shape
@@ -370,7 +370,7 @@ class JFDataHandler:
         """Current module map"""
         if self._module_map is None:
             # support legacy data by emulating 'all modules are present'
-            return np.arange(self._detector.n_modules)
+            return np.arange(self.detector.n_modules)
         return self._module_map
 
     @module_map.setter
@@ -379,14 +379,14 @@ class JFDataHandler:
             self._module_map = None
             return
 
-        if len(value) != self._detector.n_modules:
+        if len(value) != self.detector.n_modules:
             raise ValueError(
-                f"Expected module_map length is {self._detector.n_modules}, provided value length is {len(value)}"
+                f"Expected module_map length is {self.detector.n_modules}, provided value length is {len(value)}"
             )
 
-        if min(value) < -1 or self._detector.n_modules <= max(value):
+        if min(value) < -1 or self.detector.n_modules <= max(value):
             raise ValueError(
-                f"Valid module_map values are integers between -1 and {self._detector.n_modules-1}"
+                f"Valid module_map values are integers between -1 and {self.detector.n_modules-1}"
             )
 
         self._module_map = value
