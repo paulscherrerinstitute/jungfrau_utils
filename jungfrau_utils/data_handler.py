@@ -522,7 +522,7 @@ class JFDataHandler:
                     rx_s = k * CHIP_SIZE_X
 
                     # writing positions
-                    wy_s = m * MODULE_SIZE_Y + ry_s + j * CHIP_GAP_Y
+                    wy_s = m * (MODULE_SIZE_Y + CHIP_GAP_Y) + ry_s + j * CHIP_GAP_Y
                     wx_s = rx_s + k * CHIP_GAP_X
 
                     res[:, wy_s : wy_s + CHIP_SIZE_Y, wx_s : wx_s + CHIP_SIZE_X] = module[
