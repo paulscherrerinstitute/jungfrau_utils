@@ -16,4 +16,4 @@ echo "Done."
 
 echo "Starting data-api downloader."
 
-python /photonics/home/sala/git/jungfrau_utils/jungfrau_utils/scripts/download_from_audit.py $_args
+python download_from_audit.py $_args

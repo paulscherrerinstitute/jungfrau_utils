@@ -103,7 +103,7 @@ if __name__ == "__main__":
     parser.add_argument("--to_time", type=str, default="", help="timestamp to look for in the audit file, e.g. 20180607-213328")
     args = parser.parse_args()
 
-    os.setgid(args.user_id)
-    os.setuid(args.user_id)
+#    os.setgid(args.user_id)
+#    os.setuid(args.user_id)
     write_file(args.audit, args.stepname, args.from_time, args.to_time)
 
