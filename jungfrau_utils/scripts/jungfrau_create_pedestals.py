@@ -2,7 +2,6 @@ import argparse
 import sys
 import os
 import numpy as np
-import matplotlib.pyplot as plt
 import h5py
 import logging
 
@@ -32,8 +31,6 @@ def forcedGainValue(i, n0, n1, n2, n3):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--filename", default="pedestal.h5", help="pedestal file")
-    parser.add_argument("--frame_number", type=int, default=-1, help="show frame number N and exit")
-    parser.add_argument("--verbosity", type=int, default=1, help="verbosity level (0 - silent, 2 - DEBUG, default=1)")
     parser.add_argument("--X_test_pixel", type=int, default=0, help="x position of the test pixel")
     parser.add_argument("--Y_test_pixel", type=int, default=0, help="y position of the test pixel")
     parser.add_argument("--nFramesPede", type=int, default=1000, help="number of pedestal frames to average pedestal value")
@@ -45,7 +42,6 @@ def main():
     parser.add_argument("--frames_average", type=int, default=1000, help="for pedestal in each gain average over last frames_average frames, reducing weight of previous")
     parser.add_argument("--directory", default="./", help="Output directory where to store pixelmask and gain file")
     parser.add_argument("--gain_check", type=int, default=1, help="check that gain setting in each of the module corresponds to the general gain switch, (0 - dont check)")
-    parser.add_argument("--show_pixel_mask", type=int, default=0, help=">0 - show pixel mask image at the end of the run (default: not)")
     parser.add_argument("--add-pixel-mask", default=None, help="add additional masked pixels from external, specified file")
     args = parser.parse_args()
 
@@ -88,20 +84,6 @@ def main():
 #    if args.verbosity >= 3:
 #        f.visit(h5_printname)
     log.debug(" {} :   data has the following shape: {}, type: {}, {} modules ({} bad modules)".format(detector_name, f[data_location][0].shape, f[data_location][0].dtype, nModules, n_bad_modules))
-
-    if args.frame_number != -1:
-        frameToShow = args.frame_number
-        if frameToShow <= numberOfFrames and frameToShow >= 0:
-            log.info(" {} : Show frame number {}".format(detector_name, frameToShow))
-            frameData = np.bitwise_and(f[data_location][frameToShow], 0b0011111111111111)
-            gainData = np.bitwise_and(f[data_location][frameToShow], 0b1100000000000000) >> 14
-            log.info(" {} : Number of channels in gain0 : {}; gain1 : {}; gain2 : {}; undefined gain : {}".format(detector_name, np.sum(gainData == 0), np.sum(gainData == 1), np.sum(gainData == 3), np.sum(gainData == 2)))
-            plt.imshow(frameData, vmax=25000, origin='lower')
-            plt.colorbar()
-            plt.show()
-        else:
-            log.error(" {} : You requested to show frame number {}, but valid number for this pedestal run a 0-{}".format(detecor_name, frameToShow, numberOfFrames))
-            exit()
 
     pixelMask = np.zeros((sh_y, sh_x), dtype=np.int)
 
@@ -229,10 +211,6 @@ def main():
     dset = outFile.create_dataset('gainsRMS', data=gainsRMS)
 
     outFile.close()
-
-    if args.show_pixel_mask > 0:
-        plt.imshow(pixelMask, vmax=1.0, vmin=0.0, origin='lower')
-        plt.show()
 
     log.info(" {} : Number of good pixels: {} from {} in total ({} bad pixels)".format( detector_name, np.sum(pixelMask == 0), sh_x * sh_y, (sh_x * sh_y - np.sum(pixelMask == 0))))
 
