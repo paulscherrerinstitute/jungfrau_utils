@@ -46,6 +46,7 @@ def main():
     parser.add_argument("--directory", default="./", help="Output directory where to store pixelmask and gain file")
     parser.add_argument("--gain_check", type=int, default=1, help="check that gain setting in each of the module corresponds to the general gain switch, (0 - dont check)")
     parser.add_argument("--show_pixel_mask", type=int, default=0, help=">0 - show pixel mask image at the end of the run (default: not)")
+    parser.add_argument("--add-pixel-mask", default=None, help="add additional masked pixels from external, specified file")
     args = parser.parse_args()
 
     if not (os.path.isfile(args.filename) and os.access(args.filename, os.R_OK)):
@@ -189,6 +190,17 @@ def main():
 
     log.info(" {} : {} frames analyzed, {} good frames, {} frames without settings mismatch. Gain frames distribution (0,1,2,3,HG0) : ({})".format( detector_name, analyzeFrames, nGoodFrames, nGoodFramesGain, nMgain))
 
+    if args.add_pixel_mask != None:
+       if (os.path.isfile(args.add_pixel_mask) and os.access(args.add_pixel_mask, os.R_OK)):
+           additional_pixel_mask_file = h5py.File(args.add_pixel_mask, "r")
+           additional_pixel_mask = np.array(additional_pixel_mask_file["pixel_mask"])
+           if additional_pixel_mask.shape == pixelMask.shape:
+               pixelMask[additional_pixel_mask == 1] |= (1 << 5)
+           else:
+               log.error(" shape of additional pixel mask ({}) doesn't match current ({})".format( additional_pixel_mask.shape, pixelMask.shape))
+       else:
+           log.error(" Specified addition file with pixel mask not found or not reachable {}".format( args.add_pixel_mask))
+
     fileNameIn = os.path.splitext(os.path.basename(args.filename))[0]
     full_fileNameOut = args.directory + "/" + fileNameIn + ".res.h5"
     log.info(" {} : Output file with pedestal corrections in: {}".format( detector_name, full_fileNameOut))
@@ -209,6 +221,9 @@ def main():
             g = gain if gain < 3 else (gain-1)
             gains[g] = mean
             gainsRMS[g] = stdDeviation
+
+            pixelMask[stdDeviation == 0.0] |= (1 << (6 + g))
+ 
 
     dset = outFile.create_dataset('gains', data=gains)
     dset = outFile.create_dataset('gainsRMS', data=gainsRMS)
