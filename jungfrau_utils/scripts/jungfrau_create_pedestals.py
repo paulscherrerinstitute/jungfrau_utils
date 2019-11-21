@@ -30,6 +30,7 @@ def forcedGainValue(i, n0, n1, n2, n3):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--verbosity", default=None, help="log verbosity level INFO/DEBUG/WARN/ERROR/CRITICAL")
     parser.add_argument("--filename", default="pedestal.h5", help="pedestal file")
     parser.add_argument("--X_test_pixel", type=int, default=0, help="x position of the test pixel")
     parser.add_argument("--Y_test_pixel", type=int, default=0, help="y position of the test pixel")
@@ -49,7 +50,8 @@ def main():
         print("Pedestal file {} not found, exit".format(args.filename))
         exit()
 
-    log.setLevel(args.verbosity)
+    if args.verbosity:
+        log.setLevel(getattr(logging, args.verbosity.upper(), None))
 
     overwriteGain = False
     if (args.frames_G0 + args.frames_G1 + args.frames_G2) > 0:
