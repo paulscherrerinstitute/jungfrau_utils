@@ -129,7 +129,7 @@ class JFDataHandler:
         self._pixel_mask = None
 
         self._highgain = False
-        self._module_map = None
+        self._module_map = np.arange(self.detector.n_modules)
 
     @property
     def detector_name(self):
@@ -346,15 +346,15 @@ class JFDataHandler:
             return None
 
         # currently, it requeires a hack of cleaning convertion and module_map values for shaping
-        _module_map = self._module_map
+        module_map = self.module_map
         conversion = self.convertion
 
-        self._module_map = None
+        self.module_map = None
         self.convertion = False
         res = np.invert(self.process(np.invert(self.pixel_mask)))
 
         # restore module_map and convertion values
-        self._module_map = _module_map
+        self.module_map = module_map
         self.convertion = conversion
 
         return res
@@ -362,15 +362,13 @@ class JFDataHandler:
     @property
     def module_map(self):
         """Current module map"""
-        if self._module_map is None:
-            # support legacy data by emulating 'all modules are present'
-            return np.arange(self.detector.n_modules)
         return self._module_map
 
     @module_map.setter
     def module_map(self, value):
         if value is None:
-            self._module_map = None
+            # support legacy data by emulating 'all modules are present'
+            self._module_map = np.arange(self.detector.n_modules)
             return
 
         if len(value) != self.detector.n_modules:
