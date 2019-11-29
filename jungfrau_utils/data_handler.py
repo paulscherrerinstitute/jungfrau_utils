@@ -505,7 +505,10 @@ class JFDataHandler:
 
         res = np.zeros((image_stack.shape[0], *self.shape), dtype=image_stack.dtype)
 
-        for m in range(np.sum(self.module_map != -1)):
+        for m in self.module_map:
+            if m == -1:
+                continue
+
             module = self._get_module_slice(image_stack, m)
             for j in range(CHIP_NUM_Y):
                 for k in range(CHIP_NUM_X):
