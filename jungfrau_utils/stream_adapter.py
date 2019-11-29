@@ -47,20 +47,20 @@ class StreamAdapter:
 
     def _update_handler(self, md_dict):
         # gain file
-        gain_file = md_dict.get('gain_file')
+        gain_file = md_dict.get('gain_file', '')
         try:
             self.handler.gain_file = gain_file
         except Exception:
             logging.exception(f"Error loading gain file {gain_file}")
-            self.handler.gain_file = None
+            self.handler.gain_file = ''
 
         # pedestal file
-        pedestal_file = md_dict.get('pedestal_file')
+        pedestal_file = md_dict.get('pedestal_file', '')
         try:
             self.handler.pedestal_file = pedestal_file
         except Exception:
             logging.exception(f"Error loading pedestal file {pedestal_file}")
-            self.handler.pedestal_file = None
+            self.handler.pedestal_file = ''
 
         # module map
         module_map = md_dict.get('module_map')

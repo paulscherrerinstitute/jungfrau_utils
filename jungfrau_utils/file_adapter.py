@@ -18,8 +18,8 @@ class File:
     def __init__(
         self,
         file_path,
-        gain_file=None,
-        pedestal_file=None,
+        gain_file='',
+        pedestal_file='',
         convertion=True,
         gap_pixels=True,
         geometry=True,
@@ -28,9 +28,9 @@ class File:
 
         Args:
             file_path (str): path to Jungfrau file
-            gain_file (str, optional): path to gain file. Auto-locate if None. Defaults to None.
-            pedestal_file (str, optional): path to pedestal file. Auto-locate if None.
-                Defaults to None.
+            gain_file (str, optional): path to gain file. Auto-locate if empty. Defaults to ''.
+            pedestal_file (str, optional): path to pedestal file. Auto-locate if empty.
+                Defaults to ''.
             convertion (bool, optional): Apply gain conversion and pedestal correction.
                 Defaults to True.
             gap_pixels (bool, optional): Add gap pixels between detector submodules.
@@ -47,16 +47,18 @@ class File:
         self.geometry = geometry
 
         # Gain file
-        if gain_file is None:
+        if gain_file:
+            gain_file = Path(gain_file)
+        else:
             gain_file = self._locate_gain_file()
             print(f'Auto-located gain file: {gain_file}')
-        else:
-            gain_file = Path(gain_file)
 
         self.handler.gain_file = gain_file.as_posix()
 
         # Pedestal file (with a pixel mask)
-        if pedestal_file is None:
+        if pedestal_file:
+            pedestal_file = Path(pedestal_file)
+        else:
             pedestal_file, mtime_diff = self._locate_pedestal_file()
             print(f'Auto-located pedestal file: {pedestal_file}')
             if mtime_diff < 0:
@@ -66,8 +68,6 @@ class File:
             else:
                 tdelta_str = str(timedelta(seconds=mtime_diff))
             print('    mtime difference: ' + tdelta_str)
-        else:
-            pedestal_file = Path(pedestal_file)
 
         self.handler.pedestal_file = pedestal_file.as_posix()
 
@@ -314,21 +314,19 @@ class File:
 
         # find a pedestal file, which was created closest in time to the jungfrau file
         jf_file_mtime = self.file_path.stat().st_mtime
-        nearest_pedestal_file = None
+        closest_pedestal_file = ''
         min_time_diff = float('inf')
         for entry in pedestal_path.iterdir():
             if entry.is_file() and self.detector_name in entry.name:
                 time_diff = jf_file_mtime - entry.stat().st_mtime
                 if abs(time_diff) < abs(min_time_diff):
                     min_time_diff = time_diff
-                    nearest_pedestal_file = entry
+                    closest_pedestal_file = entry
 
-        pedestal_file = nearest_pedestal_file
-
-        if pedestal_file is None:
+        if not closest_pedestal_file:
             raise Exception(f'No pedestal file in default location: {pedestal_path}')
 
-        return pedestal_file, min_time_diff
+        return closest_pedestal_file, min_time_diff
 
     def __enter__(self):
         return self

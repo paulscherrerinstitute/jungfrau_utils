@@ -121,8 +121,8 @@ class JFDataHandler:
         self.gap_pixels = True  # add gap pixels between detector submodules
         self.geometry = True  # apply detector geometry corrections
 
-        self._gain_file = None
-        self._pedestal_file = None
+        self._gain_file = ''
+        self._pedestal_file = ''
 
         self._G = None
         self._P = None
@@ -207,8 +207,8 @@ class JFDataHandler:
 
     @gain_file.setter
     def gain_file(self, filepath):
-        if filepath is None:
-            self._gain_file = None
+        if not filepath:
+            self._gain_file = ''
             self.G = None
             return
 
@@ -257,8 +257,8 @@ class JFDataHandler:
 
     @pedestal_file.setter
     def pedestal_file(self, filepath):
-        if filepath is None:
-            self._pedestal_file = None
+        if not filepath:
+            self._pedestal_file = ''
             self.P = None
             self.pixel_mask = None
             return
