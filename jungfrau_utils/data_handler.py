@@ -436,6 +436,7 @@ class JFDataHandler:
             raise RuntimeError("Gain and/or pedestal values are not set")
 
         res = np.empty(shape=image_stack.shape, dtype=np.float32)
+
         for i, m in enumerate(self.module_map):
             if m == -1:
                 continue
@@ -466,9 +467,13 @@ class JFDataHandler:
         modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
 
         res = np.zeros((image_stack.shape[0], *self.shape), dtype=image_stack.dtype)
-        for m, oy, ox in zip(self.module_map, modules_orig_y, modules_orig_x):
+
+        for i, m in enumerate(self.module_map):
             if m == -1:
                 continue
+
+            oy = modules_orig_y[i]
+            ox = modules_orig_x[i]
 
             module = self._get_module_slice(image_stack, m)
 
@@ -501,11 +506,15 @@ class JFDataHandler:
     def _add_gap_pixels(self, image_stack):
         res = np.zeros((image_stack.shape[0], *self.shape), dtype=image_stack.dtype)
 
-        for m in self.module_map:
+        for _, m in enumerate(self.module_map):
             if m == -1:
                 continue
 
+            oy = m * (MODULE_SIZE_Y + CHIP_GAP_Y)
+            ox = 0
+
             module = self._get_module_slice(image_stack, m)
+
             for j in range(CHIP_NUM_Y):
                 for k in range(CHIP_NUM_X):
                     # reading positions
@@ -513,8 +522,8 @@ class JFDataHandler:
                     rx_s = k * CHIP_SIZE_X
 
                     # writing positions
-                    wy_s = m * (MODULE_SIZE_Y + CHIP_GAP_Y) + ry_s + j * CHIP_GAP_Y
-                    wx_s = rx_s + k * CHIP_GAP_X
+                    wy_s = oy + ry_s + j * CHIP_GAP_Y
+                    wx_s = ox + rx_s + k * CHIP_GAP_X
 
                     res[:, wy_s : wy_s + CHIP_SIZE_Y, wx_s : wx_s + CHIP_SIZE_X] = module[
                         :, ry_s : ry_s + CHIP_SIZE_Y, rx_s : rx_s + CHIP_SIZE_X
@@ -534,9 +543,13 @@ class JFDataHandler:
         modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
 
         res = np.zeros((image_stack.shape[0], *self.shape), dtype=image_stack.dtype)
-        for m, oy, ox in zip(self.module_map, modules_orig_y, modules_orig_x):
+
+        for i, m in enumerate(self.module_map):
             if m == -1:
                 continue
+
+            oy = modules_orig_y[i]
+            ox = modules_orig_x[i]
 
             module = self._get_module_slice(image_stack, m)
 
