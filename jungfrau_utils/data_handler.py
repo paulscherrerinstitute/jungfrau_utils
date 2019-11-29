@@ -399,6 +399,8 @@ class JFDataHandler:
         else:
             remove_first_dim = False
 
+        self._check_image_stack_shape(images)
+
         if self.convertion:
             images = self._convert(images)
 
@@ -429,8 +431,6 @@ class JFDataHandler:
         Returns:
             ndarray: resulting image stack or a single image
         """
-        self._check_image_stack_shape(image_stack)
-
         if not self.can_convert():
             raise RuntimeError("Gain and/or pedestal values are not set")
 
@@ -463,8 +463,6 @@ class JFDataHandler:
         Returns:
             ndarray: resulting image_stack with modules on their actual places
         """
-        self._check_image_stack_shape(image_stack)
-
         modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
 
         res = np.zeros((image_stack.shape[0], *self.shape), dtype=image_stack.dtype)
@@ -501,8 +499,6 @@ class JFDataHandler:
         return res
 
     def _add_gap_pixels(self, image_stack):
-        self._check_image_stack_shape(image_stack)
-
         res = np.zeros((image_stack.shape[0], *self.shape), dtype=image_stack.dtype)
 
         for m in self.module_map:
@@ -535,8 +531,6 @@ class JFDataHandler:
         Returns:
             ndarray: resulting image_stack with modules on their actual places
         """
-        self._check_image_stack_shape(image_stack)
-
         modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
 
         res = np.zeros((image_stack.shape[0], *self.shape), dtype=image_stack.dtype)
