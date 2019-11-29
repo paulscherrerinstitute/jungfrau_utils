@@ -64,7 +64,7 @@ try:
         number of pixels in the image array
     image : uint16_t array
         Jungfrau 2D array to be corrected
-    GP : float32 array
+    gp : float32 array
         array containing combined gain and pedestal corrections
     res : float32 array
         2D array containing corrected image
@@ -87,7 +87,7 @@ try:
         number of pixels in the image array
     image : uint16_t array
         Jungfrau 2D array to be corrected
-    GP : float32 array
+    gp : float32 array
         array containing combined gain and pedestal corrections
     res : float32 array
         2D array containing corrected image
@@ -111,9 +111,9 @@ class JFDataHandler:
             raise KeyError(f"Geometry for '{detector_name}' detector is not present.")
 
         # array to be used for the actual data conversion
-        # G and P values are interleaved for better CPU cache utilization
-        self._GP = np.empty(
-            (self._GP_shape[0], 2 * NUM_GAINS * self._GP_shape[1]), dtype=np.float32
+        # gain and pedestal values are interleaved for better CPU cache utilization
+        self._gp = np.empty(
+            (self._gp_shape[0], 2 * NUM_GAINS * self._gp_shape[1]), dtype=np.float32
         )
 
         # values that define processing pipeline
@@ -124,8 +124,8 @@ class JFDataHandler:
         self._gain_file = ''
         self._pedestal_file = ''
 
-        self._G = None
-        self._P = None
+        self._gain = None
+        self._pedestal = None
         self._pixel_mask = None
 
         self._highgain = False
@@ -154,7 +154,7 @@ class JFDataHandler:
         return shape_y, shape_x
 
     @property
-    def _GP_shape(self):
+    def _gp_shape(self):
         n_modules = self.detector.n_modules
         return self._get_n_modules_shape(n_modules)
 
@@ -209,7 +209,7 @@ class JFDataHandler:
     def gain_file(self, filepath):
         if not filepath:
             self._gain_file = ''
-            self.G = None
+            self.gain = None
             return
 
         if filepath == self._gain_file:
@@ -219,36 +219,36 @@ class JFDataHandler:
             gains = h5f['/gains'][:]
 
         self._gain_file = filepath
-        self.G = gains
+        self.gain = gains
 
     @property
-    def G(self):
+    def gain(self):
         """Current gain values"""
-        return self._G
+        return self._gain
 
-    @G.setter
-    def G(self, value):
+    @gain.setter
+    def gain(self, value):
         if value is None:
-            self._G = None
+            self._gain = None
             return
 
         if value.ndim != 3:
-            raise ValueError(f"G should have 3 dimensions, provided G has {value.ndim} dimensions.")
+            raise ValueError(f"Gain should have 3 dimensions, provided gain has {value.ndim} dimensions.")
 
         if value.shape[0] != 4:
             raise ValueError(
-                f"First dimension of G should have length 4, provided G has {value.shape[0]}."
+                f"First dimension of gain should have length 4, provided gain has {value.shape[0]}."
             )
 
-        if value.shape[1:] != self._GP_shape:
+        if value.shape[1:] != self._gp_shape:
             raise ValueError(
-                f"Expected G shape is {self._GP_shape}, while provided G has {value.shape[1:]}."
+                f"Expected gain shape is {self._gp_shape}, provided gain has {value.shape[1:]}."
             )
 
-        # make sure _G has type float32
-        self._G = value.astype(np.float32, copy=False)
+        # make sure _gain has type float32
+        self._gain = value.astype(np.float32, copy=False)
         for i, g in zip(range(NUM_GAINS), HIGHGAIN_ORDER[self.highgain]):
-            self._GP[:, 2 * i :: NUM_GAINS * 2] = 1 / self._G[g]
+            self._gp[:, 2 * i :: NUM_GAINS * 2] = 1 / self._gain[g]
 
     @property
     def pedestal_file(self):
@@ -259,7 +259,7 @@ class JFDataHandler:
     def pedestal_file(self, filepath):
         if not filepath:
             self._pedestal_file = ''
-            self.P = None
+            self.pedestal = None
             self.pixel_mask = None
             return
 
@@ -271,37 +271,37 @@ class JFDataHandler:
             pixel_mask = h5f['/pixel_mask'][:]
 
         self._pedestal_file = filepath
-        self.P = pedestal
+        self.pedestal = pedestal
         self.pixel_mask = pixel_mask
 
     @property
-    def P(self):
+    def pedestal(self):
         """Current pedestal values"""
-        return self._P
+        return self._pedestal
 
-    @P.setter
-    def P(self, value):
+    @pedestal.setter
+    def pedestal(self, value):
         if value is None:
-            self._P = None
+            self._pedestal = None
             return
 
         if value.ndim != 3:
-            raise ValueError(f"P should have 3 dimensions, provided P has {value.ndim} dimensions.")
+            raise ValueError(f"Pedestal should have 3 dimensions, provided pedestal has {value.ndim} dimensions.")
 
         if value.shape[0] != 4:
             raise ValueError(
-                f"First dimension of P should have length 4, provided P has {value.shape[0]}."
+                f"First dimension of pedestal should have length 4, provided pedestal has {value.shape[0]}."
             )
 
-        if value.shape[1:] != self._GP_shape:
+        if value.shape[1:] != self._gp_shape:
             raise ValueError(
-                f"Expected P shape is {self._GP_shape}, while provided P has {value.shape[1:]}."
+                f"Expected pedestal shape is {self._gp_shape}, provided pedestal has {value.shape[1:]}."
             )
 
-        # make sure _P has type float32
-        self._P = value.astype(np.float32, copy=False)
+        # make sure _pedestal has type float32
+        self._pedestal = value.astype(np.float32, copy=False)
         for i, g in zip(range(NUM_GAINS), HIGHGAIN_ORDER[self.highgain]):
-            self._GP[:, 2 * i + 1 :: NUM_GAINS * 2] = self._P[g]
+            self._gp[:, 2 * i + 1 :: NUM_GAINS * 2] = self._pedestal[g]
 
     @property
     def highgain(self):
@@ -316,11 +316,11 @@ class JFDataHandler:
         self._highgain = value
         first_gain = HIGHGAIN_ORDER[value][0]
 
-        if self.G is not None:
-            self._GP[:, :: NUM_GAINS * 2] = 1 / self._G[first_gain]
+        if self.gain is not None:
+            self._gp[:, :: NUM_GAINS * 2] = 1 / self._gain[first_gain]
 
-        if self.P is not None:
-            self._GP[:, 1 :: NUM_GAINS * 2] = self._P[first_gain]
+        if self.pedestal is not None:
+            self._gp[:, 1 :: NUM_GAINS * 2] = self._pedestal[first_gain]
 
     @property
     def pixel_mask(self):
@@ -338,9 +338,9 @@ class JFDataHandler:
                 f"Pixel mask should have 2 dimensions, provided pixel mask has {value.ndim}."
             )
 
-        if value.shape != self._GP_shape:
+        if value.shape != self._gp_shape:
             raise ValueError(
-                f"Expected pixel mask shape is {self._GP_shape}, provided pixel mask has {value.shape} shape."
+                f"Expected pixel mask shape is {self._gp_shape}, provided pixel mask has {value.shape} shape."
             )
 
         self._pixel_mask = value.astype(np.bool, copy=False)
@@ -426,7 +426,7 @@ class JFDataHandler:
         return images
 
     def can_convert(self):
-        return (self.G is not None) and (self.P is not None)
+        return (self.gain is not None) and (self.pedestal is not None)
 
     def _convert(self, image_stack):
         """Apply pedestal correction and gain conversion
@@ -450,15 +450,15 @@ class JFDataHandler:
 
             module = self._get_module_slice(image_stack, m)
             module_res = res[:, m * MODULE_SIZE_Y : (m + 1) * MODULE_SIZE_Y, :]
-            module_GP = self._GP[i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
+            module_gp = self._gp[i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
 
             if self.pixel_mask is None:
                 for mod, mod_res in zip(module, module_res):
-                    correct(module_size, mod, module_GP, mod_res)
+                    correct(module_size, mod, module_gp, mod_res)
             else:
                 mask_module = self.pixel_mask[i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
                 for mod, mod_res in zip(module, module_res):
-                    correct_mask(module_size, mod, module_GP, mod_res, mask_module)
+                    correct_mask(module_size, mod, module_gp, mod_res, mask_module)
 
         return res
 

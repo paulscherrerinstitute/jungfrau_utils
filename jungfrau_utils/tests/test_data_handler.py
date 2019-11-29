@@ -24,8 +24,8 @@ def _empty_handler():
 
 @pytest.fixture(name='handler', scope='function')
 def _handler(empty_handler):
-    empty_handler.G = gain
-    empty_handler.P = pedestal
+    empty_handler.gain = gain
+    empty_handler.pedestal = pedestal
     empty_handler.pixel_mask = pixel_mask
 
     prepared_handler = empty_handler
@@ -35,8 +35,8 @@ def _handler(empty_handler):
 
 @pytest.fixture(name='handler_no_mask', scope='function')
 def _handler_no_mask(empty_handler):
-    empty_handler.G = gain
-    empty_handler.P = pedestal
+    empty_handler.gain = gain
+    empty_handler.pedestal = pedestal
 
     prepared_handler = empty_handler
 
@@ -53,23 +53,23 @@ def test_handler_init(empty_handler):
     assert empty_handler.detector_name == DETECTOR_NAME
     assert empty_handler.shape == DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY
 
-    assert empty_handler.P is None
-    assert empty_handler.G is None
+    assert empty_handler.pedestal is None
+    assert empty_handler.gain is None
     assert empty_handler.pixel_mask is None
 
 
 def test_handler_set_gain(empty_handler):
-    empty_handler.G = gain
+    empty_handler.gain = gain
 
-    assert np.array_equal(empty_handler.G, gain)
-    assert empty_handler.G.dtype == np.float32
-    assert empty_handler.G.ndim == 3
-    assert empty_handler.G.shape == (4, *DATA_SHAPE)
+    assert np.array_equal(empty_handler.gain, gain)
+    assert empty_handler.gain.dtype == np.float32
+    assert empty_handler.gain.ndim == 3
+    assert empty_handler.gain.shape == (4, *DATA_SHAPE)
 
-    empty_handler.G = None
-    assert empty_handler.G is None
+    empty_handler.gain = None
+    assert empty_handler.gain is None
 
-    assert empty_handler.P is None
+    assert empty_handler.pedestal is None
     assert empty_handler.pixel_mask is None
 
 
@@ -78,21 +78,21 @@ def test_handler_set_gain_fail(empty_handler):
     gain = 100 * np.ones([1, *DATA_SHAPE]).astype(np.float32) + 1
 
     with pytest.raises(ValueError):
-        empty_handler.G = gain
+        empty_handler.gain = gain
 
 
 def test_handler_set_pedestal(empty_handler):
-    empty_handler.P = pedestal
+    empty_handler.pedestal = pedestal
 
-    assert np.array_equal(empty_handler.P, pedestal)
-    assert empty_handler.P.dtype == np.float32
-    assert empty_handler.P.ndim == 3
-    assert empty_handler.P.shape == (4, *DATA_SHAPE)
+    assert np.array_equal(empty_handler.pedestal, pedestal)
+    assert empty_handler.pedestal.dtype == np.float32
+    assert empty_handler.pedestal.ndim == 3
+    assert empty_handler.pedestal.shape == (4, *DATA_SHAPE)
 
-    empty_handler.P = None
-    assert empty_handler.P is None
+    empty_handler.pedestal = None
+    assert empty_handler.pedestal is None
 
-    assert empty_handler.G is None
+    assert empty_handler.gain is None
     assert empty_handler.pixel_mask is None
 
 
@@ -101,7 +101,7 @@ def test_handler_set_pedestal_fail(empty_handler):
     pedestal = 60000 * np.ones([1, *DATA_SHAPE]).astype(np.float32)
 
     with pytest.raises(ValueError):
-        empty_handler.P = pedestal
+        empty_handler.pedestal = pedestal
 
 
 def test_handler_set_pixel_mask(empty_handler):
@@ -116,8 +116,8 @@ def test_handler_set_pixel_mask(empty_handler):
     empty_handler.pixel_mask = None
     assert empty_handler.pixel_mask is None
 
-    assert empty_handler.G is None
-    assert empty_handler.P is None
+    assert empty_handler.gain is None
+    assert empty_handler.pedestal is None
 
 
 def test_handler_set_highgain(empty_handler):
@@ -151,17 +151,17 @@ def test_handler_set_module_map_value_error(empty_handler, mm_value):
 
 def test_handler_can_convert(empty_handler):
     assert empty_handler.can_convert() is False
-    empty_handler.P = pedestal
+    empty_handler.pedestal = pedestal
     assert empty_handler.can_convert() is False
-    empty_handler.G = gain
+    empty_handler.gain = gain
     assert empty_handler.can_convert() is True
-    empty_handler.P = None
+    empty_handler.pedestal = None
     assert empty_handler.can_convert() is False
-    empty_handler.P = pedestal
+    empty_handler.pedestal = pedestal
     assert empty_handler.can_convert() is True
-    empty_handler.G = None
+    empty_handler.gain = None
     assert empty_handler.can_convert() is False
-    empty_handler.G = gain
+    empty_handler.gain = gain
     assert empty_handler.can_convert() is True
 
 
