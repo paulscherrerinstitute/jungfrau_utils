@@ -189,7 +189,6 @@ def main():
     full_fileNameOut = args.directory + "/" + fileNameIn + ".res.h5"
     log.info(" {} : Output file with pedestal corrections in: {}".format( detector_name, full_fileNameOut))
     outFile = h5py.File(full_fileNameOut, "w")
-    dset = outFile.create_dataset('pixel_mask', data=pixelMask)
 
     gains = [None] * 4
     gainsRMS = [None] * 4
@@ -206,9 +205,9 @@ def main():
             gains[g] = mean
             gainsRMS[g] = stdDeviation
 
-            pixelMask[stdDeviation == 0.0] |= (1 << (6 + g))
+            pixelMask[np.isclose(stdDeviation,0)] |= (1 << (6 + g))
  
-
+    dset = outFile.create_dataset('pixel_mask', data=pixelMask)
     dset = outFile.create_dataset('gains', data=gains)
     dset = outFile.create_dataset('gainsRMS', data=gainsRMS)
 
