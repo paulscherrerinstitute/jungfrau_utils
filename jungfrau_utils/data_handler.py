@@ -233,19 +233,16 @@ class JFDataHandler:
             return
 
         if value.ndim != 3:
-            raise ValueError(f"Gain should have 3 dimensions, provided gain has {value.ndim} dimensions.")
-
-        if value.shape[0] != 4:
             raise ValueError(
-                f"First dimension of gain should have length 4, provided gain has {value.shape[0]}."
+                f"Gain should have 3 dimensions, provided gain has {value.ndim} dimensions."
             )
 
-        if value.shape[1:] != self._gp_shape:
+        if value.shape != (4, *self._gp_shape):
             raise ValueError(
-                f"Expected gain shape is {self._gp_shape}, provided gain has {value.shape[1:]}."
+                f"Expected gain shape is {(4, *self._gp_shape)}, provided gain has {value.shape}."
             )
 
-        # make sure _gain has type float32
+        # convert _gain values to float32
         self._gain = value.astype(np.float32, copy=False)
         for i, g in zip(range(NUM_GAINS), HIGHGAIN_ORDER[self.highgain]):
             self._gp[:, 2 * i :: NUM_GAINS * 2] = 1 / self._gain[g]
@@ -286,19 +283,16 @@ class JFDataHandler:
             return
 
         if value.ndim != 3:
-            raise ValueError(f"Pedestal should have 3 dimensions, provided pedestal has {value.ndim} dimensions.")
-
-        if value.shape[0] != 4:
             raise ValueError(
-                f"First dimension of pedestal should have length 4, provided pedestal has {value.shape[0]}."
+                f"Pedestal should have 3 dimensions, provided pedestal has {value.ndim} dimensions."
             )
 
-        if value.shape[1:] != self._gp_shape:
+        if value.shape != (4, *self._gp_shape):
             raise ValueError(
-                f"Expected pedestal shape is {self._gp_shape}, provided pedestal has {value.shape[1:]}."
+                f"Expected pedestal shape is {(4, *self._gp_shape)}, provided pedestal has {value.shape}."
             )
 
-        # make sure _pedestal has type float32
+        # convert _pedestal values to float32
         self._pedestal = value.astype(np.float32, copy=False)
         for i, g in zip(range(NUM_GAINS), HIGHGAIN_ORDER[self.highgain]):
             self._gp[:, 2 * i + 1 :: NUM_GAINS * 2] = self._pedestal[g]
