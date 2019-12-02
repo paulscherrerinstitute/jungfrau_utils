@@ -5,14 +5,28 @@ from jungfrau_utils import JFDataHandler
 
 DETECTOR_NAME = 'JF01T03V01'
 DATA_SHAPE = (3 * 512, 1024)
+STACK_SHAPE = (5, *DATA_SHAPE)
 DATA_SHAPE_WITH_GAPS = (3 * (512 + 2), 1024 + 6)
 DATA_SHAPE_WITH_GEOMETRY = (1040 + 512, 0 + 1024)
 DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY = (1040 + 512 + 2, 0 + 1024 + 6)
 
-pedestal = 60000 * np.random.random(size=[4, *DATA_SHAPE]).astype(np.float32)
-gain = 100 * np.random.random(size=[4, *DATA_SHAPE]).astype(np.float32) + 1
+pedestal = np.ones((4, *DATA_SHAPE)).astype(np.float32)
+gain = 10 * np.ones((4, *DATA_SHAPE)).astype(np.float32)
 pixel_mask = np.random.randint(2, size=DATA_SHAPE, dtype=np.bool)
-data = np.zeros(DATA_SHAPE, dtype=np.uint16)
+
+image_stack = np.arange(np.prod(STACK_SHAPE), dtype=np.uint16).reshape(STACK_SHAPE[::-1])
+image_stack = np.ascontiguousarray(image_stack.transpose(2, 1, 0))
+
+converted_image_stack = ((image_stack & 0b11111111111111).astype(np.float32) - 1) / 10
+converted_image_stack[:, pixel_mask] = 0
+
+image_single = image_stack[0]
+converted_image_single = converted_image_stack[0]
+
+MM_DATA_SHAPE = (2 * 512, 1024)
+MM_DATA_SHAPE_WITH_GAPS = (2 * (512 + 2), 1024 + 6)
+mm_image_single = image_single[: 2 * 512, :]
+mm_expected_image_single = converted_image_single[: 2 * 512, :]
 
 
 @pytest.fixture(name='empty_handler', scope='function')
@@ -75,10 +89,10 @@ def test_handler_set_gain(empty_handler):
 
 def test_handler_set_gain_fail(empty_handler):
     # bad gain shape
-    gain = 100 * np.ones([1, *DATA_SHAPE]).astype(np.float32) + 1
+    gain_bad_shape = 100 * np.ones([1, *DATA_SHAPE]).astype(np.float32) + 1
 
     with pytest.raises(ValueError):
-        empty_handler.gain = gain
+        empty_handler.gain = gain_bad_shape
 
 
 def test_handler_set_pedestal(empty_handler):
@@ -98,14 +112,13 @@ def test_handler_set_pedestal(empty_handler):
 
 def test_handler_set_pedestal_fail(empty_handler):
     # bad pedestal shape
-    pedestal = 60000 * np.ones([1, *DATA_SHAPE]).astype(np.float32)
+    pedestal_bad_shape = 60000 * np.ones([1, *DATA_SHAPE]).astype(np.float32)
 
     with pytest.raises(ValueError):
-        empty_handler.pedestal = pedestal
+        empty_handler.pedestal = pedestal_bad_shape
 
 
 def test_handler_set_pixel_mask(empty_handler):
-    pixel_mask = np.random.randint(2, size=DATA_SHAPE, dtype=np.bool)
     empty_handler.pixel_mask = pixel_mask
 
     assert np.array_equal(empty_handler.pixel_mask, pixel_mask)
@@ -166,22 +179,86 @@ def test_handler_can_convert(empty_handler):
 
 
 def test_handler_process_single_image(handler):
-    data = np.zeros(DATA_SHAPE, dtype=np.uint16)
-    res = handler.process(data)
+    res = handler.process(image_single)
 
     assert res.dtype == np.float32
     assert res.ndim == 2
     assert res.shape == DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY
 
+    # check data for submodules in all 4 corners
+    assert np.allclose(res[:256, :256], converted_image_single[:256, :256])
+    assert np.allclose(res[:256, -256:], converted_image_single[:256, -256:])
+    assert np.allclose(res[-256:, :256], converted_image_single[-256:, :256])
+    assert np.allclose(res[-256:, -256:], converted_image_single[-256:, -256:])
 
-@pytest.mark.parametrize("stack_size", [0, 1, 10])
+
+def test_handler_process_single_image_no_gaps(handler):
+    handler.gap_pixels = False
+
+    res = handler.process(image_single)
+
+    assert res.dtype == np.float32
+    assert res.ndim == 2
+    assert res.shape == DATA_SHAPE_WITH_GEOMETRY
+
+    # check data for submodules in all 4 corners
+    assert np.allclose(res[:256, :256], converted_image_single[:256, :256])
+    assert np.allclose(res[:256, -256:], converted_image_single[:256, -256:])
+    assert np.allclose(res[-256:, :256], converted_image_single[-256:, :256])
+    assert np.allclose(res[-256:, -256:], converted_image_single[-256:, -256:])
+
+
+def test_handler_process_single_image_no_geom(handler):
+    handler.geometry = False
+
+    res = handler.process(image_single)
+
+    assert res.dtype == np.float32
+    assert res.ndim == 2
+    assert res.shape == DATA_SHAPE_WITH_GAPS
+
+    # check data for submodules in all 4 corners
+    assert np.allclose(res[:256, :256], converted_image_single[:256, :256])
+    assert np.allclose(res[:256, -256:], converted_image_single[:256, -256:])
+    assert np.allclose(res[-256:, :256], converted_image_single[-256:, :256])
+    assert np.allclose(res[-256:, -256:], converted_image_single[-256:, -256:])
+
+
+def test_handler_process_no_gaps_no_geom(handler):
+    handler.gap_pixels = False
+    handler.geometry = False
+
+    res = handler.process(image_single)
+
+    assert res.dtype == np.float32
+    assert res.ndim == 2
+    assert res.shape == DATA_SHAPE
+    assert np.allclose(res, converted_image_single)
+
+
+def test_handler_process_empty_image_stack(handler):
+    stack = image_stack[:0]
+    res = handler.process(stack)
+
+    assert res.dtype == np.float32
+    assert res.ndim == 3
+    assert res.shape == (0, *DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY)
+
+
+@pytest.mark.parametrize("stack_size", [1, 5])
 def test_handler_process_image_stack(handler, stack_size):
-    data = np.zeros([stack_size, *DATA_SHAPE], dtype=np.uint16)
-    res = handler.process(data)
+    stack = image_stack[:stack_size]
+    res = handler.process(stack)
 
     assert res.dtype == np.float32
     assert res.ndim == 3
     assert res.shape == (stack_size, *DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY)
+
+    # check data for submodules in all 4 corners
+    assert np.allclose(res[:, :256, :256], converted_image_stack[:stack_size, :256, :256])
+    assert np.allclose(res[:, :256, -256:], converted_image_stack[:stack_size, :256, -256:])
+    assert np.allclose(res[:, -256:, :256], converted_image_stack[:stack_size, -256:, :256])
+    assert np.allclose(res[:, -256:, -256:], converted_image_stack[:stack_size, -256:, -256:])
 
 
 @pytest.mark.parametrize("convertion", [True, False])
@@ -192,13 +269,13 @@ def test_handler_process(handler, convertion, gap_pixels, geometry):
     handler.gap_pixels = gap_pixels
     handler.geometry = geometry
 
-    res = handler.process(data)
+    res = handler.process(image_single)
 
     assert res.ndim == 2
     if convertion:
-        assert res.dtype == np.dtype(np.float32)
+        assert res.dtype == np.float32
     else:
-        assert res.dtype == np.dtype(np.uint16)
+        assert res.dtype == np.uint16
 
     if gap_pixels and geometry:
         assert res.shape == DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY
@@ -210,23 +287,75 @@ def test_handler_process(handler, convertion, gap_pixels, geometry):
         assert res.shape == DATA_SHAPE
 
 
-def test_handler_process_no_gaps_no_geom(handler):
-    handler.gap_pixels = False
-    handler.geometry = False
+@pytest.mark.parametrize("gap_pixels", [True, False])
+@pytest.mark.parametrize("geometry", [True, False])
+@pytest.mark.parametrize("module_map", [None, np.array([0, 1, 2])])
+def test_handler_process_mm_all(handler, gap_pixels, geometry, module_map):
+    handler.gap_pixels = gap_pixels
+    handler.geometry = geometry
+    handler.module_map = module_map
 
-    res = handler.process(data)
-    assert res.dtype == np.float32
+    res = handler.process(image_single)
+
     assert res.ndim == 2
-    assert res.shape == DATA_SHAPE
+    assert res.dtype == np.float32
+
+    if gap_pixels and geometry:
+        assert res.shape == DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY
+    elif not gap_pixels and geometry:
+        assert res.shape == DATA_SHAPE_WITH_GEOMETRY
+    elif gap_pixels and not geometry:
+        assert res.shape == DATA_SHAPE_WITH_GAPS
+    elif not gap_pixels and not geometry:
+        assert res.shape == DATA_SHAPE
+
+    # check data for submodules in all 4 corners
+    assert np.allclose(res[:256, :256], converted_image_single[:256, :256])
+    assert np.allclose(res[:256, -256:], converted_image_single[:256, -256:])
+    assert np.allclose(res[-256:, :256], converted_image_single[-256:, :256])
+    assert np.allclose(res[-256:, -256:], converted_image_single[-256:, -256:])
 
 
 @pytest.mark.parametrize("gap_pixels", [True, False])
 @pytest.mark.parametrize("geometry", [True, False])
-@pytest.mark.parametrize("module_mask", [None, np.array([0, -1, 1])])
-def test_handler_shaped_pixel_mask(handler, gap_pixels, geometry, module_mask):
+def test_handler_process_mm_missing(handler, gap_pixels, geometry):
     handler.gap_pixels = gap_pixels
     handler.geometry = geometry
-    handler.module_map = module_mask
+    handler.module_map = np.array([0, 1, -1])
+
+    res = handler.process(mm_image_single)
+
+    assert res.ndim == 2
+    assert res.dtype == np.float32
+
+    if gap_pixels and geometry:
+        assert res.shape == DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY
+    elif not gap_pixels and geometry:
+        assert res.shape == DATA_SHAPE_WITH_GEOMETRY
+    elif gap_pixels and not geometry:
+        assert res.shape == MM_DATA_SHAPE_WITH_GAPS
+    elif not gap_pixels and not geometry:
+        assert res.shape == MM_DATA_SHAPE
+
+    # check data for submodules in all 4 corners
+    assert np.allclose(res[:256, :256], mm_expected_image_single[:256, :256])
+    assert np.allclose(res[:256, -256:], mm_expected_image_single[:256, -256:])
+
+    if geometry:
+        assert np.allclose(res[-256:, :256], 0)
+        assert np.allclose(res[-256:, -256:], 0)
+    else:
+        assert np.allclose(res[-256:, :256], mm_expected_image_single[-256:, :256])
+        assert np.allclose(res[-256:, -256:], mm_expected_image_single[-256:, -256:])
+
+
+@pytest.mark.parametrize("gap_pixels", [True, False])
+@pytest.mark.parametrize("geometry", [True, False])
+@pytest.mark.parametrize("module_map", [None, np.array([0, 1, 2]), np.array([0, -1, 1])])
+def test_handler_shaped_pixel_mask(handler, gap_pixels, geometry, module_map):
+    handler.gap_pixels = gap_pixels
+    handler.geometry = geometry
+    handler.module_map = module_map
 
     res = handler.shaped_pixel_mask
 
