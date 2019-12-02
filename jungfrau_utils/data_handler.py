@@ -354,13 +354,14 @@ class JFDataHandler:
         module_map = self.module_map
         conversion = self.convertion
 
-        self.module_map = None
-        self.convertion = False
-        res = np.invert(self.process(np.invert(self.pixel_mask)))
-
-        # restore module_map and convertion values
-        self.module_map = module_map
-        self.convertion = conversion
+        try:
+            self.module_map = None
+            self.convertion = False
+            res = np.invert(self.process(np.invert(self.pixel_mask)))
+        finally:
+            # restore module_map and convertion values
+            self.module_map = module_map
+            self.convertion = conversion
 
         return res
 
@@ -580,6 +581,22 @@ class JFDataHandler:
             module = images[Ellipsis, index * MODULE_SIZE_Y : (index + 1) * MODULE_SIZE_Y, :]
 
         return module
+
+    def get_gains(self, image_stack):
+        if image_stack.dtype != np.uint16:
+            raise TypeError(
+                f"Expected image type is {np.uint16}, provided data has type {image_stack.dtype}"
+            )
+
+        conversion = self.convertion
+
+        try:
+            self.convertion = False
+            gains = self.process(image_stack >> 14)
+        finally:
+            self.convertion = conversion
+
+        return gains
 
 
 @jit(nopython=True)

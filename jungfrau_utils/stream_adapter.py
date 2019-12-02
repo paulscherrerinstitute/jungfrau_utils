@@ -12,14 +12,6 @@ class StreamAdapter:
         # a placeholder for jf data handler to be initiated with detector name
         self.handler = None
 
-    @staticmethod
-    def get_gains(image):
-        if image.dtype != np.uint16:
-            raise TypeError(
-                f"Expected image type is 'uint16', provided data has type '{image.dtype}'"
-            )
-        return image >> 14
-
     def process(self, image, metadata):
         # as a first step, try to set the detector_name
         detector_name = metadata.get('detector_name')

@@ -370,3 +370,19 @@ def test_handler_shaped_pixel_mask(handler, gap_pixels, geometry, module_map):
         assert res.shape == DATA_SHAPE_WITH_GAPS
     elif not gap_pixels and not geometry:
         assert res.shape == DATA_SHAPE
+
+
+def test_handler_get_gains(handler):
+    res = handler.get_gains(image_stack)
+
+    assert (res >= 0).all() and (res <= 3).all()
+
+
+@pytest.mark.parametrize(
+    "dtype",
+    [np.float16, np.float32, np.float64, np.uint32, np.uint64, np.int16, np.int32, np.int64],
+)
+def test_handler_get_gains_fail(handler, dtype):
+    bad_data = image_stack.astype(dtype)
+    with pytest.raises(TypeError):
+        handler.get_gains(bad_data)
