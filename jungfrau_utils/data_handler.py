@@ -27,6 +27,7 @@ CHIP_NUM_Y = 2
 
 MODULE_SIZE_X = CHIP_NUM_X * CHIP_SIZE_X
 MODULE_SIZE_Y = CHIP_NUM_Y * CHIP_SIZE_Y
+MODULE_SIZE = MODULE_SIZE_X * MODULE_SIZE_Y
 
 CHIP_GAP_X = 2
 CHIP_GAP_Y = 2
@@ -435,7 +436,6 @@ class JFDataHandler:
             raise RuntimeError("Gain and/or pedestal values are not set")
 
         res = np.empty(shape=image_stack.shape, dtype=np.float32)
-        module_size = np.uint32(MODULE_SIZE_X * MODULE_SIZE_Y)
         for i, m in enumerate(self.module_map):
             if m == -1:
                 continue
@@ -446,11 +446,11 @@ class JFDataHandler:
 
             if self.pixel_mask is None:
                 for mod, mod_res in zip(module, module_res):
-                    correct(module_size, mod, module_gp, mod_res)
+                    correct(np.uint32(MODULE_SIZE), mod, module_gp, mod_res)
             else:
                 mask_module = self.pixel_mask[i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
                 for mod, mod_res in zip(module, module_res):
-                    correct_mask(module_size, mod, module_gp, mod_res, mask_module)
+                    correct_mask(np.uint32(MODULE_SIZE), mod, module_gp, mod_res, mask_module)
 
         return res
 
