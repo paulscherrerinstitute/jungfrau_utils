@@ -155,14 +155,18 @@ class JFDataHandler:
         return shape_y, shape_x
 
     @property
+    def _n_active_modules(self):
+        return np.sum(self.module_map != -1)
+
+    @property
     def _gp_shape(self):
         n_modules = self.detector.n_modules
         return self._get_n_modules_shape(n_modules)
 
     @property
     def _raw_shape(self):
-        n_active_modules = np.sum(self.module_map != -1)
-        return self._get_n_modules_shape(n_active_modules)
+        n_modules = self._n_active_modules
+        return self._get_n_modules_shape(n_modules)
 
     @property
     def _stripsel_shape(self):
@@ -194,7 +198,7 @@ class JFDataHandler:
         elif not self.geometry and self.gap_pixels:
             shape_y, shape_x = self._raw_shape
             shape_x += (CHIP_NUM_X - 1) * CHIP_GAP_X
-            shape_y += (CHIP_NUM_Y - 1) * CHIP_GAP_Y * self.detector.n_modules
+            shape_y += (CHIP_NUM_Y - 1) * CHIP_GAP_Y * self._n_active_modules
 
         elif not self.geometry and not self.gap_pixels:
             shape_y, shape_x = self._raw_shape
