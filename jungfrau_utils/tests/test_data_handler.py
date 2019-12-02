@@ -386,3 +386,12 @@ def test_handler_get_gains_fail(handler, dtype):
     bad_data = image_stack.astype(dtype)
     with pytest.raises(TypeError):
         handler.get_gains(bad_data)
+
+
+def test_handler_get_saturated_value(handler):
+    assert handler.get_saturated_value() == 49152
+
+
+def test_handler_get_saturated_value_highgain(handler):
+    handler.highgain = True
+    assert handler.get_saturated_value() == 16383

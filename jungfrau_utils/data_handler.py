@@ -598,6 +598,32 @@ class JFDataHandler:
 
         return gains
 
+    def get_saturated_pixels(self, image_stack):
+        if image_stack.dtype != np.uint16:
+            raise TypeError(
+                f"Expected image type is {np.uint16}, provided data has type {image_stack.dtype}"
+            )
+
+        conversion = self.convertion
+
+        try:
+            self.convertion = False
+            saturated_pixels = self.process(image_stack == self.get_saturated_value())
+        finally:
+            self.convertion = conversion
+
+        return saturated_pixels
+
+    def get_saturated_value(self):
+        """Get a value for saturated pixels.
+        """
+        if self.highgain:
+            saturated_value = 0b0011111111111111  # 16383
+        else:
+            saturated_value = 0b1100000000000000  # 49152
+
+        return saturated_value
+
 
 @jit(nopython=True)
 def reshape_stripsel(image):
