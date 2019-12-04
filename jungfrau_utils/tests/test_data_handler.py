@@ -27,6 +27,7 @@ MM_DATA_SHAPE = (2 * 512, 1024)
 MM_DATA_SHAPE_WITH_GAPS = (2 * (512 + 2), 1024 + 6)
 mm_image_single = image_single[: 2 * 512, :]
 mm_expected_image_single = converted_image_single[: 2 * 512, :]
+mm_pixel_mask = pixel_mask[: 2 * 512, :]
 
 
 @pytest.fixture(name='empty_handler', scope='function')
@@ -351,7 +352,7 @@ def test_handler_process_mm_missing(handler, gap_pixels, geometry):
 
 @pytest.mark.parametrize("gap_pixels", [True, False])
 @pytest.mark.parametrize("geometry", [True, False])
-@pytest.mark.parametrize("module_map", [None, np.array([0, 1, 2]), np.array([0, -1, 1])])
+@pytest.mark.parametrize("module_map", [None, np.array([0, 1, 2])])
 def test_handler_shaped_pixel_mask(handler, gap_pixels, geometry, module_map):
     handler.gap_pixels = gap_pixels
     handler.geometry = geometry
@@ -370,6 +371,45 @@ def test_handler_shaped_pixel_mask(handler, gap_pixels, geometry, module_map):
         assert res.shape == DATA_SHAPE_WITH_GAPS
     elif not gap_pixels and not geometry:
         assert res.shape == DATA_SHAPE
+
+    # check data for submodules in all 4 corners
+    assert np.allclose(res[:256, :256], handler.pixel_mask[:256, :256])
+    assert np.allclose(res[:256, -256:], handler.pixel_mask[:256, -256:])
+    assert np.allclose(res[-256:, :256], handler.pixel_mask[-256:, :256])
+    assert np.allclose(res[-256:, -256:], handler.pixel_mask[-256:, -256:])
+
+
+@pytest.mark.parametrize("gap_pixels", [True, False])
+@pytest.mark.parametrize("geometry", [True, False])
+def test_handler_shaped_pixel_mask_mm_missing(handler, gap_pixels, geometry):
+    handler.gap_pixels = gap_pixels
+    handler.geometry = geometry
+    handler.module_map = np.array([0, 1, -1])
+
+    res = handler.shaped_pixel_mask
+
+    assert res.ndim == 2
+    assert res.dtype == np.bool
+
+    if gap_pixels and geometry:
+        assert res.shape == DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY
+    elif not gap_pixels and geometry:
+        assert res.shape == DATA_SHAPE_WITH_GEOMETRY
+    elif gap_pixels and not geometry:
+        assert res.shape == MM_DATA_SHAPE_WITH_GAPS
+    elif not gap_pixels and not geometry:
+        assert res.shape == MM_DATA_SHAPE
+
+    # check data for submodules in all 4 corners
+    assert np.allclose(res[:256, :256], mm_pixel_mask[:256, :256])
+    assert np.allclose(res[:256, -256:], mm_pixel_mask[:256, -256:])
+
+    if geometry:
+        assert np.allclose(res[-256:, :256], True)
+        assert np.allclose(res[-256:, -256:], True)
+    else:
+        assert np.allclose(res[-256:, :256], mm_pixel_mask[-256:, :256])
+        assert np.allclose(res[-256:, -256:], mm_pixel_mask[-256:, -256:])
 
 
 def test_handler_get_gains(handler):

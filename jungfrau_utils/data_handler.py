@@ -350,17 +350,22 @@ class JFDataHandler:
         if self.pixel_mask is None:
             return None
 
-        # currently, it requeires a hack of cleaning convertion and module_map values for shaping
-        module_map = self.module_map
+        res = np.empty(self._raw_shape, dtype=self.pixel_mask.dtype)
+        for i, m in enumerate(self.module_map):
+            if m == -1:
+                continue
+
+            module = self._get_module_slice(self.pixel_mask, i)
+            res[m * MODULE_SIZE_Y : (m + 1) * MODULE_SIZE_Y, :] = module
+
+        # currently, it requeires a hack of cleaning convertion value for shaping
         conversion = self.convertion
 
         try:
-            self.module_map = None
             self.convertion = False
-            res = np.invert(self.process(np.invert(self.pixel_mask)))
+            res = np.invert(self.process(np.invert(res)))
         finally:
-            # restore module_map and convertion values
-            self.module_map = module_map
+            # restore convertion value
             self.convertion = conversion
 
         return res
