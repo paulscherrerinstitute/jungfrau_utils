@@ -501,7 +501,7 @@ class JFDataHandler:
 
         # rotate image stack in case of alvra detector
         if self.detector_name.startswith('JF06'):
-            res = np.rot90(res, axes=(1, 2))
+            res = np.rot90(res, axes=(1, 2)).copy()
 
         return res
 
