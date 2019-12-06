@@ -42,7 +42,7 @@ class File:
         self.file = h5py.File(self.file_path, 'r')
         self.handler = JFDataHandler(self.file['/general/detector_name'][()].decode())
 
-        self.convertion = convertion
+        self._convertion = convertion
         self.gap_pixels = gap_pixels
         self.geometry = geometry
 
@@ -107,7 +107,7 @@ class File:
     @property
     def convertion(self):
         """A flag for applying pedestal correction and gain conversion"""
-        return self.handler.convertion
+        return self._convertion
 
     @convertion.setter
     def convertion(self, value):
@@ -115,7 +115,7 @@ class File:
             print("The file is already processed, setting 'convertion' to False")
             value = False
 
-        self.handler.convertion = value
+        self._convertion = value
 
     @property
     def gap_pixels(self):
@@ -430,7 +430,7 @@ class File:
             ind, roi = item[0], item[1:]
 
         data = self.file[f'/data/{self.detector_name}/data'][ind]
-        data = self.handler.process(data)
+        data = self.handler.process(data, convertion=self.convertion)
 
         if roi:
             if data.ndim == 3:

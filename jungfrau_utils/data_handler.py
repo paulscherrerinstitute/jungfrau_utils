@@ -118,7 +118,6 @@ class JFDataHandler:
         )
 
         # values that define processing pipeline
-        self.convertion = True  # convert to keV (apply gain and pedestal corrections)
         self.gap_pixels = True  # add gap pixels between detector submodules
         self.geometry = True  # apply detector geometry corrections
 
@@ -358,15 +357,7 @@ class JFDataHandler:
             module = self._get_module_slice(self.pixel_mask, i)
             res[m * MODULE_SIZE_Y : (m + 1) * MODULE_SIZE_Y, :] = module
 
-        # currently, it requeires a hack of cleaning convertion value for shaping
-        conversion = self.convertion
-
-        try:
-            self.convertion = False
-            res = np.invert(self.process(np.invert(res)))
-        finally:
-            # restore convertion value
-            self.convertion = conversion
+        res = np.invert(self.process(np.invert(res), convertion=False))
 
         return res
 
@@ -394,12 +385,14 @@ class JFDataHandler:
 
         self._module_map = value
 
-    def process(self, images):
+    def process(self, images, convertion=True):
         """Perform jungfrau detector data processing like pedestal correction, gain conversion,
         pixel mask, module map, etc.
 
         Args:
             images (ndarray): image stack or single image to be processed
+            convertion (bool, optional): convert to keV (apply gain and pedestal corrections).
+                Defaults to True.
 
         Returns:
             ndarray: resulting image stack or single image
@@ -412,7 +405,7 @@ class JFDataHandler:
 
         self._check_image_stack_shape(images)
 
-        if self.convertion:
+        if convertion:
             images = self._convert(images)
 
         if self.is_stripsel():
@@ -593,13 +586,7 @@ class JFDataHandler:
                 f"Expected image type is {np.uint16}, provided data has type {image_stack.dtype}"
             )
 
-        conversion = self.convertion
-
-        try:
-            self.convertion = False
-            gains = self.process(image_stack >> 14)
-        finally:
-            self.convertion = conversion
+        gains = self.process(image_stack >> 14, convertion=False)
 
         return gains
 
@@ -609,13 +596,7 @@ class JFDataHandler:
                 f"Expected image type is {np.uint16}, provided data has type {image_stack.dtype}"
             )
 
-        conversion = self.convertion
-
-        try:
-            self.convertion = False
-            saturated_pixels = self.process(image_stack == self.get_saturated_value())
-        finally:
-            self.convertion = conversion
+        saturated_pixels = self.process(image_stack == self.get_saturated_value(), convertion=False)
 
         return saturated_pixels
 

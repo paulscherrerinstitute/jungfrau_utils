@@ -266,11 +266,10 @@ def test_handler_process_image_stack(handler, stack_size):
 @pytest.mark.parametrize("gap_pixels", [True, False])
 @pytest.mark.parametrize("geometry", [True, False])
 def test_handler_process(handler, convertion, gap_pixels, geometry):
-    handler.convertion = convertion
     handler.gap_pixels = gap_pixels
     handler.geometry = geometry
 
-    res = handler.process(image_single)
+    res = handler.process(image_single, convertion=convertion)
 
     assert res.ndim == 2
     if convertion:
