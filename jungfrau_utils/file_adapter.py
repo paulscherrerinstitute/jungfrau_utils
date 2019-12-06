@@ -148,6 +148,88 @@ class File:
         # TODO: generalize this check for data reduction case, where dtype can be different
         return self.file[f'/data/{self.detector_name}/data'].dtype == np.float32
 
+    def save_roi(self, dest, roi_x, roi_y, compress=False, factor=None, dtype=None):
+        """Save data in a separate hdf5 file
+
+        Args:
+            dest (str): Destination file path
+            roi_x (tuple): ROIs to save along x axis.
+            roi_y (tuple): ROIs to save along y axis.
+            compress (bool, optional): Apply bitshuffle+lz4 compression. Defaults to False.
+            factor (float, optional): Divide all values by a factor. Defaults to None.
+            dtype (np.dtype, optional): Resulting image data type. Defaults to None.
+        """
+
+        def copy_objects(name, obj):
+            if isinstance(obj, h5py.Group):
+                h5_dest.create_group(name)
+
+            elif isinstance(obj, h5py.Dataset):
+                dset_source = self.file[name]
+
+                args = {
+                    k: getattr(dset_source, k)
+                    for k in (
+                        'shape',
+                        'dtype',
+                        'chunks',
+                        'compression',
+                        'compression_opts',
+                        'scaleoffset',
+                        'shuffle',
+                        'fletcher32',
+                        'fillvalue',
+                    )
+                }
+
+                if dset_source.shape != dset_source.maxshape:
+                    args['maxshape'] = dset_source.maxshape
+
+                if name == f'data/{self.detector_name}/data':  # compress and copy
+                    data = self[:]
+
+                    h5_dest.create_dataset(f'data/{self.detector_name}/n_roi', data=len(roi_x))
+
+                    for i, (roix, roiy) in enumerate(zip(roi_x, roi_y)):
+                        roi_data = data[:, slice(*roiy), slice(*roix)]
+
+                        if factor:
+                            roi_data = np.round(roi_data / factor)
+
+                        args['shape'] = roi_data.shape
+                        args['maxshape'] = roi_data.shape
+
+                        if roi_data.ndim == 3:
+                            args['chunks'] = (1, *roi_data.shape[1:])
+                        else:
+                            args['chunks'] = roi_data.shape
+
+                        if dtype is None:
+                            args['dtype'] = roi_data.dtype
+                        else:
+                            args['dtype'] = dtype
+
+                        if compress:
+                            args.update(compargs)
+
+                        dset_dest = h5_dest.create_dataset(f'{name}_roi_{i}', **args)
+                        dset_dest[:] = roi_data
+
+                        h5_dest.create_dataset(
+                            f'data/{self.detector_name}/roi_{i}', data=[roiy, roix]
+                        )
+
+                else:  # copy
+                    h5_dest.create_dataset(name, data=dset_source, **args)
+
+            if name != f'data/{self.detector_name}/data':
+                # copy attributes
+                for key, value in self.file[name].attrs.items():
+                    h5_dest[name].attrs[key] = value
+
+        with h5py.File(dest, 'w') as h5_dest:
+            self.file.visititems(copy_objects)
+
     def save_as(self, dest, roi_x=(None,), roi_y=(None,), compress=False, factor=None, dtype=None):
         """Save data in a separate hdf5 file
 
