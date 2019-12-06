@@ -117,9 +117,6 @@ class JFDataHandler:
             (self._gp_shape[0], 2 * NUM_GAINS * self._gp_shape[1]), dtype=np.float32
         )
 
-        # values that define processing pipeline
-        self.gap_pixels = True  # add gap pixels between detector submodules
-
         self._gain_file = ''
         self._pedestal_file = ''
 
@@ -176,27 +173,27 @@ class JFDataHandler:
 
         return shape_y, shape_x
 
-    def get_shape(self, geometry):
+    def get_shape(self, gap_pixels, geometry):
         """Shape of image after geometry correction"""
         if self.is_stripsel():
             return self._get_stripsel_shape(geometry=geometry)
 
-        if geometry and self.gap_pixels:
+        if geometry and gap_pixels:
             modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
             shape_x = max(modules_orig_x) + MODULE_SIZE_X + (CHIP_NUM_X - 1) * CHIP_GAP_X
             shape_y = max(modules_orig_y) + MODULE_SIZE_Y + (CHIP_NUM_Y - 1) * CHIP_GAP_Y
 
-        elif geometry and not self.gap_pixels:
+        elif geometry and not gap_pixels:
             modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
             shape_x = max(modules_orig_x) + MODULE_SIZE_X
             shape_y = max(modules_orig_y) + MODULE_SIZE_Y
 
-        elif not geometry and self.gap_pixels:
+        elif not geometry and gap_pixels:
             shape_y, shape_x = self._raw_shape
             shape_x += (CHIP_NUM_X - 1) * CHIP_GAP_X
             shape_y += (CHIP_NUM_Y - 1) * CHIP_GAP_Y * self._n_active_modules
 
-        elif not geometry and not self.gap_pixels:
+        elif not geometry and not gap_pixels:
             shape_y, shape_x = self._raw_shape
 
         return shape_y, shape_x
@@ -340,7 +337,7 @@ class JFDataHandler:
 
         self._pixel_mask = value.astype(np.bool, copy=False)
 
-    def get_pixel_mask(self, geometry):
+    def get_pixel_mask(self, gap_pixels, geometry):
         """Pixel mask with gap pixels based on the corresponding flags (readonly)"""
         if self.pixel_mask is None:
             return None
@@ -353,7 +350,9 @@ class JFDataHandler:
             module = self._get_module_slice(self.pixel_mask, i)
             res[m * MODULE_SIZE_Y : (m + 1) * MODULE_SIZE_Y, :] = module
 
-        res = np.invert(self.process(np.invert(res), convertion=False, geometry=geometry))
+        res = np.invert(
+            self.process(np.invert(res), convertion=False, gap_pixels=gap_pixels, geometry=geometry)
+        )
 
         return res
 
@@ -381,13 +380,15 @@ class JFDataHandler:
 
         self._module_map = value
 
-    def process(self, images, convertion=True, geometry=True):
+    def process(self, images, convertion=True, gap_pixels=True, geometry=True):
         """Perform jungfrau detector data processing like pedestal correction, gain conversion,
         pixel mask, module map, etc.
 
         Args:
             images (ndarray): image stack or single image to be processed
             convertion (bool, optional): convert to keV (apply gain and pedestal corrections).
+                Defaults to True.
+            gap_pixels (bool, optional): add gap pixels between detector submodules.
                 Defaults to True.
             geometry (bool, optional): apply detector geometry corrections. Defaults to True.
 
@@ -410,9 +411,9 @@ class JFDataHandler:
                 images = self._apply_geometry_stripsel(images)
         else:
             if geometry:
-                # this will also handle self.gap_pixels
-                images = self._apply_geometry(images)
-            elif self.gap_pixels:
+                # this will also handle gap_pixels
+                images = self._apply_geometry(images, gap_pixels=gap_pixels)
+            elif gap_pixels:
                 images = self._add_gap_pixels(images)
 
         if remove_first_dim:
@@ -455,7 +456,7 @@ class JFDataHandler:
 
         return res
 
-    def _apply_geometry(self, image_stack):
+    def _apply_geometry(self, image_stack, gap_pixels):
         """Rearrange image according to geometry of detector modules
 
         Args:
@@ -466,7 +467,7 @@ class JFDataHandler:
         """
         modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
 
-        res_shape = self.get_shape(geometry=True)
+        res_shape = self.get_shape(gap_pixels=gap_pixels, geometry=True)
         res = np.zeros((image_stack.shape[0], *res_shape), dtype=image_stack.dtype)
 
         for i, m in enumerate(self.module_map):
@@ -481,7 +482,7 @@ class JFDataHandler:
             if self.detector_name in ('JF02T09V02', 'JF02T01V02'):
                 module = np.rot90(module, 2, axes=(1, 2))
 
-            if self.gap_pixels:
+            if gap_pixels:
                 for j in range(CHIP_NUM_Y):
                     for k in range(CHIP_NUM_X):
                         # reading positions
@@ -505,7 +506,7 @@ class JFDataHandler:
         return res
 
     def _add_gap_pixels(self, image_stack):
-        res_shape = self.get_shape(geometry=False)
+        res_shape = self.get_shape(gap_pixels=True, geometry=False)
         res = np.zeros((image_stack.shape[0], *res_shape), dtype=image_stack.dtype)
 
         for _, m in enumerate(self.module_map):
@@ -544,7 +545,7 @@ class JFDataHandler:
         """
         modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
 
-        res_shape = self.get_shape(geometry=True)
+        res_shape = self.get_shape(gap_pixels=False, geometry=True)
         res = np.zeros((image_stack.shape[0], *res_shape), dtype=image_stack.dtype)
 
         for i, m in enumerate(self.module_map):
@@ -580,24 +581,27 @@ class JFDataHandler:
 
         return module
 
-    def get_gains(self, image_stack, geometry):
+    def get_gains(self, image_stack, gap_pixels, geometry):
         if image_stack.dtype != np.uint16:
             raise TypeError(
                 f"Expected image type is {np.uint16}, provided data has type {image_stack.dtype}"
             )
 
-        gains = self.process(image_stack >> 14, convertion=False, geometry=geometry)
+        gains = image_stack >> 14
+        gains = self.process(gains, convertion=False, gap_pixels=gap_pixels, geometry=geometry)
 
         return gains
 
-    def get_saturated_pixels(self, image_stack, geometry):
+    def get_saturated_pixels(self, image_stack, gap_pixels, geometry):
         if image_stack.dtype != np.uint16:
             raise TypeError(
                 f"Expected image type is {np.uint16}, provided data has type {image_stack.dtype}"
             )
 
         saturated_pixels = image_stack == self.get_saturated_value()
-        saturated_pixels = self.process(saturated_pixels, convertion=False, geometry=geometry)
+        saturated_pixels = self.process(
+            saturated_pixels, convertion=False, gap_pixels=gap_pixels, geometry=geometry
+        )
 
         return saturated_pixels
 

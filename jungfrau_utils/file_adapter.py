@@ -43,7 +43,7 @@ class File:
         self.handler = JFDataHandler(self.file['/general/detector_name'][()].decode())
 
         self._convertion = convertion
-        self.gap_pixels = gap_pixels
+        self._gap_pixels = gap_pixels
         self._geometry = geometry
 
         # Gain file
@@ -120,7 +120,7 @@ class File:
     @property
     def gap_pixels(self):
         """A flag for adding gap pixels"""
-        return self.handler.gap_pixels
+        return self._gap_pixels
 
     @gap_pixels.setter
     def gap_pixels(self, value):
@@ -128,7 +128,7 @@ class File:
             print("The file is already processed, setting 'gap_pixels' to False")
             value = False
 
-        self.handler.gap_pixels = value
+        self._gap_pixels = value
 
     @property
     def geometry(self):
@@ -430,7 +430,9 @@ class File:
             ind, roi = item[0], item[1:]
 
         data = self.file[f'/data/{self.detector_name}/data'][ind]
-        data = self.handler.process(data, convertion=self.convertion, geometry=self.geometry)
+        data = self.handler.process(
+            data, convertion=self.convertion, gap_pixels=self.gap_pixels, geometry=self.geometry
+        )
 
         if roi:
             if data.ndim == 3:
