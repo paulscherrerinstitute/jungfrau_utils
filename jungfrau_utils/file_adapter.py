@@ -44,7 +44,7 @@ class File:
 
         self._convertion = convertion
         self.gap_pixels = gap_pixels
-        self.geometry = geometry
+        self._geometry = geometry
 
         # Gain file
         if gain_file:
@@ -133,7 +133,7 @@ class File:
     @property
     def geometry(self):
         """A flag for applying geometry"""
-        return self.handler.geometry
+        return self._geometry
 
     @geometry.setter
     def geometry(self, value):
@@ -141,7 +141,7 @@ class File:
             print("The file is already processed, setting 'geometry' to False")
             value = False
 
-        self.handler.geometry = value
+        self._geometry = value
 
     @property
     def _processed(self):
@@ -430,7 +430,7 @@ class File:
             ind, roi = item[0], item[1:]
 
         data = self.file[f'/data/{self.detector_name}/data'][ind]
-        data = self.handler.process(data, convertion=self.convertion)
+        data = self.handler.process(data, convertion=self.convertion, geometry=self.geometry)
 
         if roi:
             if data.ndim == 3:

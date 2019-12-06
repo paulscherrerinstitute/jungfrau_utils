@@ -66,7 +66,7 @@ def test_handler_init_fail(detector_name):
 
 def test_handler_init(empty_handler):
     assert empty_handler.detector_name == DETECTOR_NAME
-    assert empty_handler.shape == DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY
+    assert empty_handler.get_shape(geometry=True) == DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY
 
     assert empty_handler.pedestal is None
     assert empty_handler.gain is None
@@ -210,9 +210,7 @@ def test_handler_process_single_image_no_gaps(handler):
 
 
 def test_handler_process_single_image_no_geom(handler):
-    handler.geometry = False
-
-    res = handler.process(image_single)
+    res = handler.process(image_single, geometry=False)
 
     assert res.dtype == np.float32
     assert res.ndim == 2
@@ -227,9 +225,8 @@ def test_handler_process_single_image_no_geom(handler):
 
 def test_handler_process_no_gaps_no_geom(handler):
     handler.gap_pixels = False
-    handler.geometry = False
 
-    res = handler.process(image_single)
+    res = handler.process(image_single, geometry=False)
 
     assert res.dtype == np.float32
     assert res.ndim == 2
@@ -267,9 +264,8 @@ def test_handler_process_image_stack(handler, stack_size):
 @pytest.mark.parametrize("geometry", [True, False])
 def test_handler_process(handler, convertion, gap_pixels, geometry):
     handler.gap_pixels = gap_pixels
-    handler.geometry = geometry
 
-    res = handler.process(image_single, convertion=convertion)
+    res = handler.process(image_single, convertion=convertion, geometry=geometry)
 
     assert res.ndim == 2
     if convertion:
@@ -292,10 +288,9 @@ def test_handler_process(handler, convertion, gap_pixels, geometry):
 @pytest.mark.parametrize("module_map", [None, np.array([0, 1, 2])])
 def test_handler_process_mm_all(handler, gap_pixels, geometry, module_map):
     handler.gap_pixels = gap_pixels
-    handler.geometry = geometry
     handler.module_map = module_map
 
-    res = handler.process(image_single)
+    res = handler.process(image_single, geometry=geometry)
 
     assert res.ndim == 2
     assert res.dtype == np.float32
@@ -320,10 +315,9 @@ def test_handler_process_mm_all(handler, gap_pixels, geometry, module_map):
 @pytest.mark.parametrize("geometry", [True, False])
 def test_handler_process_mm_missing(handler, gap_pixels, geometry):
     handler.gap_pixels = gap_pixels
-    handler.geometry = geometry
     handler.module_map = np.array([0, 1, -1])
 
-    res = handler.process(mm_image_single)
+    res = handler.process(mm_image_single, geometry=geometry)
 
     assert res.ndim == 2
     assert res.dtype == np.float32
@@ -354,10 +348,9 @@ def test_handler_process_mm_missing(handler, gap_pixels, geometry):
 @pytest.mark.parametrize("module_map", [None, np.array([0, 1, 2])])
 def test_handler_shaped_pixel_mask(handler, gap_pixels, geometry, module_map):
     handler.gap_pixels = gap_pixels
-    handler.geometry = geometry
     handler.module_map = module_map
 
-    res = handler.shaped_pixel_mask
+    res = handler.get_pixel_mask(geometry=geometry)
 
     assert res.ndim == 2
     assert res.dtype == np.bool
@@ -382,10 +375,9 @@ def test_handler_shaped_pixel_mask(handler, gap_pixels, geometry, module_map):
 @pytest.mark.parametrize("geometry", [True, False])
 def test_handler_shaped_pixel_mask_mm_missing(handler, gap_pixels, geometry):
     handler.gap_pixels = gap_pixels
-    handler.geometry = geometry
     handler.module_map = np.array([0, 1, -1])
 
-    res = handler.shaped_pixel_mask
+    res = handler.get_pixel_mask(geometry=geometry)
 
     assert res.ndim == 2
     assert res.dtype == np.bool
@@ -412,7 +404,7 @@ def test_handler_shaped_pixel_mask_mm_missing(handler, gap_pixels, geometry):
 
 
 def test_handler_get_gains(handler):
-    res = handler.get_gains(image_stack)
+    res = handler.get_gains(image_stack, geometry=False)
 
     assert (res >= 0).all() and (res <= 3).all()
 
