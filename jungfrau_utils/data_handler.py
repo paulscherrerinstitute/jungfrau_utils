@@ -342,15 +342,11 @@ class JFDataHandler:
         if convertion:
             images = self._convert(images)
 
-        if self.is_stripsel():
-            if geometry:
-                images = self._apply_geometry_stripsel(images)
-        else:
-            if geometry:
-                # this will also handle gap_pixels
-                images = self._apply_geometry(images, gap_pixels=gap_pixels)
-            elif gap_pixels:
-                images = self._add_gap_pixels(images)
+        if geometry:
+            # this will also handle gap_pixels
+            images = self._apply_geometry(images, gap_pixels=gap_pixels)
+        elif gap_pixels:
+            images = self._add_gap_pixels(images)
 
         if remove_first_dim:
             images = images[0]
@@ -401,6 +397,9 @@ class JFDataHandler:
         Returns:
             ndarray: resulting image_stack with modules on their actual places
         """
+        if self.is_stripsel():
+            return self._apply_geometry_stripsel(image_stack)
+
         modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
 
         res_shape = self.get_shape(gap_pixels=gap_pixels, geometry=True)
@@ -454,19 +453,23 @@ class JFDataHandler:
 
             module = self._get_module_slice(image_stack, m)
 
-            for j in range(CHIP_NUM_Y):
-                for k in range(CHIP_NUM_X):
-                    # reading positions
-                    ry_s = j * CHIP_SIZE_Y
-                    rx_s = k * CHIP_SIZE_X
+            if self.is_stripsel():
+                # 'gap_pixels' is ignored on stripsel detectors
+                res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X] = module
+            else:
+                for j in range(CHIP_NUM_Y):
+                    for k in range(CHIP_NUM_X):
+                        # reading positions
+                        ry_s = j * CHIP_SIZE_Y
+                        rx_s = k * CHIP_SIZE_X
 
-                    # writing positions
-                    wy_s = oy + ry_s + j * CHIP_GAP_Y
-                    wx_s = ox + rx_s + k * CHIP_GAP_X
+                        # writing positions
+                        wy_s = oy + ry_s + j * CHIP_GAP_Y
+                        wx_s = ox + rx_s + k * CHIP_GAP_X
 
-                    res[:, wy_s : wy_s + CHIP_SIZE_Y, wx_s : wx_s + CHIP_SIZE_X] = module[
-                        :, ry_s : ry_s + CHIP_SIZE_Y, rx_s : rx_s + CHIP_SIZE_X
-                    ]
+                        res[:, wy_s : wy_s + CHIP_SIZE_Y, wx_s : wx_s + CHIP_SIZE_X] = module[
+                            :, ry_s : ry_s + CHIP_SIZE_Y, rx_s : rx_s + CHIP_SIZE_X
+                        ]
 
         return res
 
