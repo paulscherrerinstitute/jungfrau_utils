@@ -258,16 +258,16 @@ def test_handler_process_image_stack(handler, stack_size):
     assert np.allclose(res[:, -256:, -256:], converted_image_stack[:stack_size, -256:, -256:])
 
 
-@pytest.mark.parametrize("convertion", [True, False])
+@pytest.mark.parametrize("conversion", [True, False])
 @pytest.mark.parametrize("gap_pixels", [True, False])
 @pytest.mark.parametrize("geometry", [True, False])
-def test_handler_process(handler, convertion, gap_pixels, geometry):
+def test_handler_process(handler, conversion, gap_pixels, geometry):
     res = handler.process(
-        image_single, convertion=convertion, gap_pixels=gap_pixels, geometry=geometry
+        image_single, conversion=conversion, gap_pixels=gap_pixels, geometry=geometry
     )
 
     assert res.ndim == 2
-    if convertion:
+    if conversion:
         assert res.dtype == np.float32
     else:
         assert res.dtype == np.uint16

@@ -20,7 +20,7 @@ class File:
         file_path,
         gain_file='',
         pedestal_file='',
-        convertion=True,
+        conversion=True,
         gap_pixels=True,
         geometry=True,
     ):
@@ -31,7 +31,7 @@ class File:
             gain_file (str, optional): path to gain file. Auto-locate if empty. Defaults to ''.
             pedestal_file (str, optional): path to pedestal file. Auto-locate if empty.
                 Defaults to ''.
-            convertion (bool, optional): Apply gain conversion and pedestal correction.
+            conversion (bool, optional): Apply gain conversion and pedestal correction.
                 Defaults to True.
             gap_pixels (bool, optional): Add gap pixels between detector submodules.
                 Defaults to True.
@@ -42,7 +42,7 @@ class File:
         self.file = h5py.File(self.file_path, 'r')
         self.handler = JFDataHandler(self.file['/general/detector_name'][()].decode())
 
-        self._convertion = convertion
+        self._conversion = conversion
         self._gap_pixels = gap_pixels
         self._geometry = geometry
 
@@ -105,17 +105,17 @@ class File:
         return self.handler.pedestal_file
 
     @property
-    def convertion(self):
+    def conversion(self):
         """A flag for applying pedestal correction and gain conversion"""
-        return self._convertion
+        return self._conversion
 
-    @convertion.setter
-    def convertion(self, value):
+    @conversion.setter
+    def conversion(self, value):
         if self._processed:
-            print("The file is already processed, setting 'convertion' to False")
+            print("The file is already processed, setting 'conversion' to False")
             value = False
 
-        self._convertion = value
+        self._conversion = value
 
     @property
     def gap_pixels(self):
@@ -431,7 +431,7 @@ class File:
 
         data = self.file[f'/data/{self.detector_name}/data'][ind]
         data = self.handler.process(
-            data, convertion=self.convertion, gap_pixels=self.gap_pixels, geometry=self.geometry
+            data, conversion=self.conversion, gap_pixels=self.gap_pixels, geometry=self.geometry
         )
 
         if roi:

@@ -287,7 +287,7 @@ class JFDataHandler:
             res[m * MODULE_SIZE_Y : (m + 1) * MODULE_SIZE_Y, :] = module
 
         res = np.invert(
-            self.process(np.invert(res), convertion=False, gap_pixels=gap_pixels, geometry=geometry)
+            self.process(np.invert(res), conversion=False, gap_pixels=gap_pixels, geometry=geometry)
         )
 
         return res
@@ -316,13 +316,13 @@ class JFDataHandler:
 
         self._module_map = value
 
-    def process(self, images, convertion=True, gap_pixels=True, geometry=True):
+    def process(self, images, conversion=True, gap_pixels=True, geometry=True):
         """Perform jungfrau detector data processing like pedestal correction, gain conversion,
         pixel mask, module map, etc.
 
         Args:
             images (ndarray): image stack or single image to be processed
-            convertion (bool, optional): convert to keV (apply gain and pedestal corrections).
+            conversion (bool, optional): convert to keV (apply gain and pedestal corrections).
                 Defaults to True.
             gap_pixels (bool, optional): add gap pixels between detector submodules.
                 Defaults to True.
@@ -339,7 +339,7 @@ class JFDataHandler:
 
         self._check_image_stack_shape(images)
 
-        if convertion:
+        if conversion:
             images = self._convert(images)
 
         if geometry:
@@ -500,7 +500,7 @@ class JFDataHandler:
             )
 
         gains = image_stack >> 14
-        gains = self.process(gains, convertion=False, gap_pixels=gap_pixels, geometry=geometry)
+        gains = self.process(gains, conversion=False, gap_pixels=gap_pixels, geometry=geometry)
 
         return gains
 
@@ -512,7 +512,7 @@ class JFDataHandler:
 
         saturated_pixels = image_stack == self.get_saturated_value()
         saturated_pixels = self.process(
-            saturated_pixels, convertion=False, gap_pixels=gap_pixels, geometry=geometry
+            saturated_pixels, conversion=False, gap_pixels=gap_pixels, geometry=geometry
         )
 
         return saturated_pixels

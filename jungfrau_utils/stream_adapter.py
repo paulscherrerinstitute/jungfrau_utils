@@ -33,9 +33,9 @@ class StreamAdapter:
         self._update_handler(metadata)
 
         # skip conversion step if jungfrau data handler cannot do it, thus avoiding Exception raise
-        convertion = self.handler.can_convert()
+        conversion = self.handler.can_convert()
 
-        return self.handler.process(image, convertion=convertion)
+        return self.handler.process(image, conversion=conversion)
 
     def _update_handler(self, md_dict):
         # gain file
