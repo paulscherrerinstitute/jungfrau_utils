@@ -397,9 +397,6 @@ class JFDataHandler:
         Returns:
             ndarray: resulting image_stack with modules on their actual places
         """
-        if self.is_stripsel():
-            return self._apply_geometry_stripsel(image_stack)
-
         modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
 
         res_shape = self.get_shape(gap_pixels=gap_pixels, geometry=True)
@@ -417,22 +414,28 @@ class JFDataHandler:
             if self.detector_name in ('JF02T09V02', 'JF02T01V02'):
                 module = np.rot90(module, 2, axes=(1, 2))
 
-            if gap_pixels:
-                for j in range(CHIP_NUM_Y):
-                    for k in range(CHIP_NUM_X):
-                        # reading positions
-                        ry_s = j * CHIP_SIZE_Y
-                        rx_s = k * CHIP_SIZE_X
-
-                        # writing positions
-                        wy_s = oy + ry_s + j * CHIP_GAP_Y
-                        wx_s = ox + rx_s + k * CHIP_GAP_X
-
-                        res[:, wy_s : wy_s + CHIP_SIZE_Y, wx_s : wx_s + CHIP_SIZE_X] = module[
-                            :, ry_s : ry_s + CHIP_SIZE_Y, rx_s : rx_s + CHIP_SIZE_X
-                        ]
+            if self.is_stripsel():
+                for ind in range(module.shape[0]):
+                    res[
+                        ind, oy : oy + STRIPSEL_MODULE_SIZE_Y, ox : ox + STRIPSEL_MODULE_SIZE_X
+                    ] = reshape_stripsel(module[ind])
             else:
-                res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X] = module
+                if gap_pixels:
+                    for j in range(CHIP_NUM_Y):
+                        for k in range(CHIP_NUM_X):
+                            # reading positions
+                            ry_s = j * CHIP_SIZE_Y
+                            rx_s = k * CHIP_SIZE_X
+
+                            # writing positions
+                            wy_s = oy + ry_s + j * CHIP_GAP_Y
+                            wx_s = ox + rx_s + k * CHIP_GAP_X
+
+                            res[:, wy_s : wy_s + CHIP_SIZE_Y, wx_s : wx_s + CHIP_SIZE_X] = module[
+                                :, ry_s : ry_s + CHIP_SIZE_Y, rx_s : rx_s + CHIP_SIZE_X
+                            ]
+                else:
+                    res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X] = module
 
         # rotate image stack in case of alvra detector
         if self.detector_name.startswith('JF06'):
@@ -470,36 +473,6 @@ class JFDataHandler:
                         res[:, wy_s : wy_s + CHIP_SIZE_Y, wx_s : wx_s + CHIP_SIZE_X] = module[
                             :, ry_s : ry_s + CHIP_SIZE_Y, rx_s : rx_s + CHIP_SIZE_X
                         ]
-
-        return res
-
-    def _apply_geometry_stripsel(self, image_stack):
-        """Rearrange stripsel image according to geometry of detector modules
-
-        Args:
-            image_stack (ndarray): image stack to be processed
-
-        Returns:
-            ndarray: resulting image_stack with modules on their actual places
-        """
-        modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
-
-        res_shape = self.get_shape(gap_pixels=False, geometry=True)
-        res = np.zeros((image_stack.shape[0], *res_shape), dtype=image_stack.dtype)
-
-        for i, m in enumerate(self.module_map):
-            if m == -1:
-                continue
-
-            oy = modules_orig_y[i]
-            ox = modules_orig_x[i]
-
-            module = self._get_module_slice(image_stack, m)
-
-            for ind in range(module.shape[0]):
-                res[
-                    ind, oy : oy + STRIPSEL_MODULE_SIZE_Y, ox : ox + STRIPSEL_MODULE_SIZE_X
-                ] = reshape_stripsel(module[ind])
 
         return res
 
