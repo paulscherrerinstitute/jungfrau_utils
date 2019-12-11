@@ -1,5 +1,3 @@
-import ctypes
-import os
 import re
 from collections import namedtuple
 
@@ -16,8 +14,7 @@ except ImportError:
 else:
     mkl.set_num_threads(1)  # pylint: disable=no-member
 
-NUM_GAINS = 3
-HIGHGAIN_ORDER = {True: (3, 1, 2), False: (0, 1, 2)}
+HIGHGAIN_ORDER = {True: (3, 1, 2, 2), False: (0, 1, 2, 2)}
 
 CHIP_SIZE_X = 256
 CHIP_SIZE_Y = 256
@@ -38,65 +35,6 @@ STRIPSEL_MODULE_SIZE_X = 1024 * 3 + 18  # = 3090
 STRIPSEL_MODULE_SIZE_Y = 86
 
 
-try:
-    # TODO: make a proper external package integration
-    mod_path = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
-    for entry in os.scandir(mod_path):
-        if (
-            entry.is_file()
-            and entry.name.startswith('libcorrections')
-            and entry.name.endswith('.so')
-        ):
-            _mod = ctypes.cdll.LoadLibrary(os.path.join(mod_path, entry))
-
-    correct_mask = _mod.jf_apply_pede_gain_mask
-    correct_mask.argtypes = (
-        ctypes.c_uint32,
-        np.ctypeslib.ndpointer(ctypes.c_uint16, flags="C_CONTIGUOUS"),
-        np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),
-        np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),
-        np.ctypeslib.ndpointer(ctypes.c_bool, flags="C_CONTIGUOUS"),
-    )
-    correct_mask.restype = None
-    correct_mask.__doc__ = """Apply gain/pedestal and pixel mask corrections
-    Parameters
-    ----------
-    image_size : c_uint32
-        number of pixels in the image array
-    image : uint16_t array
-        Jungfrau 2D array to be corrected
-    gp : float32 array
-        array containing combined gain and pedestal corrections
-    res : float32 array
-        2D array containing corrected image
-    pixel_mask : array_like, int
-        2D array containing pixels to be masked (tagged with a one)
-    """
-
-    correct = _mod.jf_apply_pede_gain
-    correct.argtypes = (
-        ctypes.c_uint32,
-        np.ctypeslib.ndpointer(ctypes.c_uint16, flags="C_CONTIGUOUS"),
-        np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),
-        np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),
-    )
-    correct.restype = None
-    correct.__doc__ = """Apply gain/pedestal corrections
-    Parameters
-    ----------
-    image_size : c_uint32
-        number of pixels in the image array
-    image : uint16_t array
-        Jungfrau 2D array to be corrected
-    gp : float32 array
-        array containing combined gain and pedestal corrections
-    res : float32 array
-        2D array containing corrected image
-    """
-except:
-    raise ImportError('Could not load libcorrections.')
-
-
 class JFDataHandler:
     def __init__(self, detector_name):
         """Create an object to perform jungfrau detector data handling like pedestal correction,
@@ -111,11 +49,9 @@ class JFDataHandler:
         else:
             raise KeyError(f"Geometry for '{detector_name}' detector is not present.")
 
-        # array to be used for the actual data conversion
-        # gain and pedestal values are interleaved for better CPU cache utilization
-        self._gp = np.empty(
-            (self._gp_shape[0], 2 * NUM_GAINS * self._gp_shape[1]), dtype=np.float32
-        )
+        # gain and pedestal arrays to be used for the actual data conversion
+        self._g = np.empty((4, *self._gp_shape), dtype=np.float32)
+        self._p = np.empty((4, *self._gp_shape), dtype=np.float32)
 
         self._gain_file = ''
         self._pedestal_file = ''
@@ -242,8 +178,8 @@ class JFDataHandler:
 
         # convert _gain values to float32
         self._gain = value.astype(np.float32, copy=False)
-        for i, g in zip(range(NUM_GAINS), HIGHGAIN_ORDER[self.highgain]):
-            self._gp[:, 2 * i :: NUM_GAINS * 2] = 1 / self._gain[g]
+        for i, order in enumerate(HIGHGAIN_ORDER[self.highgain]):
+            self._g[i] = 1 / self._gain[order]
 
     @property
     def pedestal_file(self):
@@ -292,8 +228,8 @@ class JFDataHandler:
 
         # convert _pedestal values to float32
         self._pedestal = value.astype(np.float32, copy=False)
-        for i, g in zip(range(NUM_GAINS), HIGHGAIN_ORDER[self.highgain]):
-            self._gp[:, 2 * i + 1 :: NUM_GAINS * 2] = self._pedestal[g]
+        for i, order in enumerate(HIGHGAIN_ORDER[self.highgain]):
+            self._p[i] = self._pedestal[order]
 
     @property
     def highgain(self):
@@ -309,10 +245,10 @@ class JFDataHandler:
         first_gain = HIGHGAIN_ORDER[value][0]
 
         if self.gain is not None:
-            self._gp[:, :: NUM_GAINS * 2] = 1 / self._gain[first_gain]
+            self._g[0] = 1 / self._gain[first_gain]
 
         if self.pedestal is not None:
-            self._gp[:, 1 :: NUM_GAINS * 2] = self._pedestal[first_gain]
+            self._p[0] = self._pedestal[first_gain]
 
     @property
     def pixel_mask(self):
@@ -444,15 +380,15 @@ class JFDataHandler:
 
             module = self._get_module_slice(image_stack, m)
             module_res = res[:, m * MODULE_SIZE_Y : (m + 1) * MODULE_SIZE_Y, :]
-            module_gp = self._gp[i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
+            module_g = self._g[:, i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
+            module_p = self._p[:, i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
 
             if self.pixel_mask is None:
-                for mod, mod_res in zip(module, module_res):
-                    correct(np.uint32(MODULE_SIZE), mod, module_gp, mod_res)
+                module_mask = None
             else:
-                mask_module = self.pixel_mask[i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
-                for mod, mod_res in zip(module, module_res):
-                    correct_mask(np.uint32(MODULE_SIZE), mod, module_gp, mod_res, mask_module)
+                module_mask = self.pixel_mask[i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
+
+            correct(module_res, module, module_g, module_p, module_mask)
 
         return res
 
@@ -614,6 +550,20 @@ class JFDataHandler:
             saturated_value = 0b1100000000000000  # 49152
 
         return saturated_value
+
+
+@jit(nopython=True)
+def correct(res, image, gain, pedestal, mask):
+    num, size_y, size_x = image.shape
+    for i1 in range(num):
+        for i2 in range(size_y):
+            for i3 in range(size_x):
+                if mask is not None and mask[i2, i3]:
+                    res[i1, i2, i3] = 0
+                else:
+                    gm = image[i1, i2, i3] >> 14
+                    val = image[i1, i2, i3] & 0x3FFF
+                    res[i1, i2, i3] = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
 
 
 @jit(nopython=True)
