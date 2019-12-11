@@ -339,20 +339,23 @@ class JFDataHandler:
 
         self._check_image_stack_shape(images)
 
-        if conversion:
-            images = self._convert(images)
+        if conversion or gap_pixels or geometry:
+            if conversion:
+                if not self.can_convert():
+                    raise RuntimeError("Gain and/or pedestal values are not set")
+                res_dtype = np.float32
+            else:
+                res_dtype = images.dtype
 
-        if geometry or gap_pixels:
             res_shape = self.get_shape(gap_pixels=gap_pixels, geometry=geometry)
-            res = np.zeros((images.shape[0], *res_shape), dtype=images.dtype)
+            res = np.zeros((images.shape[0], *res_shape), dtype=res_dtype)
 
-            self._arrange_geometry(res, images, gap_pixels=gap_pixels, geometry=geometry)
-
+            self._process(res, images, conversion, gap_pixels, geometry)
             images = res
 
-        # rotate image stack in case of alvra detector
-        if geometry and self.detector_name.startswith('JF06'):
-            images = np.rot90(images, axes=(1, 2)).copy()
+            # rotate image stack in case of alvra detector
+            if geometry and self.detector_name.startswith('JF06'):
+                images = np.rot90(images, axes=(1, 2)).copy()
 
         if remove_first_dim:
             images = images[0]
@@ -362,47 +365,7 @@ class JFDataHandler:
     def can_convert(self):
         return (self.gain is not None) and (self.pedestal is not None)
 
-    def _convert(self, image_stack):
-        """Apply pedestal correction and gain conversion
-
-        Args:
-            image_stack (ndarray): image stack to be processed
-
-        Returns:
-            ndarray: resulting image stack or a single image
-        """
-        if not self.can_convert():
-            raise RuntimeError("Gain and/or pedestal values are not set")
-
-        res = np.empty(shape=image_stack.shape, dtype=np.float32)
-
-        for i, m in enumerate(self.module_map):
-            if m == -1:
-                continue
-
-            module = self._get_module_slice(image_stack, m)
-            module_res = res[:, m * MODULE_SIZE_Y : (m + 1) * MODULE_SIZE_Y, :]
-            module_g = self._g[:, i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
-            module_p = self._p[:, i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
-
-            if self.pixel_mask is None:
-                module_mask = None
-            else:
-                module_mask = self.pixel_mask[i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
-
-            correct(module_res, module, module_g, module_p, module_mask)
-
-        return res
-
-    def _arrange_geometry(self, res, image_stack, gap_pixels, geometry):
-        """Rearrange image according to geometry of detector modules
-
-        Args:
-            image_stack (ndarray): image stack to be processed
-
-        Returns:
-            ndarray: resulting image_stack with modules on their actual places
-        """
+    def _process(self, res, image_stack, conversion, gap_pixels, geometry):
         for i, m in enumerate(self.module_map):
             if m == -1:
                 continue
@@ -410,11 +373,27 @@ class JFDataHandler:
             if geometry:
                 oy = modules_orig[self.detector_name][0][i]
                 ox = modules_orig[self.detector_name][1][i]
-            else:
+            elif gap_pixels:
                 oy = m * (MODULE_SIZE_Y + CHIP_GAP_Y)
+                ox = 0
+            else:
+                oy = m * MODULE_SIZE_Y
                 ox = 0
 
             module = self._get_module_slice(image_stack, m)
+
+            if conversion:
+                module_res = np.empty(shape=module.shape, dtype=np.float32)
+                module_g = self._g[:, i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
+                module_p = self._p[:, i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
+
+                if self.pixel_mask is None:
+                    module_mask = None
+                else:
+                    module_mask = self.pixel_mask[i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
+
+                correct(module_res, module, module_g, module_p, module_mask)
+                module = module_res
 
             if geometry and self.detector_name in ('JF02T09V02', 'JF02T01V02'):
                 module = np.rot90(module, 2, axes=(1, 2))
@@ -429,26 +408,22 @@ class JFDataHandler:
                     # gap_pixels has no effect on stripsel detectors
                     res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X] = module
             else:
-                self._place_module(res, module, oy, ox, gap_pixels)
+                if gap_pixels:
+                    for j in range(CHIP_NUM_Y):
+                        for k in range(CHIP_NUM_X):
+                            # reading positions
+                            ry_s = j * CHIP_SIZE_Y
+                            rx_s = k * CHIP_SIZE_X
 
-    @staticmethod
-    def _place_module(res, module, oy, ox, gap_pixels):
-        if gap_pixels:
-            for j in range(CHIP_NUM_Y):
-                for k in range(CHIP_NUM_X):
-                    # reading positions
-                    ry_s = j * CHIP_SIZE_Y
-                    rx_s = k * CHIP_SIZE_X
+                            # writing positions
+                            wy_s = oy + ry_s + j * CHIP_GAP_Y
+                            wx_s = ox + rx_s + k * CHIP_GAP_X
 
-                    # writing positions
-                    wy_s = oy + ry_s + j * CHIP_GAP_Y
-                    wx_s = ox + rx_s + k * CHIP_GAP_X
-
-                    res[:, wy_s : wy_s + CHIP_SIZE_Y, wx_s : wx_s + CHIP_SIZE_X] = module[
-                        :, ry_s : ry_s + CHIP_SIZE_Y, rx_s : rx_s + CHIP_SIZE_X
-                    ]
-        else:
-            res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X] = module
+                            res[:, wy_s : wy_s + CHIP_SIZE_Y, wx_s : wx_s + CHIP_SIZE_X] = module[
+                                :, ry_s : ry_s + CHIP_SIZE_Y, rx_s : rx_s + CHIP_SIZE_X
+                            ]
+                else:
+                    res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X] = module
 
     def _check_image_stack_shape(self, image_stack):
         image_shape = image_stack.shape[-2:]
