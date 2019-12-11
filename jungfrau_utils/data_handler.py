@@ -346,11 +346,7 @@ class JFDataHandler:
             res_shape = self.get_shape(gap_pixels=gap_pixels, geometry=geometry)
             res = np.zeros((images.shape[0], *res_shape), dtype=images.dtype)
 
-            if geometry:
-                # this will also handle gap_pixels
-                self._apply_geometry(res, images, gap_pixels=gap_pixels)
-            elif gap_pixels:
-                self._add_gap_pixels(res, images)
+            self._arrange_geometry(res, images, gap_pixels=gap_pixels, geometry=geometry)
 
             images = res
 
@@ -398,7 +394,7 @@ class JFDataHandler:
 
         return res
 
-    def _apply_geometry(self, res, image_stack, gap_pixels):
+    def _arrange_geometry(self, res, image_stack, gap_pixels, geometry):
         """Rearrange image according to geometry of detector modules
 
         Args:
@@ -407,70 +403,52 @@ class JFDataHandler:
         Returns:
             ndarray: resulting image_stack with modules on their actual places
         """
-        modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
-
         for i, m in enumerate(self.module_map):
             if m == -1:
                 continue
 
-            oy = modules_orig_y[i]
-            ox = modules_orig_x[i]
+            if geometry:
+                oy = modules_orig[self.detector_name][0][i]
+                ox = modules_orig[self.detector_name][1][i]
+            else:
+                oy = m * (MODULE_SIZE_Y + CHIP_GAP_Y)
+                ox = 0
 
             module = self._get_module_slice(image_stack, m)
 
-            if self.detector_name in ('JF02T09V02', 'JF02T01V02'):
+            if geometry and self.detector_name in ('JF02T09V02', 'JF02T01V02'):
                 module = np.rot90(module, 2, axes=(1, 2))
 
             if self.is_stripsel():
-                for ind in range(module.shape[0]):
-                    res[
-                        ind, oy : oy + STRIPSEL_MODULE_SIZE_Y, ox : ox + STRIPSEL_MODULE_SIZE_X
-                    ] = reshape_stripsel(module[ind])
-            else:
-                if gap_pixels:
-                    for j in range(CHIP_NUM_Y):
-                        for k in range(CHIP_NUM_X):
-                            # reading positions
-                            ry_s = j * CHIP_SIZE_Y
-                            rx_s = k * CHIP_SIZE_X
-
-                            # writing positions
-                            wy_s = oy + ry_s + j * CHIP_GAP_Y
-                            wx_s = ox + rx_s + k * CHIP_GAP_X
-
-                            res[:, wy_s : wy_s + CHIP_SIZE_Y, wx_s : wx_s + CHIP_SIZE_X] = module[
-                                :, ry_s : ry_s + CHIP_SIZE_Y, rx_s : rx_s + CHIP_SIZE_X
-                            ]
+                if geometry:
+                    for ind in range(module.shape[0]):
+                        res[
+                            ind, oy : oy + STRIPSEL_MODULE_SIZE_Y, ox : ox + STRIPSEL_MODULE_SIZE_X
+                        ] = reshape_stripsel(module[ind])
                 else:
+                    # gap_pixels has no effect on stripsel detectors
                     res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X] = module
-
-    def _add_gap_pixels(self, res, image_stack):
-        for _, m in enumerate(self.module_map):
-            if m == -1:
-                continue
-
-            oy = m * (MODULE_SIZE_Y + CHIP_GAP_Y)
-            ox = 0
-
-            module = self._get_module_slice(image_stack, m)
-
-            if self.is_stripsel():
-                # 'gap_pixels' is ignored on stripsel detectors
-                res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X] = module
             else:
-                for j in range(CHIP_NUM_Y):
-                    for k in range(CHIP_NUM_X):
-                        # reading positions
-                        ry_s = j * CHIP_SIZE_Y
-                        rx_s = k * CHIP_SIZE_X
+                self._place_module(res, module, oy, ox, gap_pixels)
 
-                        # writing positions
-                        wy_s = oy + ry_s + j * CHIP_GAP_Y
-                        wx_s = ox + rx_s + k * CHIP_GAP_X
+    @staticmethod
+    def _place_module(res, module, oy, ox, gap_pixels):
+        if gap_pixels:
+            for j in range(CHIP_NUM_Y):
+                for k in range(CHIP_NUM_X):
+                    # reading positions
+                    ry_s = j * CHIP_SIZE_Y
+                    rx_s = k * CHIP_SIZE_X
 
-                        res[:, wy_s : wy_s + CHIP_SIZE_Y, wx_s : wx_s + CHIP_SIZE_X] = module[
-                            :, ry_s : ry_s + CHIP_SIZE_Y, rx_s : rx_s + CHIP_SIZE_X
-                        ]
+                    # writing positions
+                    wy_s = oy + ry_s + j * CHIP_GAP_Y
+                    wx_s = ox + rx_s + k * CHIP_GAP_X
+
+                    res[:, wy_s : wy_s + CHIP_SIZE_Y, wx_s : wx_s + CHIP_SIZE_X] = module[
+                        :, ry_s : ry_s + CHIP_SIZE_Y, rx_s : rx_s + CHIP_SIZE_X
+                    ]
+        else:
+            res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X] = module
 
     def _check_image_stack_shape(self, image_stack):
         image_shape = image_stack.shape[-2:]
