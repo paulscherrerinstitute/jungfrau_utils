@@ -342,11 +342,21 @@ class JFDataHandler:
         if conversion:
             images = self._convert(images)
 
-        if geometry:
-            # this will also handle gap_pixels
-            images = self._apply_geometry(images, gap_pixels=gap_pixels)
-        elif gap_pixels:
-            images = self._add_gap_pixels(images)
+        if geometry or gap_pixels:
+            res_shape = self.get_shape(gap_pixels=gap_pixels, geometry=geometry)
+            res = np.zeros((images.shape[0], *res_shape), dtype=images.dtype)
+
+            if geometry:
+                # this will also handle gap_pixels
+                self._apply_geometry(res, images, gap_pixels=gap_pixels)
+            elif gap_pixels:
+                self._add_gap_pixels(res, images)
+
+            images = res
+
+        # rotate image stack in case of alvra detector
+        if geometry and self.detector_name.startswith('JF06'):
+            images = np.rot90(images, axes=(1, 2)).copy()
 
         if remove_first_dim:
             images = images[0]
@@ -388,7 +398,7 @@ class JFDataHandler:
 
         return res
 
-    def _apply_geometry(self, image_stack, gap_pixels):
+    def _apply_geometry(self, res, image_stack, gap_pixels):
         """Rearrange image according to geometry of detector modules
 
         Args:
@@ -398,9 +408,6 @@ class JFDataHandler:
             ndarray: resulting image_stack with modules on their actual places
         """
         modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
-
-        res_shape = self.get_shape(gap_pixels=gap_pixels, geometry=True)
-        res = np.zeros((image_stack.shape[0], *res_shape), dtype=image_stack.dtype)
 
         for i, m in enumerate(self.module_map):
             if m == -1:
@@ -437,16 +444,7 @@ class JFDataHandler:
                 else:
                     res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X] = module
 
-        # rotate image stack in case of alvra detector
-        if self.detector_name.startswith('JF06'):
-            res = np.rot90(res, axes=(1, 2)).copy()
-
-        return res
-
-    def _add_gap_pixels(self, image_stack):
-        res_shape = self.get_shape(gap_pixels=True, geometry=False)
-        res = np.zeros((image_stack.shape[0], *res_shape), dtype=image_stack.dtype)
-
+    def _add_gap_pixels(self, res, image_stack):
         for _, m in enumerate(self.module_map):
             if m == -1:
                 continue
@@ -473,8 +471,6 @@ class JFDataHandler:
                         res[:, wy_s : wy_s + CHIP_SIZE_Y, wx_s : wx_s + CHIP_SIZE_X] = module[
                             :, ry_s : ry_s + CHIP_SIZE_Y, rx_s : rx_s + CHIP_SIZE_X
                         ]
-
-        return res
 
     def _check_image_stack_shape(self, image_stack):
         image_shape = image_stack.shape[-2:]
