@@ -383,22 +383,26 @@ class JFDataHandler:
             module = self._get_module_slice(image_stack, m)
 
             if conversion:
-                module_res = np.empty(shape=module.shape, dtype=np.float32)
                 module_g = self._g[:, i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
                 module_p = self._p[:, i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
-
                 if self.pixel_mask is None:
                     module_mask = None
                 else:
                     module_mask = self.pixel_mask[i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
 
-                correct(module_res, module, module_g, module_p, module_mask)
-                module = module_res
-
             if geometry and self.detector_name in ('JF02T09V02', 'JF02T01V02'):
                 module = np.rot90(module, 2, axes=(1, 2))
+                if conversion:
+                    module_g = np.rot90(module_g, 2, axes=(1, 2))
+                    module_p = np.rot90(module_p, 2, axes=(1, 2))
+                    module_mask = np.rot90(module_mask, 2)
 
             if self.is_stripsel():
+                if conversion:
+                    module_res = np.empty(shape=module.shape, dtype=np.float32)
+                    correct(module_res, module, module_g, module_p, module_mask)
+                    module = module_res
+
                 if geometry:
                     for ind in range(module.shape[0]):
                         res[
@@ -407,23 +411,39 @@ class JFDataHandler:
                 else:
                     # gap_pixels has no effect on stripsel detectors
                     res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X] = module
+                return
+
+            if gap_pixels:
+                for j in range(CHIP_NUM_Y):
+                    for k in range(CHIP_NUM_X):
+                        # reading positions
+                        ry_s = j * CHIP_SIZE_Y
+                        rx_s = k * CHIP_SIZE_X
+
+                        # writing positions
+                        wy_s = oy + ry_s + j * CHIP_GAP_Y
+                        wx_s = ox + rx_s + k * CHIP_GAP_X
+
+                        sread = (slice(ry_s, ry_s + CHIP_SIZE_Y), slice(rx_s, rx_s + CHIP_SIZE_X))
+                        swrite = (slice(wy_s, wy_s + CHIP_SIZE_Y), slice(wx_s, wx_s + CHIP_SIZE_X))
+
+                        submod = module[(slice(None), *sread)]
+                        submod_res = res[(slice(None), *swrite)]
+
+                        if conversion:
+                            submod_g = module_g[(slice(None), *sread)]
+                            submod_p = module_p[(slice(None), *sread)]
+                            submod_mask = module_mask[sread]
+                            correct(submod_res, submod, submod_g, submod_p, submod_mask)
+                        else:
+                            submod_res[:] = submod
+
             else:
-                if gap_pixels:
-                    for j in range(CHIP_NUM_Y):
-                        for k in range(CHIP_NUM_X):
-                            # reading positions
-                            ry_s = j * CHIP_SIZE_Y
-                            rx_s = k * CHIP_SIZE_X
-
-                            # writing positions
-                            wy_s = oy + ry_s + j * CHIP_GAP_Y
-                            wx_s = ox + rx_s + k * CHIP_GAP_X
-
-                            res[:, wy_s : wy_s + CHIP_SIZE_Y, wx_s : wx_s + CHIP_SIZE_X] = module[
-                                :, ry_s : ry_s + CHIP_SIZE_Y, rx_s : rx_s + CHIP_SIZE_X
-                            ]
+                module_res = res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X]
+                if conversion:
+                    correct(module_res, module, module_g, module_p, module_mask)
                 else:
-                    res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X] = module
+                    module_res[:] = module
 
     def _check_image_stack_shape(self, image_stack):
         image_shape = image_stack.shape[-2:]
