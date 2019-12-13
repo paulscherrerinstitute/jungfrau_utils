@@ -74,6 +74,7 @@ class JFDataHandler:
 
     @property
     def detector(self):
+        """A namedtuple of detector parameters extracted from its name (readonly)"""
         det = namedtuple('Detector', ['id', 'n_modules', 'version'])
         return det(*(int(d) for d in re.findall(r'\d+', self.detector_name)))
 
@@ -110,7 +111,7 @@ class JFDataHandler:
         return shape_y, shape_x
 
     def get_shape(self, gap_pixels, geometry):
-        """Shape of image after geometry correction"""
+        """Resulting image shape of a detector, based on gap_pixel and geometry flags"""
         if self.is_stripsel():
             return self._get_stripsel_shape(geometry=geometry)
 
@@ -274,7 +275,7 @@ class JFDataHandler:
         self._pixel_mask = value.astype(np.bool, copy=False)
 
     def get_pixel_mask(self, gap_pixels, geometry):
-        """Pixel mask with gap pixels based on the corresponding flags (readonly)"""
+        """Return pixel mask, shaped according to gap_pixel and geometry flags"""
         if self.pixel_mask is None:
             return None
 
@@ -318,7 +319,7 @@ class JFDataHandler:
 
     def process(self, images, conversion=True, gap_pixels=True, geometry=True):
         """Perform jungfrau detector data processing like pedestal correction, gain conversion,
-        pixel mask, module map, etc.
+        applying pixel mask, module map, etc.
 
         Args:
             images (ndarray): image stack or single image to be processed
@@ -353,7 +354,7 @@ class JFDataHandler:
             self._process(res, images, conversion, gap_pixels, geometry)
             images = res
 
-            # rotate image stack in case of alvra detector
+            # rotate image stack in case of alvra JF06 detector
             if geometry and self.detector_name.startswith('JF06'):
                 images = np.rot90(images, axes=(1, 2)).copy()
 
@@ -363,6 +364,7 @@ class JFDataHandler:
         return images
 
     def can_convert(self):
+        """Whether all data for gain/pedestal conversion is present"""
         return (self.gain is not None) and (self.pedestal is not None)
 
     def _process(self, res, image_stack, conversion, gap_pixels, geometry):
@@ -462,24 +464,29 @@ class JFDataHandler:
 
         return module
 
-    def get_gains(self, image_stack, gap_pixels, geometry):
-        if image_stack.dtype != np.uint16:
+    def get_gains(self, images, gap_pixels, geometry):
+        """Return gain values of images, shaped according to gap_pixel and geometry flags.
+        """
+        if images.dtype != np.uint16:
             raise TypeError(
-                f"Expected image type is {np.uint16}, provided data has type {image_stack.dtype}"
+                f"Expected image type is {np.uint16}, provided data has type {images.dtype}"
             )
 
-        gains = image_stack >> 14
+        gains = images >> 14
         gains = self.process(gains, conversion=False, gap_pixels=gap_pixels, geometry=geometry)
 
         return gains
 
-    def get_saturated_pixels(self, image_stack, gap_pixels, geometry):
-        if image_stack.dtype != np.uint16:
+    def get_saturated_pixels(self, images, gap_pixels, geometry):
+        """Return a boolean array of saturated pixels, shaped according to gap_pixel and geometry
+        flags.
+        """
+        if images.dtype != np.uint16:
             raise TypeError(
-                f"Expected image type is {np.uint16}, provided data has type {image_stack.dtype}"
+                f"Expected image type is {np.uint16}, provided data has type {images.dtype}"
             )
 
-        saturated_pixels = image_stack == self.get_saturated_value()
+        saturated_pixels = images == self.get_saturated_value()
         saturated_pixels = self.process(
             saturated_pixels, conversion=False, gap_pixels=gap_pixels, geometry=geometry
         )
@@ -490,9 +497,9 @@ class JFDataHandler:
         """Get a value for saturated pixels.
         """
         if self.highgain:
-            saturated_value = 0b0011111111111111  # 16383
+            saturated_value = 0b0011111111111111  # = 16383
         else:
-            saturated_value = 0b1100000000000000  # 49152
+            saturated_value = 0b1100000000000000  # = 49152
 
         return saturated_value
 
