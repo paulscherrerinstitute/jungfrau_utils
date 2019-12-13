@@ -1,5 +1,6 @@
 import re
 from collections import namedtuple
+from functools import wraps
 
 import h5py
 import numpy as np
@@ -33,6 +34,25 @@ CHIP_GAP_Y = 2
 # 18 since we have 6 more pixels in H per gap
 STRIPSEL_MODULE_SIZE_X = 1024 * 3 + 18  # = 3090
 STRIPSEL_MODULE_SIZE_Y = 86
+
+
+def _allow_single_image(func):
+    @wraps(func)
+    def wrapper(self, images, *args, **kwargs):
+        if images.ndim == 2:
+            remove_first_dim = True
+            images = images[np.newaxis]
+        else:
+            remove_first_dim = False
+
+        images = func(self, images, *args, **kwargs)
+
+        if remove_first_dim:
+            images = images[0]
+
+        return images
+
+    return wrapper
 
 
 class JFDataHandler:
@@ -317,6 +337,7 @@ class JFDataHandler:
 
         self._module_map = value
 
+    @_allow_single_image
     def process(self, images, conversion=True, gap_pixels=True, geometry=True):
         """Perform jungfrau detector data processing like pedestal correction, gain conversion,
         applying pixel mask, module map, etc.
@@ -332,36 +353,30 @@ class JFDataHandler:
         Returns:
             ndarray: resulting image stack or single image
         """
-        if images.ndim == 2:
-            remove_first_dim = True
-            images = images[np.newaxis]
-        else:
-            remove_first_dim = False
+        image_shape = images.shape[-2:]
+        if image_shape != self._raw_shape:
+            raise ValueError(
+                f"Expected image shape {self._raw_shape}, provided image shape {image_shape}"
+            )
 
-        self._check_image_stack_shape(images)
+        if not (conversion or gap_pixels or geometry):
+            # no need to continue, return unchanged images
+            return images
 
-        if conversion or gap_pixels or geometry:
-            if conversion:
-                if not self.can_convert():
-                    raise RuntimeError("Gain and/or pedestal values are not set")
-                res_dtype = np.float32
-            else:
-                res_dtype = images.dtype
+        if conversion and not self.can_convert():
+            raise RuntimeError("Gain and/or pedestal values are not set")
 
-            res_shape = self.get_shape(gap_pixels=gap_pixels, geometry=geometry)
-            res = np.zeros((images.shape[0], *res_shape), dtype=res_dtype)
+        res_dtype = np.float32 if conversion else images.dtype
+        res_shape = self.get_shape(gap_pixels=gap_pixels, geometry=geometry)
+        res = np.zeros((images.shape[0], *res_shape), dtype=res_dtype)
 
-            self._process(res, images, conversion, gap_pixels, geometry)
-            images = res
+        self._process(res, images, conversion, gap_pixels, geometry)
 
-            # rotate image stack in case of alvra JF06 detector
-            if geometry and self.detector_name.startswith('JF06'):
-                images = np.rot90(images, axes=(1, 2)).copy()
+        # rotate image stack in case of alvra JF06 detector
+        if geometry and self.detector_name.startswith('JF06'):
+            res = np.rot90(res, axes=(1, 2)).copy()
 
-        if remove_first_dim:
-            images = images[0]
-
-        return images
+        return res
 
     def can_convert(self):
         """Whether all data for gain/pedestal conversion is present"""
@@ -447,20 +462,12 @@ class JFDataHandler:
                 else:
                     module_res[:] = module
 
-    def _check_image_stack_shape(self, image_stack):
-        image_shape = image_stack.shape[-2:]
-        if image_shape != self._raw_shape:
-            raise ValueError(
-                f"Expected image shape {self._raw_shape}, provided image shape {image_shape}"
-            )
-
+    @_allow_single_image
     def _get_module_slice(self, images, index):
-        # in case of a single image, Ellipsis will be ignored
-        # in case of 3D image stack, Ellipsis will be parsed into slice(None, None)
         if self.detector_name == 'JF02T09V01':
-            module = images[Ellipsis, :, index * MODULE_SIZE_X : (index + 1) * MODULE_SIZE_X]
+            module = images[:, :, index * MODULE_SIZE_X : (index + 1) * MODULE_SIZE_X]
         else:
-            module = images[Ellipsis, index * MODULE_SIZE_Y : (index + 1) * MODULE_SIZE_Y, :]
+            module = images[:, index * MODULE_SIZE_Y : (index + 1) * MODULE_SIZE_Y, :]
 
         return module
 
