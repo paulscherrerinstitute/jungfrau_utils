@@ -259,7 +259,10 @@ class JFDataHandler:
 
     @highgain.setter
     def highgain(self, value):
-        if self._highgain == value:
+        if not isinstance(value, bool):
+            value = bool(value)
+
+        if self._highgain is value:
             return
 
         self._highgain = value
