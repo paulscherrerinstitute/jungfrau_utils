@@ -15,8 +15,6 @@ except ImportError:
 else:
     mkl.set_num_threads(1)  # pylint: disable=no-member
 
-HIGHGAIN_ORDER = {True: (3, 1, 2, 2), False: (0, 1, 2, 2)}
-
 CHIP_SIZE_X = 256
 CHIP_SIZE_Y = 256
 
@@ -69,10 +67,6 @@ class JFDataHandler:
         else:
             raise KeyError(f"Geometry for '{detector_name}' detector is not present.")
 
-        # gain and pedestal arrays to be used for the actual data conversion
-        self._g = np.empty(self._gp_shape, dtype=np.float32)
-        self._p = np.empty(self._gp_shape, dtype=np.float32)
-
         self._gain_file = ''
         self._pedestal_file = ''
 
@@ -81,6 +75,12 @@ class JFDataHandler:
         self._pixel_mask = None
 
         self._highgain = False
+
+        # gain and pedestal arrays to be used for the actual data conversion
+        self._g_all = {True: None, False: None}
+        self._p_all = {True: None, False: None}
+        self._proc_func_all = {True: _correct_highgain, False: _correct}
+
         self._module_map = np.arange(self.detector.n_modules)
 
     @property
@@ -199,8 +199,13 @@ class JFDataHandler:
 
         # convert _gain values to float32
         self._gain = value.astype(np.float32, copy=False)
-        for i, order in enumerate(HIGHGAIN_ORDER[self.highgain]):
-            self._g[i] = 1 / self._gain[order]
+
+        _g = 1 / self._gain
+
+        self._g_all[True] = _g[3:]
+
+        _g[3] = _g[2]
+        self._g_all[False] = _g
 
     @property
     def pedestal_file(self):
@@ -249,8 +254,13 @@ class JFDataHandler:
 
         # convert _pedestal values to float32
         self._pedestal = value.astype(np.float32, copy=False)
-        for i, order in enumerate(HIGHGAIN_ORDER[self.highgain]):
-            self._p[i] = self._pedestal[order]
+
+        _p = self._pedestal.copy()
+
+        self._p_all[True] = _p[3:]
+
+        _p[3] = _p[2]
+        self._p_all[False] = _p
 
     @property
     def highgain(self):
@@ -262,17 +272,19 @@ class JFDataHandler:
         if not isinstance(value, bool):
             value = bool(value)
 
-        if self._highgain is value:
-            return
-
         self._highgain = value
-        first_gain = HIGHGAIN_ORDER[value][0]
 
-        if self.gain is not None:
-            self._g[0] = 1 / self._gain[first_gain]
+    @property
+    def _g(self):
+        return self._g_all[self.highgain]
 
-        if self.pedestal is not None:
-            self._p[0] = self._pedestal[first_gain]
+    @property
+    def _p(self):
+        return self._p_all[self.highgain]
+
+    @property
+    def _proc_func(self):
+        return self._proc_func_all[self.highgain]
 
     @property
     def pixel_mask(self):
@@ -421,7 +433,7 @@ class JFDataHandler:
             if self.is_stripsel():
                 if conversion:
                     module_res = np.empty(shape=module.shape, dtype=np.float32)
-                    correct(module_res, module, module_g, module_p, module_mask)
+                    self._proc_func(module_res, module, module_g, module_p, module_mask)
                     module = module_res
 
                 if geometry:
@@ -456,14 +468,14 @@ class JFDataHandler:
                             submod_g = module_g[(slice(None), *sread)]
                             submod_p = module_p[(slice(None), *sread)]
                             submod_mask = module_mask[sread]
-                            correct(submod_res, submod, submod_g, submod_p, submod_mask)
+                            self._proc_func(submod_res, submod, submod_g, submod_p, submod_mask)
                         else:
                             submod_res[:] = submod
 
             else:
                 module_res = res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X]
                 if conversion:
-                    correct(module_res, module, module_g, module_p, module_mask)
+                    self._proc_func(module_res, module, module_g, module_p, module_mask)
                 else:
                     module_res[:] = module
 
@@ -517,7 +529,7 @@ class JFDataHandler:
 
 
 @jit(nopython=True, cache=True)
-def correct(res, image, gain, pedestal, mask):
+def _correct(res, image, gain, pedestal, mask):
     num, size_y, size_x = image.shape
     for i1 in range(num):
         for i2 in range(size_y):
@@ -528,6 +540,19 @@ def correct(res, image, gain, pedestal, mask):
                     gm = image[i1, i2, i3] >> 14
                     val = image[i1, i2, i3] & 0x3FFF
                     res[i1, i2, i3] = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
+
+
+@jit(nopython=True, cache=True)
+def _correct_highgain(res, image, gain, pedestal, mask):
+    num, size_y, size_x = image.shape
+    for i1 in range(num):
+        for i2 in range(size_y):
+            for i3 in range(size_x):
+                if mask is not None and mask[i2, i3]:
+                    res[i1, i2, i3] = 0
+                else:
+                    val = image[i1, i2, i3] & 0x3FFF
+                    res[i1, i2, i3] = (val - pedestal[0, i2, i3]) * gain[0, i2, i3]
 
 
 @jit(nopython=True, cache=True)
