@@ -426,9 +426,10 @@ class JFDataHandler:
 
                 if geometry:
                     for ind in range(module.shape[0]):
-                        res[
+                        module_res = res[
                             ind, oy : oy + STRIPSEL_MODULE_SIZE_Y, ox : ox + STRIPSEL_MODULE_SIZE_X
-                        ] = reshape_stripsel(module[ind])
+                        ]
+                        reshape_stripsel(module_res, module[ind])
                 else:
                     # gap_pixels has no effect on stripsel detectors
                     res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X] = module
@@ -530,9 +531,7 @@ def correct(res, image, gain, pedestal, mask):
 
 
 @jit(nopython=True, cache=True)
-def reshape_stripsel(image):
-    res = np.zeros((STRIPSEL_MODULE_SIZE_Y, STRIPSEL_MODULE_SIZE_X), dtype=image.dtype)
-
+def reshape_stripsel(res, image):
     # first we fill the normal pixels, the gap ones will be overwritten later
     for yin in range(256):
         for xin in range(1024):
