@@ -511,7 +511,7 @@ class JFDataHandler:
         return saturated_value
 
 
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def correct(res, image, gain, pedestal, mask):
     num, size_y, size_x = image.shape
     for i1 in range(num):
@@ -525,7 +525,7 @@ def correct(res, image, gain, pedestal, mask):
                     res[i1, i2, i3] = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
 
 
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def reshape_stripsel(image):
     res = np.zeros((STRIPSEL_MODULE_SIZE_Y, STRIPSEL_MODULE_SIZE_X), dtype=image.dtype)
 
