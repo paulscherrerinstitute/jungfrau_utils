@@ -70,8 +70,8 @@ class JFDataHandler:
             raise KeyError(f"Geometry for '{detector_name}' detector is not present.")
 
         # gain and pedestal arrays to be used for the actual data conversion
-        self._g = np.empty((4, *self._gp_shape), dtype=np.float32)
-        self._p = np.empty((4, *self._gp_shape), dtype=np.float32)
+        self._g = np.empty(self._gp_shape, dtype=np.float32)
+        self._p = np.empty(self._gp_shape, dtype=np.float32)
 
         self._gain_file = ''
         self._pedestal_file = ''
@@ -113,7 +113,7 @@ class JFDataHandler:
     @property
     def _gp_shape(self):
         n_modules = self.detector.n_modules
-        return self._get_n_modules_shape(n_modules)
+        return (4, *self._get_n_modules_shape(n_modules))
 
     @property
     def _raw_shape(self):
@@ -192,9 +192,9 @@ class JFDataHandler:
                 f"Gain should have 3 dimensions, provided gain has {value.ndim} dimensions."
             )
 
-        if value.shape != (4, *self._gp_shape):
+        if value.shape != self._gp_shape:
             raise ValueError(
-                f"Expected gain shape is {(4, *self._gp_shape)}, provided gain has {value.shape}."
+                f"Expected gain shape is {self._gp_shape}, provided gain has {value.shape}."
             )
 
         # convert _gain values to float32
@@ -242,9 +242,9 @@ class JFDataHandler:
                 f"Pedestal should have 3 dimensions, provided pedestal has {value.ndim} dimensions."
             )
 
-        if value.shape != (4, *self._gp_shape):
+        if value.shape != self._gp_shape:
             raise ValueError(
-                f"Expected pedestal shape is {(4, *self._gp_shape)}, provided pedestal has {value.shape}."
+                f"Expected pedestal shape is {self._gp_shape}, provided pedestal has {value.shape}."
             )
 
         # convert _pedestal values to float32
@@ -287,9 +287,10 @@ class JFDataHandler:
                 f"Pixel mask should have 2 dimensions, provided pixel mask has {value.ndim}."
             )
 
-        if value.shape != self._gp_shape:
+        m_shape = self._gp_shape[-2:]
+        if value.shape != m_shape:
             raise ValueError(
-                f"Expected pixel mask shape is {self._gp_shape}, provided pixel mask has {value.shape} shape."
+                f"Expected pixel mask shape is {m_shape}, provided pixel mask has {value.shape} shape."
             )
 
         self._pixel_mask = value.astype(np.bool, copy=False)
