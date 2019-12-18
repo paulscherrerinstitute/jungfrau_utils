@@ -101,14 +101,6 @@ class JFDataHandler:
         det = namedtuple('Detector', ['id', 'n_modules', 'version'])
         return det(*(int(d) for d in re.findall(r'\d+', self.detector_name)))
 
-    def _get_n_modules_shape(self, n_modules):
-        if self.detector_name == 'JF02T09V01':  # a special case
-            shape_y, shape_x = MODULE_SIZE_Y, MODULE_SIZE_X * n_modules
-        else:
-            shape_y, shape_x = MODULE_SIZE_Y * n_modules, MODULE_SIZE_X
-
-        return shape_y, shape_x
-
     @property
     def _n_active_modules(self):
         return np.sum(self.module_map != -1)
@@ -116,12 +108,12 @@ class JFDataHandler:
     @property
     def _gp_shape(self):
         n_modules = self.detector.n_modules
-        return (4, *self._get_n_modules_shape(n_modules))
+        return 4, MODULE_SIZE_Y * n_modules, MODULE_SIZE_X
 
     @property
     def _raw_shape(self):
         n_modules = self._n_active_modules
-        return self._get_n_modules_shape(n_modules)
+        return MODULE_SIZE_Y * n_modules, MODULE_SIZE_X
 
     def _get_stripsel_shape(self, geometry):
         if geometry:
@@ -451,12 +443,13 @@ class JFDataHandler:
             module = self._get_module_slice(image_stack, m)
 
             if conversion:
-                module_g = self._g[:, i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
-                module_p = self._p[:, i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
+                module_g = self._get_module_slice(self._g, i)
+                module_p = self._get_module_slice(self._p, i)
+
                 if self._mask is None:
                     module_mask = None
                 else:
-                    module_mask = self._mask[i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
+                    module_mask = self._get_module_slice(self._mask, i)
 
             if geometry and self.detector_name in ('JF02T09V02', 'JF02T01V02'):
                 module = np.rot90(module, 2, axes=(1, 2))
