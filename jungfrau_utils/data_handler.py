@@ -83,6 +83,9 @@ class JFDataHandler:
 
         self._module_map = np.arange(self.detector.n_modules)
 
+        self._mask_all = {True: None, False: None}
+        self._mask_double_pixels = False
+
     @property
     def detector_name(self):
         """Detector name (readonly)"""
@@ -310,6 +313,22 @@ class JFDataHandler:
 
         self._pixel_mask = value.astype(np.bool, copy=False)
 
+        self._mask_all[False] = self._pixel_mask
+
+        mask = self._pixel_mask.copy()
+
+        for m in range(self.detector.n_modules):
+            module_mask = self._get_module_slice(mask, m)
+            for n in range(CHIP_NUM_X):
+                module_mask[:, CHIP_SIZE_X * n] = True
+                module_mask[:, CHIP_SIZE_X * (n + 1) - 1] = True
+
+            for n in range(CHIP_NUM_Y):
+                module_mask[CHIP_SIZE_Y * n, :] = True
+                module_mask[CHIP_SIZE_Y * (n + 1) - 1, :] = True
+
+        self._mask_all[True] = mask
+
     def get_pixel_mask(self, gap_pixels, geometry):
         """Return pixel mask, shaped according to gap_pixel and geometry flags"""
         if self.pixel_mask is None:
@@ -328,6 +347,22 @@ class JFDataHandler:
         )
 
         return res
+
+    @property
+    def mask_double_pixels(self):
+        """Current flag for masking double pixels"""
+        return self._mask_double_pixels
+
+    @mask_double_pixels.setter
+    def mask_double_pixels(self, value):
+        if not isinstance(value, bool):
+            value = bool(value)
+
+        self._mask_double_pixels = value
+
+    @property
+    def _mask(self):
+        return self._mask_all[self.mask_double_pixels]
 
     @property
     def module_map(self):
@@ -418,10 +453,10 @@ class JFDataHandler:
             if conversion:
                 module_g = self._g[:, i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
                 module_p = self._p[:, i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
-                if self.pixel_mask is None:
+                if self._mask is None:
                     module_mask = None
                 else:
-                    module_mask = self.pixel_mask[i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
+                    module_mask = self._mask[i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
 
             if geometry and self.detector_name in ('JF02T09V02', 'JF02T01V02'):
                 module = np.rot90(module, 2, axes=(1, 2))
