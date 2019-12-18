@@ -444,23 +444,15 @@ class JFDataHandler:
                 oy = m * MODULE_SIZE_Y
                 ox = 0
 
-            module = self._get_module_slice(image_stack, m)
+            module = self._get_module_slice(image_stack, m, geometry)
 
             if conversion:
-                module_g = self._get_module_slice(self._g, i)
-                module_p = self._get_module_slice(self._p, i)
-
+                module_g = self._get_module_slice(self._g, i, geometry)
+                module_p = self._get_module_slice(self._p, i, geometry)
                 if self._mask is None:
                     module_mask = None
                 else:
-                    module_mask = self._get_module_slice(self._mask, i)
-
-            if geometry and self.detector_name in ('JF02T09V02', 'JF02T01V02'):
-                module = np.rot90(module, 2, axes=(1, 2))
-                if conversion:
-                    module_g = np.rot90(module_g, 2, axes=(1, 2))
-                    module_p = np.rot90(module_p, 2, axes=(1, 2))
-                    module_mask = np.rot90(module_mask, 2)
+                    module_mask = self._get_module_slice(self._mask, i, geometry)
 
             if self.is_stripsel():
                 if conversion:
@@ -512,11 +504,14 @@ class JFDataHandler:
                     module_res[:] = module
 
     @_allow_2darray
-    def _get_module_slice(self, data, m):
+    def _get_module_slice(self, data, m, geometry=False):
         if self.detector_name == 'JF02T09V01':
             out = data[:, :, m * MODULE_SIZE_X : (m + 1) * MODULE_SIZE_X]
         else:
             out = data[:, m * MODULE_SIZE_Y : (m + 1) * MODULE_SIZE_Y, :]
+
+        if geometry and self.detector_name in ('JF02T09V02', 'JF02T01V02'):
+            out = np.rot90(out, 2, axes=(1, 2))
 
         return out
 
