@@ -106,9 +106,13 @@ class JFDataHandler:
         return np.sum(self.module_map != -1)
 
     @property
-    def _gp_shape(self):
+    def _shape(self):
         n_modules = self.detector.n_modules
-        return 4, MODULE_SIZE_Y * n_modules, MODULE_SIZE_X
+        return MODULE_SIZE_Y * n_modules, MODULE_SIZE_X
+
+    @property
+    def _gp_shape(self):
+        return (4, *self._shape)
 
     @property
     def _mm_shape(self):
@@ -297,10 +301,9 @@ class JFDataHandler:
                 f"Pixel mask should have 2 dimensions, provided pixel mask has {value.ndim}."
             )
 
-        m_shape = self._gp_shape[-2:]
-        if value.shape != m_shape:
+        if value.shape != self._shape:
             raise ValueError(
-                f"Expected pixel mask shape is {m_shape}, provided pixel mask has {value.shape} shape."
+                f"Expected pixel mask shape is {self._shape}, provided pixel mask has {value.shape} shape."
             )
 
         self._pixel_mask = value.astype(np.bool, copy=False)
