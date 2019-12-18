@@ -34,21 +34,21 @@ STRIPSEL_MODULE_SIZE_X = 1024 * 3 + 18  # = 3090
 STRIPSEL_MODULE_SIZE_Y = 86
 
 
-def _allow_single_image(func):
+def _allow_2darray(func):
     @wraps(func)
-    def wrapper(self, images, *args, **kwargs):
-        if images.ndim == 2:
-            remove_first_dim = True
-            images = images[np.newaxis]
+    def wrapper(self, array, *args, **kwargs):
+        if array.ndim == 2:
+            is_2darray = True
+            array = array[np.newaxis]
         else:
-            remove_first_dim = False
+            is_2darray = False
 
-        images = func(self, images, *args, **kwargs)
+        array = func(self, array, *args, **kwargs)
 
-        if remove_first_dim:
-            images = images[0]
+        if is_2darray:
+            array = array[0]
 
-        return images
+        return array
 
     return wrapper
 
@@ -102,7 +102,7 @@ class JFDataHandler:
         return det(*(int(d) for d in re.findall(r'\d+', self.detector_name)))
 
     @property
-    def _n_active_modules(self):
+    def _number_active_modules(self):
         return np.sum(self.module_map != -1)
 
     @property
@@ -111,8 +111,8 @@ class JFDataHandler:
         return 4, MODULE_SIZE_Y * n_modules, MODULE_SIZE_X
 
     @property
-    def _raw_shape(self):
-        n_modules = self._n_active_modules
+    def _mm_shape(self):
+        n_modules = self._number_active_modules
         return MODULE_SIZE_Y * n_modules, MODULE_SIZE_X
 
     def _get_stripsel_shape(self, geometry):
@@ -121,7 +121,7 @@ class JFDataHandler:
             shape_x = max(modules_orig_x) + STRIPSEL_MODULE_SIZE_X
             shape_y = max(modules_orig_y) + STRIPSEL_MODULE_SIZE_Y
         else:
-            shape_y, shape_x = self._raw_shape
+            shape_y, shape_x = self._mm_shape
 
         return shape_y, shape_x
 
@@ -141,12 +141,12 @@ class JFDataHandler:
             shape_y = max(modules_orig_y) + MODULE_SIZE_Y
 
         elif not geometry and gap_pixels:
-            shape_y, shape_x = self._raw_shape
+            shape_y, shape_x = self._mm_shape
             shape_x += (CHIP_NUM_X - 1) * CHIP_GAP_X
-            shape_y += (CHIP_NUM_Y - 1) * CHIP_GAP_Y * self._n_active_modules
+            shape_y += (CHIP_NUM_Y - 1) * CHIP_GAP_Y * self._number_active_modules
 
         elif not geometry and not gap_pixels:
-            shape_y, shape_x = self._raw_shape
+            shape_y, shape_x = self._mm_shape
 
         return shape_y, shape_x
 
@@ -326,7 +326,7 @@ class JFDataHandler:
         if self.pixel_mask is None:
             return None
 
-        res = np.empty(self._raw_shape, dtype=self.pixel_mask.dtype)
+        res = np.empty(self._mm_shape, dtype=self.pixel_mask.dtype)
         for i, m in enumerate(self.module_map):
             if m == -1:
                 continue
@@ -380,7 +380,7 @@ class JFDataHandler:
 
         self._module_map = value
 
-    @_allow_single_image
+    @_allow_2darray
     def process(self, images, conversion=True, gap_pixels=True, geometry=True):
         """Perform jungfrau detector data processing like pedestal correction, gain conversion,
         applying pixel mask, module map, etc.
@@ -397,9 +397,9 @@ class JFDataHandler:
             ndarray: resulting image stack or single image
         """
         image_shape = images.shape[-2:]
-        if image_shape != self._raw_shape:
+        if image_shape != self._mm_shape:
             raise ValueError(
-                f"Expected image shape {self._raw_shape}, provided image shape {image_shape}"
+                f"Expected image shape {self._mm_shape}, provided image shape {image_shape}"
             )
 
         if not (conversion or gap_pixels or geometry):
@@ -507,14 +507,14 @@ class JFDataHandler:
                 else:
                     module_res[:] = module
 
-    @_allow_single_image
-    def _get_module_slice(self, images, index):
+    @_allow_2darray
+    def _get_module_slice(self, data, m):
         if self.detector_name == 'JF02T09V01':
-            module = images[:, :, index * MODULE_SIZE_X : (index + 1) * MODULE_SIZE_X]
+            out = data[:, :, m * MODULE_SIZE_X : (m + 1) * MODULE_SIZE_X]
         else:
-            module = images[:, index * MODULE_SIZE_Y : (index + 1) * MODULE_SIZE_Y, :]
+            out = data[:, m * MODULE_SIZE_Y : (m + 1) * MODULE_SIZE_Y, :]
 
-        return module
+        return out
 
     def get_gains(self, images, gap_pixels, geometry):
         """Return gain values of images, shaped according to gap_pixel and geometry flags.
@@ -612,6 +612,6 @@ def reshape_stripsel(res, image):
             res[yout + 1, xout] = image[yin, xin]
             # if we want a proper normalization (the area of those pixels is double, so they see 2x
             # the signal)
-            # res[yout,xout] = res[yout,xout]/2
+            # res[yout, xout] = res[yout, xout] / 2
 
     return res
