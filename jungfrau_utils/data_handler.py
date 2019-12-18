@@ -188,12 +188,12 @@ class JFDataHandler:
 
         if value.ndim != 3:
             raise ValueError(
-                f"Gain should have 3 dimensions, provided gain has {value.ndim} dimensions."
+                f"Expected gain dimensions 3, provided gain dimensions {value.ndim}."
             )
 
         if value.shape != self._gp_shape:
             raise ValueError(
-                f"Expected gain shape is {self._gp_shape}, provided gain has {value.shape}."
+                f"Expected gain shape {self._gp_shape}, provided gain shape {value.shape}."
             )
 
         # convert _gain values to float32
@@ -243,12 +243,12 @@ class JFDataHandler:
 
         if value.ndim != 3:
             raise ValueError(
-                f"Pedestal should have 3 dimensions, provided pedestal has {value.ndim} dimensions."
+                f"Expected pedestal dimensions 3, provided pedestal dimensions {value.ndim}."
             )
 
         if value.shape != self._gp_shape:
             raise ValueError(
-                f"Expected pedestal shape is {self._gp_shape}, provided pedestal has {value.shape}."
+                f"Expected pedestal shape {self._gp_shape}, provided pedestal shape {value.shape}."
             )
 
         # convert _pedestal values to float32
@@ -298,12 +298,12 @@ class JFDataHandler:
 
         if value.ndim != 2:
             raise ValueError(
-                f"Pixel mask should have 2 dimensions, provided pixel mask has {value.ndim}."
+                f"Expected pixel_mask dimensions 2, provided pixel_mask dimensions {value.ndim}."
             )
 
         if value.shape != self._shape:
             raise ValueError(
-                f"Expected pixel mask shape is {self._shape}, provided pixel mask has {value.shape} shape."
+                f"Expected pixel_mask shape {self._shape}, provided pixel_mask shape {value.shape}."
             )
 
         self._pixel_mask = value.astype(np.bool, copy=False)
@@ -366,19 +366,20 @@ class JFDataHandler:
 
     @module_map.setter
     def module_map(self, value):
+        n_modules = self.detector.n_modules
         if value is None:
             # support legacy data by emulating 'all modules are present'
-            self._module_map = np.arange(self.detector.n_modules)
+            self._module_map = np.arange(n_modules)
             return
 
-        if len(value) != self.detector.n_modules:
+        if len(value) != n_modules:
             raise ValueError(
-                f"Expected module_map length is {self.detector.n_modules}, provided value length is {len(value)}"
+                f"Expected module_map length {n_modules}, provided module_map length {len(value)}."
             )
 
-        if min(value) < -1 or self.detector.n_modules <= max(value):
+        if min(value) < -1 or n_modules <= max(value):
             raise ValueError(
-                f"Valid module_map values are integers between -1 and {self.detector.n_modules-1}"
+                f"Valid module_map values are integers between -1 and {n_modules-1}."
             )
 
         self._module_map = value
@@ -402,7 +403,7 @@ class JFDataHandler:
         image_shape = images.shape[-2:]
         if image_shape != self._mm_shape:
             raise ValueError(
-                f"Expected image shape {self._mm_shape}, provided image shape {image_shape}"
+                f"Expected image shape {self._mm_shape}, provided image shape {image_shape}."
             )
 
         if not (conversion or gap_pixels or geometry):
@@ -410,7 +411,7 @@ class JFDataHandler:
             return images
 
         if conversion and not self.can_convert():
-            raise RuntimeError("Gain and/or pedestal values are not set")
+            raise RuntimeError("Gain and/or pedestal values are not set.")
 
         res_dtype = np.float32 if conversion else images.dtype
         res_shape = self.get_shape(gap_pixels=gap_pixels, geometry=geometry)
@@ -524,7 +525,7 @@ class JFDataHandler:
         """
         if images.dtype != np.uint16:
             raise TypeError(
-                f"Expected image type is {np.uint16}, provided data has type {images.dtype}"
+                f"Expected image type {np.uint16}, provided data type {images.dtype}."
             )
 
         gains = images >> 14
@@ -538,7 +539,7 @@ class JFDataHandler:
         """
         if images.dtype != np.uint16:
             raise TypeError(
-                f"Expected image type is {np.uint16}, provided data has type {images.dtype}"
+                f"Expected image type {np.uint16}, provided data type {images.dtype}."
             )
 
         saturated_pixels = images == self.get_saturated_value()
