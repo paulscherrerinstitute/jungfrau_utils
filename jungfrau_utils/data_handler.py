@@ -509,7 +509,10 @@ class JFDataHandler:
                         if conversion:
                             submod_g = module_g[(slice(None), *sread)]
                             submod_p = module_p[(slice(None), *sread)]
-                            submod_mask = module_mask[sread]
+                            if module_mask is None:
+                                submod_mask = None
+                            else:
+                                submod_mask = module_mask[sread]
                             self._proc_func(submod_res, submod, submod_g, submod_p, submod_mask)
                         else:
                             submod_res[:] = submod
