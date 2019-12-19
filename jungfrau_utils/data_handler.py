@@ -101,38 +101,40 @@ class JFDataHandler:
         det = namedtuple('Detector', ['id', 'n_modules', 'version'])
         return det(*(int(d) for d in re.findall(r'\d+', self.detector_name)))
 
+    def _get_shape_n_modules(self, n):
+        if self.detector_name == 'JF02T09V01':  # a special case
+            shape_y, shape_x = MODULE_SIZE_Y, MODULE_SIZE_X * n
+        else:
+            shape_y, shape_x = MODULE_SIZE_Y * n, MODULE_SIZE_X
+
+        return shape_y, shape_x
+
     @property
     def _number_active_modules(self):
         return np.sum(self.module_map != -1)
 
     @property
-    def _shape(self):
-        n_modules = self.detector.n_modules
-        return MODULE_SIZE_Y * n_modules, MODULE_SIZE_X
+    def _shape_full(self):
+        return self._get_shape_n_modules(self.detector.n_modules)
 
     @property
-    def _gp_shape(self):
-        return (4, *self._shape)
+    def _shape_in(self):
+        return self._get_shape_n_modules(self._number_active_modules)
 
-    @property
-    def _mm_shape(self):
-        n_modules = self._number_active_modules
-        return MODULE_SIZE_Y * n_modules, MODULE_SIZE_X
-
-    def _get_stripsel_shape(self, geometry):
+    def _get_stripsel_shape_out(self, geometry):
         if geometry:
             modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
             shape_x = max(modules_orig_x) + STRIPSEL_MODULE_SIZE_X
             shape_y = max(modules_orig_y) + STRIPSEL_MODULE_SIZE_Y
         else:
-            shape_y, shape_x = self._mm_shape
+            shape_y, shape_x = self._shape_in
 
         return shape_y, shape_x
 
-    def get_shape(self, gap_pixels, geometry):
+    def get_shape_out(self, gap_pixels, geometry):
         """Resulting image shape of a detector, based on gap_pixel and geometry flags"""
         if self.is_stripsel():
-            return self._get_stripsel_shape(geometry=geometry)
+            return self._get_stripsel_shape_out(geometry=geometry)
 
         if geometry and gap_pixels:
             modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
@@ -145,12 +147,16 @@ class JFDataHandler:
             shape_y = max(modules_orig_y) + MODULE_SIZE_Y
 
         elif not geometry and gap_pixels:
-            shape_y, shape_x = self._mm_shape
-            shape_x += (CHIP_NUM_X - 1) * CHIP_GAP_X
-            shape_y += (CHIP_NUM_Y - 1) * CHIP_GAP_Y * self._number_active_modules
+            shape_y, shape_x = self._shape_in
+            if self.detector_name == 'JF02T09V01':
+                shape_x += (CHIP_NUM_X - 1) * CHIP_GAP_X * self._number_active_modules
+                shape_y += (CHIP_NUM_Y - 1) * CHIP_GAP_Y
+            else:
+                shape_x += (CHIP_NUM_X - 1) * CHIP_GAP_X
+                shape_y += (CHIP_NUM_Y - 1) * CHIP_GAP_Y * self._number_active_modules
 
         elif not geometry and not gap_pixels:
-            shape_y, shape_x = self._mm_shape
+            shape_y, shape_x = self._shape_in
 
         return shape_y, shape_x
 
@@ -191,9 +197,10 @@ class JFDataHandler:
                 f"Expected gain dimensions 3, provided gain dimensions {value.ndim}."
             )
 
-        if value.shape != self._gp_shape:
+        g_shape = (4, *self._shape_full)
+        if value.shape != g_shape:
             raise ValueError(
-                f"Expected gain shape {self._gp_shape}, provided gain shape {value.shape}."
+                f"Expected gain shape {g_shape}, provided gain shape {value.shape}."
             )
 
         # convert _gain values to float32
@@ -246,9 +253,10 @@ class JFDataHandler:
                 f"Expected pedestal dimensions 3, provided pedestal dimensions {value.ndim}."
             )
 
-        if value.shape != self._gp_shape:
+        p_shape = (4, *self._shape_full)
+        if value.shape != p_shape:
             raise ValueError(
-                f"Expected pedestal shape {self._gp_shape}, provided pedestal shape {value.shape}."
+                f"Expected pedestal shape {p_shape}, provided pedestal shape {value.shape}."
             )
 
         # convert _pedestal values to float32
@@ -301,9 +309,10 @@ class JFDataHandler:
                 f"Expected pixel_mask dimensions 2, provided pixel_mask dimensions {value.ndim}."
             )
 
-        if value.shape != self._shape:
+        pm_shape = self._shape_full
+        if value.shape != pm_shape:
             raise ValueError(
-                f"Expected pixel_mask shape {self._shape}, provided pixel_mask shape {value.shape}."
+                f"Expected pixel_mask shape {pm_shape}, provided pixel_mask shape {value.shape}."
             )
 
         self._pixel_mask = value.astype(np.bool, copy=False)
@@ -329,13 +338,14 @@ class JFDataHandler:
         if self.pixel_mask is None:
             return None
 
-        res = np.empty(self._mm_shape, dtype=self.pixel_mask.dtype)
+        res = np.empty(self._shape_in, dtype=self.pixel_mask.dtype)
         for i, m in enumerate(self.module_map):
             if m == -1:
                 continue
 
             module = self._get_module_slice(self.pixel_mask, i)
-            res[m * MODULE_SIZE_Y : (m + 1) * MODULE_SIZE_Y, :] = module
+            module_res = self._get_module_slice(res, m)
+            module_res[:] = module
 
         res = np.invert(
             self.process(np.invert(res), conversion=False, gap_pixels=gap_pixels, geometry=geometry)
@@ -401,9 +411,9 @@ class JFDataHandler:
             ndarray: resulting image stack or single image
         """
         image_shape = images.shape[-2:]
-        if image_shape != self._mm_shape:
+        if image_shape != self._shape_in:
             raise ValueError(
-                f"Expected image shape {self._mm_shape}, provided image shape {image_shape}."
+                f"Expected image shape {self._shape_in}, provided image shape {image_shape}."
             )
 
         if not (conversion or gap_pixels or geometry):
@@ -414,7 +424,7 @@ class JFDataHandler:
             raise RuntimeError("Gain and/or pedestal values are not set.")
 
         res_dtype = np.float32 if conversion else images.dtype
-        res_shape = self.get_shape(gap_pixels=gap_pixels, geometry=geometry)
+        res_shape = self.get_shape_out(gap_pixels=gap_pixels, geometry=geometry)
         res = np.zeros((images.shape[0], *res_shape), dtype=res_dtype)
 
         self._process(res, images, conversion, gap_pixels, geometry)
@@ -438,11 +448,19 @@ class JFDataHandler:
                 oy = modules_orig[self.detector_name][0][i]
                 ox = modules_orig[self.detector_name][1][i]
             elif gap_pixels:
-                oy = m * (MODULE_SIZE_Y + CHIP_GAP_Y)
-                ox = 0
+                if self.detector_name == 'JF02T09V01':
+                    oy = 0
+                    ox = m * (MODULE_SIZE_X + (CHIP_NUM_X - 1) * CHIP_GAP_X)
+                else:
+                    oy = m * (MODULE_SIZE_Y + (CHIP_NUM_Y - 1) * CHIP_GAP_Y)
+                    ox = 0
             else:
-                oy = m * MODULE_SIZE_Y
-                ox = 0
+                if self.detector_name == 'JF02T09V01':
+                    oy = 0
+                    ox = m * MODULE_SIZE_X
+                else:
+                    oy = m * MODULE_SIZE_Y
+                    ox = 0
 
             module = self._get_module_slice(image_stack, m, geometry)
 

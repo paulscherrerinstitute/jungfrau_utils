@@ -67,7 +67,7 @@ def test_handler_init_fail(detector_name):
 def test_handler_init(empty_handler):
     assert empty_handler.detector_name == DETECTOR_NAME
     assert (
-        empty_handler.get_shape(gap_pixels=True, geometry=True)
+        empty_handler.get_shape_out(gap_pixels=True, geometry=True)
         == DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY
     )
 
