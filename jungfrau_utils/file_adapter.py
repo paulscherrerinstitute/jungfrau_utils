@@ -9,7 +9,7 @@ from .data_handler import JFDataHandler
 
 # bitshuffle hdf5 filter params
 BLOCK_SIZE = 0
-compargs = {'compression': H5FILTER, 'compression_opts': (BLOCK_SIZE, H5_COMPRESS_LZ4)}
+compargs = {"compression": H5FILTER, "compression_opts": (BLOCK_SIZE, H5_COMPRESS_LZ4)}
 
 
 class File:
@@ -18,8 +18,8 @@ class File:
     def __init__(
         self,
         file_path,
-        gain_file='',
-        pedestal_file='',
+        gain_file="",
+        pedestal_file="",
         conversion=True,
         gap_pixels=True,
         geometry=True,
@@ -39,8 +39,8 @@ class File:
         """
         self.file_path = Path(file_path)
 
-        self.file = h5py.File(self.file_path, 'r')
-        self.handler = JFDataHandler(self.file['/general/detector_name'][()].decode())
+        self.file = h5py.File(self.file_path, "r")
+        self.handler = JFDataHandler(self.file["/general/detector_name"][()].decode())
 
         self._conversion = conversion
         self._gap_pixels = gap_pixels
@@ -51,7 +51,7 @@ class File:
             gain_file = Path(gain_file)
         else:
             gain_file = self._locate_gain_file()
-            print(f'Auto-located gain file: {gain_file}')
+            print(f"Auto-located gain file: {gain_file}")
 
         self.handler.gain_file = gain_file.as_posix()
 
@@ -60,22 +60,22 @@ class File:
             pedestal_file = Path(pedestal_file)
         else:
             pedestal_file, mtime_diff = self._locate_pedestal_file()
-            print(f'Auto-located pedestal file: {pedestal_file}')
+            print(f"Auto-located pedestal file: {pedestal_file}")
             if mtime_diff < 0:
                 # timedelta doesn't work nicely with negative values
                 # https://docs.python.org/3/library/datetime.html#datetime.timedelta.resolution
-                tdelta_str = '-' + str(timedelta(seconds=-mtime_diff))
+                tdelta_str = "-" + str(timedelta(seconds=-mtime_diff))
             else:
                 tdelta_str = str(timedelta(seconds=mtime_diff))
-            print('    mtime difference: ' + tdelta_str)
+            print("    mtime difference: " + tdelta_str)
 
         self.handler.pedestal_file = pedestal_file.as_posix()
 
-        if 'module_map' in self.file[f'/data/{self.detector_name}']:
+        if "module_map" in self.file[f"/data/{self.detector_name}"]:
             # Pick only the first row (module_map of the first frame), because it is not expected
             # that module_map ever changes during a run. In fact, it is forseen in the future that
             # this data will be saved as a single row for the whole run.
-            module_map = self.file[f'/data/{self.detector_name}/module_map'][0, :]
+            module_map = self.file[f"/data/{self.detector_name}/module_map"][0, :]
         else:
             module_map = None
 
@@ -85,7 +85,7 @@ class File:
         # value can be different for later pulses and this needs to be taken care of. Currently,
         # _allow_n_images decorator applies a function in a loop, making it impossible to change
         # highgain for separate images in a 3D stack.
-        daq_rec = self.file[f'/data/{self.detector_name}/daq_rec'][0]
+        daq_rec = self.file[f"/data/{self.detector_name}/daq_rec"][0]
 
         self.handler.highgain = daq_rec & 0b1
 
@@ -146,7 +146,7 @@ class File:
     @property
     def _processed(self):
         # TODO: generalize this check for data reduction case, where dtype can be different
-        return self.file[f'/data/{self.detector_name}/data'].dtype == np.float32
+        return self.file[f"/data/{self.detector_name}/data"].dtype == np.float32
 
     def save_roi(self, dest, roi_x, roi_y, compress=False, factor=None, dtype=None):
         """Save data in a separate hdf5 file
@@ -170,25 +170,25 @@ class File:
                 args = {
                     k: getattr(dset_source, k)
                     for k in (
-                        'shape',
-                        'dtype',
-                        'chunks',
-                        'compression',
-                        'compression_opts',
-                        'scaleoffset',
-                        'shuffle',
-                        'fletcher32',
-                        'fillvalue',
+                        "shape",
+                        "dtype",
+                        "chunks",
+                        "compression",
+                        "compression_opts",
+                        "scaleoffset",
+                        "shuffle",
+                        "fletcher32",
+                        "fillvalue",
                     )
                 }
 
                 if dset_source.shape != dset_source.maxshape:
-                    args['maxshape'] = dset_source.maxshape
+                    args["maxshape"] = dset_source.maxshape
 
-                if name == f'data/{self.detector_name}/data':  # compress and copy
+                if name == f"data/{self.detector_name}/data":  # compress and copy
                     data = self[:]
 
-                    h5_dest.create_dataset(f'data/{self.detector_name}/n_roi', data=len(roi_x))
+                    h5_dest.create_dataset(f"data/{self.detector_name}/n_roi", data=len(roi_x))
 
                     for i, (roix, roiy) in enumerate(zip(roi_x, roi_y)):
                         roi_data = data[:, slice(*roiy), slice(*roix)]
@@ -196,38 +196,38 @@ class File:
                         if factor:
                             roi_data = np.round(roi_data / factor)
 
-                        args['shape'] = roi_data.shape
-                        args['maxshape'] = roi_data.shape
+                        args["shape"] = roi_data.shape
+                        args["maxshape"] = roi_data.shape
 
                         if roi_data.ndim == 3:
-                            args['chunks'] = (1, *roi_data.shape[1:])
+                            args["chunks"] = (1, *roi_data.shape[1:])
                         else:
-                            args['chunks'] = roi_data.shape
+                            args["chunks"] = roi_data.shape
 
                         if dtype is None:
-                            args['dtype'] = roi_data.dtype
+                            args["dtype"] = roi_data.dtype
                         else:
-                            args['dtype'] = dtype
+                            args["dtype"] = dtype
 
                         if compress:
                             args.update(compargs)
 
-                        dset_dest = h5_dest.create_dataset(f'{name}_roi_{i}', **args)
+                        dset_dest = h5_dest.create_dataset(f"{name}_roi_{i}", **args)
                         dset_dest[:] = roi_data
 
                         h5_dest.create_dataset(
-                            f'data/{self.detector_name}/roi_{i}', data=[roiy, roix]
+                            f"data/{self.detector_name}/roi_{i}", data=[roiy, roix]
                         )
 
                 else:  # copy
                     h5_dest.create_dataset(name, data=dset_source, **args)
 
-            if name != f'data/{self.detector_name}/data':
+            if name != f"data/{self.detector_name}/data":
                 # copy attributes
                 for key, value in self.file[name].attrs.items():
                     h5_dest[name].attrs[key] = value
 
-        with h5py.File(dest, 'w') as h5_dest:
+        with h5py.File(dest, "w") as h5_dest:
             self.file.visititems(copy_objects)
 
     def save_as(self, dest, roi_x=(None,), roi_y=(None,), compress=False, factor=None, dtype=None):
@@ -252,38 +252,38 @@ class File:
                 args = {
                     k: getattr(dset_source, k)
                     for k in (
-                        'shape',
-                        'dtype',
-                        'chunks',
-                        'compression',
-                        'compression_opts',
-                        'scaleoffset',
-                        'shuffle',
-                        'fletcher32',
-                        'fillvalue',
+                        "shape",
+                        "dtype",
+                        "chunks",
+                        "compression",
+                        "compression_opts",
+                        "scaleoffset",
+                        "shuffle",
+                        "fletcher32",
+                        "fillvalue",
                     )
                 }
 
                 if dset_source.shape != dset_source.maxshape:
-                    args['maxshape'] = dset_source.maxshape
+                    args["maxshape"] = dset_source.maxshape
 
-                if name == f'data/{self.detector_name}/data':  # compress and copy
+                if name == f"data/{self.detector_name}/data":  # compress and copy
                     data = self[:, roi_y, roi_x]
                     if factor:
                         data = np.round(data / factor)
 
-                    args['shape'] = data.shape
-                    args['maxshape'] = data.shape
+                    args["shape"] = data.shape
+                    args["maxshape"] = data.shape
 
                     if data.ndim == 3:
-                        args['chunks'] = (1, *data.shape[1:])
+                        args["chunks"] = (1, *data.shape[1:])
                     else:
-                        args['chunks'] = data.shape
+                        args["chunks"] = data.shape
 
                     if dtype is None:
-                        args['dtype'] = data.dtype
+                        args["dtype"] = data.dtype
                     else:
-                        args['dtype'] = dtype
+                        args["dtype"] = dtype
 
                     if compress:
                         args.update(compargs)
@@ -301,7 +301,7 @@ class File:
         roi_x = slice(*roi_x)
         roi_y = slice(*roi_y)
 
-        with h5py.File(dest, 'w') as h5_dest:
+        with h5py.File(dest, "w") as h5_dest:
             self.file.visititems(copy_objects)
 
     def export_plain_data(
@@ -319,7 +319,7 @@ class File:
         if isinstance(index, int):
             index = [index]
 
-        data_group = self.file[f'/data/{self.detector_name}']
+        data_group = self.file[f"/data/{self.detector_name}"]
 
         def export_objects(name):
             dset_source = data_group[name]
@@ -327,34 +327,34 @@ class File:
             args = {
                 k: getattr(dset_source, k)
                 for k in (
-                    'shape',
-                    'dtype',
-                    'chunks',
-                    'compression',
-                    'compression_opts',
-                    'scaleoffset',
-                    'shuffle',
-                    'fletcher32',
-                    'fillvalue',
+                    "shape",
+                    "dtype",
+                    "chunks",
+                    "compression",
+                    "compression_opts",
+                    "scaleoffset",
+                    "shuffle",
+                    "fletcher32",
+                    "fillvalue",
                 )
             }
 
             if dset_source.shape != dset_source.maxshape:
-                args['maxshape'] = dset_source.maxshape
+                args["maxshape"] = dset_source.maxshape
 
-            if name == 'data':  # compress and copy
+            if name == "data":  # compress and copy
                 data = self[index, :, :]
                 if factor:
                     data = np.round(data / factor)
 
-                args['shape'] = data.shape
-                args['maxshape'] = data.shape
-                args['chunks'] = (1, *data.shape[1:])
+                args["shape"] = data.shape
+                args["maxshape"] = data.shape
+                args["chunks"] = (1, *data.shape[1:])
 
                 if dtype is None:
-                    args['dtype'] = data.dtype
+                    args["dtype"] = data.dtype
                 else:
-                    args['dtype'] = dtype
+                    args["dtype"] = dtype
 
                 if compress:
                     args.update(compargs)
@@ -364,40 +364,40 @@ class File:
 
             else:  # copy
                 data = dset_source[index, :]
-                args['shape'] = data.shape
-                args['maxshape'] = data.shape
+                args["shape"] = data.shape
+                args["maxshape"] = data.shape
                 h5_dest.create_dataset(f"/data/{name}", data=data, **args)
 
-        with h5py.File(dest, 'w') as h5_dest:
-            h5_dest.create_group('/data')
+        with h5py.File(dest, "w") as h5_dest:
+            h5_dest.create_group("/data")
             data_group.visit(export_objects)
 
     def _locate_gain_file(self):
         # the default gain file location is
         # '/sf/<beamline>/config/jungfrau/gainMaps/<detector>/gains.h5'
-        if self.file_path.parts[1] != 'sf':
-            raise Exception(f'Gain file needs to be specified explicitly.')
+        if self.file_path.parts[1] != "sf":
+            raise Exception(f"Gain file needs to be specified explicitly.")
 
-        gain_path = Path(*self.file_path.parts[:3]).joinpath('config', 'jungfrau', 'gainMaps')
-        gain_file = gain_path.joinpath(self.detector_name, 'gains.h5')
+        gain_path = Path(*self.file_path.parts[:3]).joinpath("config", "jungfrau", "gainMaps")
+        gain_file = gain_path.joinpath(self.detector_name, "gains.h5")
 
         if not gain_file.is_file():
-            raise Exception(f'No gain file in default location: {gain_path}')
+            raise Exception(f"No gain file in default location: {gain_path}")
 
         return gain_file
 
     def _locate_pedestal_file(self):
         # the default processed pedestal files path for a particula p-group is
         # '/sf/<beamline>/data/<p-group>/res/JF_pedestals/'
-        if self.file_path.parts[1] != 'sf':
-            raise Exception(f'Pedestal file needs to be specified explicitly.')
+        if self.file_path.parts[1] != "sf":
+            raise Exception(f"Pedestal file needs to be specified explicitly.")
 
-        pedestal_path = Path(*self.file_path.parts[:5]).joinpath('res', 'JF_pedestals')
+        pedestal_path = Path(*self.file_path.parts[:5]).joinpath("res", "JF_pedestals")
 
         # find a pedestal file, which was created closest in time to the jungfrau file
         jf_file_mtime = self.file_path.stat().st_mtime
-        closest_pedestal_file = ''
-        min_time_diff = float('inf')
+        closest_pedestal_file = ""
+        min_time_diff = float("inf")
         for entry in pedestal_path.iterdir():
             if entry.is_file() and self.detector_name in entry.name:
                 time_diff = jf_file_mtime - entry.stat().st_mtime
@@ -406,7 +406,7 @@ class File:
                     closest_pedestal_file = entry
 
         if not closest_pedestal_file:
-            raise Exception(f'No pedestal file in default location: {pedestal_path}')
+            raise Exception(f"No pedestal file in default location: {pedestal_path}")
 
         return closest_pedestal_file, min_time_diff
 
@@ -419,7 +419,7 @@ class File:
     def __getitem__(self, item):
         if isinstance(item, str):
             # metadata entry (lazy)
-            return self.file[f'/data/{self.detector_name}/{item}']
+            return self.file[f"/data/{self.detector_name}/{item}"]
 
         elif isinstance(item, (int, slice)):
             # single image index or slice, no roi
@@ -429,7 +429,7 @@ class File:
             # image index and roi
             ind, roi = item[0], item[1:]
 
-        data = self.file[f'/data/{self.detector_name}/data'][ind]
+        data = self.file[f"/data/{self.detector_name}/data"][ind]
         data = self.handler.process(
             data, conversion=self.conversion, gap_pixels=self.gap_pixels, geometry=self.geometry
         )
@@ -445,7 +445,7 @@ class File:
         if self.file.id:
             r = f'<Jungfrau file "{self.file_path.name}">'
         else:
-            r = '<Closed Jungfrau file>'
+            r = "<Closed Jungfrau file>"
         return r
 
     def close(self):

@@ -14,7 +14,7 @@ class StreamAdapter:
 
     def process(self, image, metadata):
         # as a first step, try to set the detector_name
-        detector_name = metadata.get('detector_name')
+        detector_name = metadata.get("detector_name")
         # check if jungfrau data handler is already set for this detector
         if self.handler is None or self.handler.detector_name != detector_name:
             try:
@@ -39,25 +39,25 @@ class StreamAdapter:
 
     def _update_handler(self, md_dict):
         # gain file
-        gain_file = md_dict.get('gain_file', '')
+        gain_file = md_dict.get("gain_file", "")
         try:
             self.handler.gain_file = gain_file
         except Exception:
             logging.exception(f"Error loading gain file {gain_file}")
-            self.handler.gain_file = ''
+            self.handler.gain_file = ""
 
         # pedestal file
-        pedestal_file = md_dict.get('pedestal_file', '')
+        pedestal_file = md_dict.get("pedestal_file", "")
         try:
             self.handler.pedestal_file = pedestal_file
         except Exception:
             logging.exception(f"Error loading pedestal file {pedestal_file}")
-            self.handler.pedestal_file = ''
+            self.handler.pedestal_file = ""
 
         # module map
-        module_map = md_dict.get('module_map')
+        module_map = md_dict.get("module_map")
         self.handler.module_map = None if (module_map is None) else np.array(module_map)
 
         # highgain
-        daq_rec = md_dict.get('daq_rec')
+        daq_rec = md_dict.get("daq_rec")
         self.handler.highgain = False if (daq_rec is None) else bool(daq_rec & 0b1)

@@ -67,8 +67,8 @@ class JFDataHandler:
         else:
             raise KeyError(f"Geometry for '{detector_name}' detector is not present.")
 
-        self._gain_file = ''
-        self._pedestal_file = ''
+        self._gain_file = ""
+        self._pedestal_file = ""
 
         self._gain = None
         self._pedestal = None
@@ -98,11 +98,11 @@ class JFDataHandler:
     @property
     def detector(self):
         """A namedtuple of detector parameters extracted from its name (readonly)"""
-        det = namedtuple('Detector', ['id', 'n_modules', 'version'])
-        return det(*(int(d) for d in re.findall(r'\d+', self.detector_name)))
+        det = namedtuple("Detector", ["id", "n_modules", "version"])
+        return det(*(int(d) for d in re.findall(r"\d+", self.detector_name)))
 
     def _get_shape_n_modules(self, n):
-        if self.detector_name == 'JF02T09V01':  # a special case
+        if self.detector_name == "JF02T09V01":  # a special case
             shape_y, shape_x = MODULE_SIZE_Y, MODULE_SIZE_X * n
         else:
             shape_y, shape_x = MODULE_SIZE_Y * n, MODULE_SIZE_X
@@ -148,7 +148,7 @@ class JFDataHandler:
 
         elif not geometry and gap_pixels:
             shape_y, shape_x = self._shape_in
-            if self.detector_name == 'JF02T09V01':
+            if self.detector_name == "JF02T09V01":
                 shape_x += (CHIP_NUM_X - 1) * CHIP_GAP_X * self._number_active_modules
                 shape_y += (CHIP_NUM_Y - 1) * CHIP_GAP_Y
             else:
@@ -168,15 +168,15 @@ class JFDataHandler:
     @gain_file.setter
     def gain_file(self, filepath):
         if not filepath:
-            self._gain_file = ''
+            self._gain_file = ""
             self.gain = None
             return
 
         if filepath == self._gain_file:
             return
 
-        with h5py.File(filepath, 'r') as h5f:
-            gains = h5f['/gains'][:]
+        with h5py.File(filepath, "r") as h5f:
+            gains = h5f["/gains"][:]
 
         self._gain_file = filepath
         self.gain = gains
@@ -193,15 +193,11 @@ class JFDataHandler:
             return
 
         if value.ndim != 3:
-            raise ValueError(
-                f"Expected gain dimensions 3, provided gain dimensions {value.ndim}."
-            )
+            raise ValueError(f"Expected gain dimensions 3, provided gain dimensions {value.ndim}.")
 
         g_shape = (4, *self._shape_full)
         if value.shape != g_shape:
-            raise ValueError(
-                f"Expected gain shape {g_shape}, provided gain shape {value.shape}."
-            )
+            raise ValueError(f"Expected gain shape {g_shape}, provided gain shape {value.shape}.")
 
         # convert _gain values to float32
         self._gain = value.astype(np.float32, copy=False)
@@ -221,7 +217,7 @@ class JFDataHandler:
     @pedestal_file.setter
     def pedestal_file(self, filepath):
         if not filepath:
-            self._pedestal_file = ''
+            self._pedestal_file = ""
             self.pedestal = None
             self.pixel_mask = None
             return
@@ -229,9 +225,9 @@ class JFDataHandler:
         if filepath == self._pedestal_file:
             return
 
-        with h5py.File(filepath, 'r') as h5f:
-            pedestal = h5f['/gains'][:]
-            pixel_mask = h5f['/pixel_mask'][:]
+        with h5py.File(filepath, "r") as h5f:
+            pedestal = h5f["/gains"][:]
+            pixel_mask = h5f["/pixel_mask"][:]
 
         self._pedestal_file = filepath
         self.pedestal = pedestal
@@ -388,9 +384,7 @@ class JFDataHandler:
             )
 
         if min(value) < -1 or n_modules <= max(value):
-            raise ValueError(
-                f"Valid module_map values are integers between -1 and {n_modules-1}."
-            )
+            raise ValueError(f"Valid module_map values are integers between -1 and {n_modules-1}.")
 
         self._module_map = value
 
@@ -430,7 +424,7 @@ class JFDataHandler:
         self._process(res, images, conversion, gap_pixels, geometry)
 
         # rotate image stack in case of alvra JF06 detector
-        if geometry and self.detector_name.startswith('JF06'):
+        if geometry and self.detector_name.startswith("JF06"):
             res = np.rot90(res, axes=(1, 2)).copy()
 
         return res
@@ -448,14 +442,14 @@ class JFDataHandler:
                 oy = modules_orig[self.detector_name][0][i]
                 ox = modules_orig[self.detector_name][1][i]
             elif gap_pixels:
-                if self.detector_name == 'JF02T09V01':
+                if self.detector_name == "JF02T09V01":
                     oy = 0
                     ox = m * (MODULE_SIZE_X + (CHIP_NUM_X - 1) * CHIP_GAP_X)
                 else:
                     oy = m * (MODULE_SIZE_Y + (CHIP_NUM_Y - 1) * CHIP_GAP_Y)
                     ox = 0
             else:
-                if self.detector_name == 'JF02T09V01':
+                if self.detector_name == "JF02T09V01":
                     oy = 0
                     ox = m * MODULE_SIZE_X
                 else:
@@ -526,12 +520,12 @@ class JFDataHandler:
 
     @_allow_2darray
     def _get_module_slice(self, data, m, geometry=False):
-        if self.detector_name == 'JF02T09V01':
+        if self.detector_name == "JF02T09V01":
             out = data[:, :, m * MODULE_SIZE_X : (m + 1) * MODULE_SIZE_X]
         else:
             out = data[:, m * MODULE_SIZE_Y : (m + 1) * MODULE_SIZE_Y, :]
 
-        if geometry and self.detector_name in ('JF02T09V02', 'JF02T01V02'):
+        if geometry and self.detector_name in ("JF02T09V02", "JF02T01V02"):
             out = np.rot90(out, 2, axes=(1, 2))
 
         return out
@@ -540,9 +534,7 @@ class JFDataHandler:
         """Return gain values of images, shaped according to gap_pixel and geometry flags.
         """
         if images.dtype != np.uint16:
-            raise TypeError(
-                f"Expected image type {np.uint16}, provided data type {images.dtype}."
-            )
+            raise TypeError(f"Expected image type {np.uint16}, provided data type {images.dtype}.")
 
         gains = images >> 14
         gains = self.process(gains, conversion=False, gap_pixels=gap_pixels, geometry=geometry)
@@ -554,9 +546,7 @@ class JFDataHandler:
         flags.
         """
         if images.dtype != np.uint16:
-            raise TypeError(
-                f"Expected image type {np.uint16}, provided data type {images.dtype}."
-            )
+            raise TypeError(f"Expected image type {np.uint16}, provided data type {images.dtype}.")
 
         saturated_pixels = images == self.get_saturated_value()
         saturated_pixels = self.process(

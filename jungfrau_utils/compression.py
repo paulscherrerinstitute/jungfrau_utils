@@ -4,7 +4,7 @@ from bitshuffle.h5 import H5FILTER, H5_COMPRESS_LZ4  # pylint: disable=no-name-i
 
 
 BLOCK_SIZE = 0
-compargs = {'compression': H5FILTER, 'compression_opts': (BLOCK_SIZE, H5_COMPRESS_LZ4)}
+compargs = {"compression": H5FILTER, "compression_opts": (BLOCK_SIZE, H5_COMPRESS_LZ4)}
 
 
 def compress_dataset(f_source, f_dest, dataset, factor=None, dtype=None):
@@ -29,24 +29,24 @@ def compress_dataset(f_source, f_dest, dataset, factor=None, dtype=None):
             args = {
                 k: getattr(dset_source, k)
                 for k in (
-                    'shape',
-                    'dtype',
-                    'chunks',
-                    'compression',
-                    'compression_opts',
-                    'scaleoffset',
-                    'shuffle',
-                    'fletcher32',
-                    'fillvalue',
+                    "shape",
+                    "dtype",
+                    "chunks",
+                    "compression",
+                    "compression_opts",
+                    "scaleoffset",
+                    "shuffle",
+                    "fletcher32",
+                    "fillvalue",
                 )
             }
 
             if dset_source.shape != dset_source.maxshape:
-                args['maxshape'] = dset_source.maxshape
+                args["maxshape"] = dset_source.maxshape
 
             if name == dataset:  # compress and copy
                 if dtype is not None:
-                    args['dtype'] = dtype
+                    args["dtype"] = dtype
 
                 args.update(compargs)
 
@@ -66,5 +66,5 @@ def compress_dataset(f_source, f_dest, dataset, factor=None, dtype=None):
         for key, value in h5_source[name].attrs.items():
             h5_dest[name].attrs[key] = value
 
-    with h5py.File(f_source, 'r') as h5_source, h5py.File(f_dest, 'w') as h5_dest:
+    with h5py.File(f_source, "r") as h5_source, h5py.File(f_dest, "w") as h5_dest:
         h5_source.visititems(copy_objects)

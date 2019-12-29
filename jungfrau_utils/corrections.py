@@ -50,8 +50,8 @@ def _apply_to_all_images(func, images, *args, **kwargs):
 
 
 def apply_gain_pede_np(image, G=None, P=None, pixel_mask=None):
-    mask = int('0b' + 14 * '1', 2)
-    mask2 = int('0b' + 2 * '1', 2)
+    mask = int("0b" + 14 * "1", 2)
+    mask2 = int("0b" + 2 * "1", 2)
 
     gain_mask = np.bitwise_and(np.right_shift(image, 14), mask2)
     data = np.bitwise_and(image, mask)
@@ -105,8 +105,8 @@ try:
 
     def apply_gain_pede_numba(image, G=None, P=None, pixel_mask=None):
 
-        mask = int('0b' + 14 * '1', 2)
-        mask2 = int('0b' + 2 * '1', 2)
+        mask = int("0b" + 14 * "1", 2)
+        mask2 = int("0b" + 2 * "1", 2)
         gain_mask = np.bitwise_and(np.right_shift(image, 14), mask2)
         image = np.bitwise_and(image, mask)
 
@@ -153,7 +153,7 @@ def apply_gain_pede(image, G=None, P=None, pixel_mask=None, highgain=False):
         Corrected image
     """
     warnings.warn(
-        "The function apply_gain_pede is deprecated and will be removed in jungfrau_utils/1.0. " \
+        "The function apply_gain_pede is deprecated and will be removed in jungfrau_utils/1.0. "
         "Use JFDataHandler to perform gain/pedestal corrections instead.",
         DeprecationWarning,
     )
@@ -199,8 +199,8 @@ def get_gain_data(image):
         Array containing the data
 
     """
-    mask = int('0b' + 14 * '1', 2)
-    mask2 = int('0b' + 2 * '1', 2)
+    mask = int("0b" + 14 * "1", 2)
+    mask2 = int("0b" + 2 * "1", 2)
 
     gain_map = np.bitwise_and(np.right_shift(image, 14), mask2)
     data = np.bitwise_and(image, mask)
@@ -255,7 +255,7 @@ def add_gap_pixels(image, modules, module_gap, chip_gap=[2, 2]):
 
 def apply_geometry(image_in, detector_name):
     warnings.warn(
-        "The function apply_geometry is deprecated and will be removed in jungfrau_utils/1.0. " \
+        "The function apply_geometry is deprecated and will be removed in jungfrau_utils/1.0. "
         "Use JFDataHandler to perform geometry corrections instead.",
         DeprecationWarning,
     )
@@ -269,9 +269,9 @@ def apply_geometry(image_in, detector_name):
     image_out = np.zeros((image_out_shape_y, image_out_shape_x), dtype=image_in.dtype)
 
     for i, (oy, ox) in enumerate(zip(modules_orig_y, modules_orig_x)):
-        if detector_name == 'JF02T09V01':
+        if detector_name == "JF02T09V01":
             module_in = image_in[:, i * MODULE_SIZE_X : (i + 1) * MODULE_SIZE_X]
-        elif detector_name == 'JF02T09V02' or detector_name == 'JF02T01V02':
+        elif detector_name == "JF02T09V02" or detector_name == "JF02T01V02":
             module_in = np.rot90(image_in[i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :], 2)
         else:
             module_in = image_in[i * MODULE_SIZE_Y : (i + 1) * MODULE_SIZE_Y, :]
@@ -291,7 +291,7 @@ def apply_geometry(image_in, detector_name):
                 ]
 
     # rotate image in case of alvra detector
-    if detector_name.startswith('JF06'):
+    if detector_name.startswith("JF06"):
         image_out = np.rot90(image_out)  # check .copy()
 
     return image_out
