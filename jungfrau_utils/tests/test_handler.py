@@ -3,7 +3,7 @@ import numpy as np
 
 from jungfrau_utils import JFDataHandler
 
-DETECTOR_NAME = 'JF01T03V01'
+DETECTOR_NAME = "JF01T03V01"
 DATA_SHAPE = (3 * 512, 1024)
 STACK_SHAPE = (5, *DATA_SHAPE)
 DATA_SHAPE_WITH_GAPS = (3 * (512 + 2), 1024 + 6)
@@ -30,14 +30,14 @@ mm_expected_image_single = converted_image_single[: 2 * 512, :]
 mm_pixel_mask = pixel_mask[: 2 * 512, :]
 
 
-@pytest.fixture(name='empty_handler', scope='function')
+@pytest.fixture(name="empty_handler", scope="function")
 def _empty_handler():
     empty_handler = JFDataHandler(DETECTOR_NAME)
 
     yield empty_handler
 
 
-@pytest.fixture(name='handler', scope='function')
+@pytest.fixture(name="handler", scope="function")
 def _handler(empty_handler):
     empty_handler.gain = gain
     empty_handler.pedestal = pedestal
@@ -48,7 +48,7 @@ def _handler(empty_handler):
     yield prepared_handler
 
 
-@pytest.fixture(name='handler_no_mask', scope='function')
+@pytest.fixture(name="handler_no_mask", scope="function")
 def _handler_no_mask(empty_handler):
     empty_handler.gain = gain
     empty_handler.pedestal = pedestal

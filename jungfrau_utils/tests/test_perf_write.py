@@ -21,17 +21,20 @@ def hdf5_init(args):
     file = h5py.File(args.output_file, "w")
 
     frame_size = [512, 1024]
-    writer = {"data": file.create_dataset(name="data",
-                                          shape=[args.n_frames] + frame_size,
-                                          maxshape=[None] + frame_size,
-                                          dtype="uint16")}
+    writer = {
+        "data": file.create_dataset(
+            name="data",
+            shape=[args.n_frames] + frame_size,
+            maxshape=[None] + frame_size,
+            dtype="uint16",
+        )
+    }
 
     for n_metadata_dataset in range(args.n_metadata):
         dataset_name = "metadata" + str(n_metadata_dataset)
-        writer[dataset_name] = file.create_dataset(name=dataset_name,
-                                                   shape=[args.n_frames, 1],
-                                                   maxshape=[None, 1],
-                                                   dtype="uint32")
+        writer[dataset_name] = file.create_dataset(
+            name=dataset_name, shape=[args.n_frames, 1], maxshape=[None, 1], dtype="uint32"
+        )
 
     return file, writer
 
@@ -48,19 +51,25 @@ def hdf5_chunked_init(args):
     file = h5py.File(args.output_file, "w")
 
     frame_size = [512, 1024]
-    writer = {"data": file.create_dataset(name="data",
-                                          shape=[args.n_frames] + frame_size,
-                                          maxshape=[None] + frame_size,
-                                          chunks=tuple([1] + frame_size),
-                                          dtype="uint16")}
+    writer = {
+        "data": file.create_dataset(
+            name="data",
+            shape=[args.n_frames] + frame_size,
+            maxshape=[None] + frame_size,
+            chunks=tuple([1] + frame_size),
+            dtype="uint16",
+        )
+    }
 
     for n_metadata_dataset in range(args.n_metadata):
         dataset_name = "metadata" + str(n_metadata_dataset)
-        writer[dataset_name] = file.create_dataset(name=dataset_name,
-                                                   shape=[args.n_frames, 1],
-                                                   maxshape=[None, 1],
-                                                   chunks=(1, 1),
-                                                   dtype="uint32")
+        writer[dataset_name] = file.create_dataset(
+            name=dataset_name,
+            shape=[args.n_frames, 1],
+            maxshape=[None, 1],
+            chunks=(1, 1),
+            dtype="uint32",
+        )
 
     return file, writer
 
@@ -74,21 +83,27 @@ def hdf5_chunked_write_data(index, writer, data, metadata, n_metadata):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='GPFS performance tests')
-    parser.add_argument('mode', choices=["binary", "hdf5", "hdf5_chunked"])
-    parser.add_argument('output_file', type=str)
-    parser.add_argument('n_frames', type=int)
-    parser.add_argument('n_modules', type=int)
-    parser.add_argument('frame_rate', type=int)
-    parser.add_argument('n_metadata', type=int)
+    parser = argparse.ArgumentParser(description="GPFS performance tests")
+    parser.add_argument("mode", choices=["binary", "hdf5", "hdf5_chunked"])
+    parser.add_argument("output_file", type=str)
+    parser.add_argument("n_frames", type=int)
+    parser.add_argument("n_modules", type=int)
+    parser.add_argument("frame_rate", type=int)
+    parser.add_argument("n_metadata", type=int)
 
     arguments = parser.parse_args()
 
-    output_format = "%s\t%d\t%d\t%d\t%d" % (arguments.mode,
-                                            arguments.n_frames,
-                                            arguments.n_modules,
-                                            arguments.frame_rate,
-                                            arguments.n_metadata) + "\t%d\t%f\t%f"
+    output_format = (
+        "%s\t%d\t%d\t%d\t%d"
+        % (
+            arguments.mode,
+            arguments.n_frames,
+            arguments.n_modules,
+            arguments.frame_rate,
+            arguments.n_metadata,
+        )
+        + "\t%d\t%f\t%f"
+    )
 
     image_buffer_size_bytes = arguments.n_modules * 512 * 1024 * 2
     metadata_buffer_size_bytes = arguments.n_modules * 4
