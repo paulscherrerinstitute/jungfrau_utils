@@ -434,28 +434,16 @@ class JFDataHandler:
         return (self.gain is not None) and (self.pedestal is not None)
 
     def _process(self, res, image_stack, conversion, gap_pixels, geometry):
+        if self.is_stripsel():
+            # gap_pixels has no effect on stripsel detectors
+            self._process_stripsel(res, image_stack, conversion, geometry)
+            return
+
         for i, m in enumerate(self.module_map):
             if m == -1:
                 continue
 
-            if geometry:
-                oy = modules_orig[self.detector_name][0][i]
-                ox = modules_orig[self.detector_name][1][i]
-            elif gap_pixels:
-                if self.detector_name == "JF02T09V01":
-                    oy = 0
-                    ox = m * (MODULE_SIZE_X + (CHIP_NUM_X - 1) * CHIP_GAP_X)
-                else:
-                    oy = m * (MODULE_SIZE_Y + (CHIP_NUM_Y - 1) * CHIP_GAP_Y)
-                    ox = 0
-            else:
-                if self.detector_name == "JF02T09V01":
-                    oy = 0
-                    ox = m * MODULE_SIZE_X
-                else:
-                    oy = m * MODULE_SIZE_Y
-                    ox = 0
-
+            oy, ox = self._get_final_module_coordinates(m, i, geometry, gap_pixels)
             module = self._get_module_slice(image_stack, m, geometry)
 
             if conversion:
@@ -465,23 +453,6 @@ class JFDataHandler:
                     module_mask = None
                 else:
                     module_mask = self._get_module_slice(self._mask, i, geometry)
-
-            if self.is_stripsel():
-                if conversion:
-                    module_res = np.empty(shape=module.shape, dtype=np.float32)
-                    self._proc_func(module_res, module, module_g, module_p, module_mask)
-                    module = module_res
-
-                if geometry:
-                    for ind in range(module.shape[0]):
-                        module_res = res[
-                            ind, oy : oy + STRIPSEL_MODULE_SIZE_Y, ox : ox + STRIPSEL_MODULE_SIZE_X
-                        ]
-                        reshape_stripsel(module_res, module[ind])
-                else:
-                    # gap_pixels has no effect on stripsel detectors
-                    res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X] = module
-                return
 
             if gap_pixels:
                 for j in range(CHIP_NUM_Y):
@@ -517,6 +488,59 @@ class JFDataHandler:
                     self._proc_func(module_res, module, module_g, module_p, module_mask)
                 else:
                     module_res[:] = module
+
+    def _process_stripsel(self, res, image_stack, conversion, geometry):
+        for i, m in enumerate(self.module_map):
+            if m == -1:
+                continue
+
+            # gap_pixels has no effect on stripsel detectors
+            oy, ox = self._get_final_module_coordinates(m, i, geometry, False)
+            module = self._get_module_slice(image_stack, m, geometry)
+
+            if conversion:
+                module_g = self._get_module_slice(self._g, i, geometry)
+                module_p = self._get_module_slice(self._p, i, geometry)
+                if self._mask is None:
+                    module_mask = None
+                else:
+                    module_mask = self._get_module_slice(self._mask, i, geometry)
+
+                module_res = np.empty(shape=module.shape, dtype=np.float32)
+                self._proc_func(module_res, module, module_g, module_p, module_mask)
+                module = module_res
+
+            if geometry:
+                for ind in range(module.shape[0]):
+                    module_res = res[
+                        ind, oy : oy + STRIPSEL_MODULE_SIZE_Y, ox : ox + STRIPSEL_MODULE_SIZE_X
+                    ]
+                    reshape_stripsel(module_res, module[ind])
+            else:
+                res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X] = module
+
+    def _get_final_module_coordinates(self, m, i, geometry, gap_pixels):
+        if geometry:
+            oy = modules_orig[self.detector_name][0][i]
+            ox = modules_orig[self.detector_name][1][i]
+
+        elif gap_pixels:
+            if self.detector_name == "JF02T09V01":
+                oy = 0
+                ox = m * (MODULE_SIZE_X + (CHIP_NUM_X - 1) * CHIP_GAP_X)
+            else:
+                oy = m * (MODULE_SIZE_Y + (CHIP_NUM_Y - 1) * CHIP_GAP_Y)
+                ox = 0
+
+        else:
+            if self.detector_name == "JF02T09V01":
+                oy = 0
+                ox = m * MODULE_SIZE_X
+            else:
+                oy = m * MODULE_SIZE_Y
+                ox = 0
+
+        return oy, ox
 
     @_allow_2darray
     def _get_module_slice(self, data, m, geometry=False):
