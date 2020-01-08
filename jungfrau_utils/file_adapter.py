@@ -1,3 +1,4 @@
+import os
 from datetime import timedelta
 from pathlib import Path
 
@@ -10,6 +11,9 @@ from .data_handler import JFDataHandler
 # bitshuffle hdf5 filter params
 BLOCK_SIZE = 0
 compargs = {"compression": H5FILTER, "compression_opts": (BLOCK_SIZE, H5_COMPRESS_LZ4)}
+# limit bitshuffle omp to a single thread
+# a better fix would be to use bitshuffle compiled without omp support
+os.environ["OMP_NUM_THREADS"] = "1"
 
 
 class File:

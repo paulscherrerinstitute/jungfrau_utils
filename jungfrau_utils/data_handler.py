@@ -8,12 +8,6 @@ from numba import jit
 
 from .geometry import modules_orig
 
-try:
-    import mkl
-except ImportError:
-    pass
-else:
-    mkl.set_num_threads(1)  # pylint: disable=no-member
 
 CHIP_SIZE_X = 256
 CHIP_SIZE_Y = 256
