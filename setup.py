@@ -12,4 +12,5 @@ setup(
     author="Paul Scherrer Institute",
     license="GNU GPLv3",
     packages=["jungfrau_utils", "jungfrau_utils.scripts"],
+    zip_safe=False,
 )
