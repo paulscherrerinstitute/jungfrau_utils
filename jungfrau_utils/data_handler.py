@@ -4,7 +4,7 @@ from functools import wraps
 
 import h5py
 import numpy as np
-from numba import jit
+from numba import jit, prange
 
 from .geometry import modules_orig
 
@@ -74,6 +74,7 @@ class JFDataHandler:
         self._g_all = {True: None, False: None}
         self._p_all = {True: None, False: None}
         self._proc_func_all = {True: _correct_highgain, False: _correct}
+        self._proc_func_parallel_all = {True: _correct_highgain_parallel, False: _correct_parallel}
 
         self._module_map = np.arange(self.detector.n_modules)
 
@@ -284,6 +285,10 @@ class JFDataHandler:
         return self._proc_func_all[self.highgain]
 
     @property
+    def _proc_func_parallel(self):
+        return self._proc_func_parallel_all[self.highgain]
+
+    @property
     def pixel_mask(self):
         """Current pixel mask"""
         return self._pixel_mask
@@ -383,7 +388,7 @@ class JFDataHandler:
         self._module_map = value
 
     @_allow_2darray
-    def process(self, images, conversion=True, gap_pixels=True, geometry=True):
+    def process(self, images, conversion=True, gap_pixels=True, geometry=True, parallel=False):
         """Perform jungfrau detector data processing like pedestal correction, gain conversion,
         applying pixel mask, module map, etc.
 
@@ -394,6 +399,7 @@ class JFDataHandler:
             gap_pixels (bool, optional): add gap pixels between detector submodules.
                 Defaults to True.
             geometry (bool, optional): apply detector geometry corrections. Defaults to True.
+            parallel (bool, optional): parallelize image stack processing. Defaults to False.
 
         Returns:
             ndarray: resulting image stack or single image
@@ -415,7 +421,7 @@ class JFDataHandler:
         res_shape = self.get_shape_out(gap_pixels=gap_pixels, geometry=geometry)
         res = np.zeros((images.shape[0], *res_shape), dtype=res_dtype)
 
-        self._process(res, images, conversion, gap_pixels, geometry)
+        self._process(res, images, conversion, gap_pixels, geometry, parallel)
 
         # rotate image stack in case of alvra JF06 detector
         if geometry and self.detector_name.startswith("JF06"):
@@ -427,11 +433,17 @@ class JFDataHandler:
         """Whether all data for gain/pedestal conversion is present"""
         return (self.gain is not None) and (self.pedestal is not None)
 
-    def _process(self, res, image_stack, conversion, gap_pixels, geometry):
+    def _process(self, res, image_stack, conversion, gap_pixels, geometry, parallel):
         if self.is_stripsel():
             # gap_pixels has no effect on stripsel detectors
-            self._process_stripsel(res, image_stack, conversion, geometry)
+            self._process_stripsel(res, image_stack, conversion, geometry, parallel)
             return
+
+        if conversion:
+            if parallel:
+                proc_func = self._proc_func_parallel
+            else:
+                proc_func = self._proc_func
 
         for i, m in enumerate(self.module_map):
             if m == -1:
@@ -472,18 +484,24 @@ class JFDataHandler:
                                 submod_mask = None
                             else:
                                 submod_mask = module_mask[sread]
-                            self._proc_func(submod_res, submod, submod_g, submod_p, submod_mask)
+                            proc_func(submod_res, submod, submod_g, submod_p, submod_mask)
                         else:
                             submod_res[:] = submod
 
             else:
                 module_res = res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X]
                 if conversion:
-                    self._proc_func(module_res, module, module_g, module_p, module_mask)
+                    proc_func(module_res, module, module_g, module_p, module_mask)
                 else:
                     module_res[:] = module
 
-    def _process_stripsel(self, res, image_stack, conversion, geometry):
+    def _process_stripsel(self, res, image_stack, conversion, geometry, parallel):
+        if conversion:
+            if parallel:
+                proc_func = self._proc_func_parallel
+            else:
+                proc_func = self._proc_func
+
         for i, m in enumerate(self.module_map):
             if m == -1:
                 continue
@@ -501,7 +519,7 @@ class JFDataHandler:
                     module_mask = self._get_module_slice(self._mask, i, geometry)
 
                 module_res = np.empty(shape=module.shape, dtype=np.float32)
-                self._proc_func(module_res, module, module_g, module_p, module_mask)
+                proc_func(module_res, module, module_g, module_p, module_mask)
                 module = module_res
 
             if geometry:
@@ -602,6 +620,35 @@ def _correct(res, image, gain, pedestal, mask):
 def _correct_highgain(res, image, gain, pedestal, mask):
     num, size_y, size_x = image.shape
     for i1 in range(num):
+        for i2 in range(size_y):
+            for i3 in range(size_x):
+                if mask is not None and mask[i2, i3]:
+                    res[i1, i2, i3] = 0
+                else:
+                    val = image[i1, i2, i3] & 0x3FFF
+                    res[i1, i2, i3] = (val - pedestal[0, i2, i3]) * gain[0, i2, i3]
+
+
+@jit(nopython=True, cache=True, parallel=True)
+def _correct_parallel(res, image, gain, pedestal, mask):
+    num, size_y, size_x = image.shape
+    # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
+    for i1 in prange(num):  # pylint: disable=not-an-iterable
+        for i2 in range(size_y):
+            for i3 in range(size_x):
+                if mask is not None and mask[i2, i3]:
+                    res[i1, i2, i3] = 0
+                else:
+                    gm = image[i1, i2, i3] >> 14
+                    val = image[i1, i2, i3] & 0x3FFF
+                    res[i1, i2, i3] = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
+
+
+@jit(nopython=True, cache=True, parallel=True)
+def _correct_highgain_parallel(res, image, gain, pedestal, mask):
+    num, size_y, size_x = image.shape
+    # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
+    for i1 in prange(num):  # pylint: disable=not-an-iterable
         for i2 in range(size_y):
             for i3 in range(size_x):
                 if mask is not None and mask[i2, i3]:
