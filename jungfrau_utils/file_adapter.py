@@ -15,6 +15,8 @@ compargs = {"compression": H5FILTER, "compression_opts": (BLOCK_SIZE, H5_COMPRES
 # a better fix would be to use bitshuffle compiled without omp support
 os.environ["OMP_NUM_THREADS"] = "1"
 
+BATCH_SIZE = 1000
+
 
 class File:
     """Jungfrau file"""
@@ -202,38 +204,43 @@ class File:
                     args["maxshape"] = dset_source.maxshape
 
                 if name == f"data/{self.detector_name}/data":  # compress and copy
-                    data = self[:]
+                    n_images = self["data"].shape[0]
 
                     h5_dest.create_dataset(f"data/{self.detector_name}/n_roi", data=len(roi_x))
 
                     for i, (roix, roiy) in enumerate(zip(roi_x, roi_y)):
-                        roi_data = data[:, slice(*roiy), slice(*roix)]
+                        h5_dest.create_dataset(
+                            f"data/{self.detector_name}/roi_{i}", data=[roiy, roix]
+                        )
 
-                        if factor:
-                            roi_data = np.round(roi_data / factor)
+                        # prepare ROI datasets
+                        roi_shape = (roiy[1] - roiy[0], roix[1] - roix[0])
 
-                        args["shape"] = roi_data.shape
-                        args["maxshape"] = roi_data.shape
-
-                        if roi_data.ndim == 3:
-                            args["chunks"] = (1, *roi_data.shape[1:])
-                        else:
-                            args["chunks"] = roi_data.shape
+                        args["shape"] = (n_images, *roi_shape)
+                        args["maxshape"] = (n_images, *roi_shape)
+                        args["chunks"] = (1, *roi_shape)
 
                         if dtype is None:
-                            args["dtype"] = roi_data.dtype
+                            args["dtype"] = self["data"].dtype
                         else:
                             args["dtype"] = dtype
 
                         if compress:
                             args.update(compargs)
 
-                        dset_dest = h5_dest.create_dataset(f"{name}_roi_{i}", **args)
-                        dset_dest[:] = roi_data
+                        h5_dest.create_dataset(f"{name}_roi_{i}", **args)
 
-                        h5_dest.create_dataset(
-                            f"data/{self.detector_name}/roi_{i}", data=[roiy, roix]
-                        )
+                    for ind in range(0, n_images, BATCH_SIZE):
+                        batch_slice = slice(ind, min(ind + BATCH_SIZE, n_images))
+                        batch_data = self[batch_slice]
+
+                        for i, (roix, roiy) in enumerate(zip(roi_x, roi_y)):
+                            roi_data = batch_data[:, slice(*roiy), slice(*roix)]
+
+                            if factor:
+                                roi_data = np.round(roi_data / factor)
+
+                            h5_dest[f"{name}_roi_{i}"][batch_slice] = roi_data
 
                 else:  # copy
                     h5_dest.create_dataset(name, data=dset_source, **args)
