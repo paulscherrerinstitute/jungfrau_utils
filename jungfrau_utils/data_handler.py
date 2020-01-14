@@ -73,8 +73,6 @@ class JFDataHandler:
         # gain and pedestal arrays to be used for the actual data conversion
         self._g_all = {True: None, False: None}
         self._p_all = {True: None, False: None}
-        self._proc_func_all = {True: _correct_highgain, False: _correct}
-        self._proc_func_parallel_all = {True: _correct_highgain_parallel, False: _correct_parallel}
 
         self._module_map = np.arange(self.detector.n_modules)
 
@@ -280,13 +278,20 @@ class JFDataHandler:
     def _p(self):
         return self._p_all[self.highgain]
 
-    @property
-    def _proc_func(self):
-        return self._proc_func_all[self.highgain]
+    def _proc_func(self, parallel):
+        if not self.highgain and not parallel:
+            proc_func = _correct
 
-    @property
-    def _proc_func_parallel(self):
-        return self._proc_func_parallel_all[self.highgain]
+        elif not self.highgain and parallel:
+            proc_func = _correct_parallel
+
+        elif self.highgain and not parallel:
+            proc_func = _correct_highgain
+
+        elif self.highgain and parallel:
+            proc_func = _correct_highgain_parallel
+
+        return proc_func
 
     @property
     def pixel_mask(self):
@@ -440,10 +445,7 @@ class JFDataHandler:
             return
 
         if conversion:
-            if parallel:
-                proc_func = self._proc_func_parallel
-            else:
-                proc_func = self._proc_func
+            proc_func = self._proc_func(parallel=parallel)
 
         for i, m in enumerate(self.module_map):
             if m == -1:
@@ -497,10 +499,7 @@ class JFDataHandler:
 
     def _process_stripsel(self, res, image_stack, conversion, geometry, parallel):
         if conversion:
-            if parallel:
-                proc_func = self._proc_func_parallel
-            else:
-                proc_func = self._proc_func
+            proc_func = self._proc_func(parallel=parallel)
 
         for i, m in enumerate(self.module_map):
             if m == -1:
