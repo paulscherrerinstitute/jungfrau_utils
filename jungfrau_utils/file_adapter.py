@@ -27,6 +27,7 @@ class File:
         conversion=True,
         gap_pixels=True,
         geometry=True,
+        parallel=True,
     ):
         """Create a new Jungfrau file wrapper
 
@@ -40,6 +41,7 @@ class File:
             gap_pixels (bool, optional): Add gap pixels between detector submodules.
                 Defaults to True.
             geometry (bool, optional): Apply geometry correction. Defaults to True.
+            parallel (bool, optional): Use parallelized processing. Defaults to True.
         """
         self.file_path = Path(file_path)
 
@@ -49,6 +51,7 @@ class File:
         self._conversion = conversion
         self._gap_pixels = gap_pixels
         self._geometry = geometry
+        self._parallel = parallel
 
         # Gain file
         if gain_file:
@@ -146,6 +149,15 @@ class File:
             value = False
 
         self._geometry = value
+
+    @property
+    def parallel(self):
+        """A flag for using parallelization"""
+        return self._parallel
+
+    @parallel.setter
+    def parallel(self, value):
+        self._parallel = value
 
     @property
     def _processed(self):
@@ -435,7 +447,11 @@ class File:
 
         data = self.file[f"/data/{self.detector_name}/data"][ind]
         data = self.handler.process(
-            data, conversion=self.conversion, gap_pixels=self.gap_pixels, geometry=self.geometry
+            data,
+            conversion=self.conversion,
+            gap_pixels=self.gap_pixels,
+            geometry=self.geometry,
+            parallel=self.parallel,
         )
 
         if roi:
