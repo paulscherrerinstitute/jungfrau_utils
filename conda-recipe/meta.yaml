@@ -20,7 +20,7 @@ requirements:
         - bitshuffle
 
 build:
-  number: 1
+  number: 0
   entry_points:
     - jungfrau_convert_gainmaps = jungfrau_utils.scripts.jungfrau_convert_gainmaps:main
     - jungfrau_run_pedestals = jungfrau_utils.scripts.jungfrau_run_pedestals:main
