@@ -5,4 +5,4 @@ from jungfrau_utils.data_handler import JFDataHandler
 from jungfrau_utils.stream_adapter import StreamAdapter
 from jungfrau_utils.file_adapter import File
 
-__version__ = "0.8.1"
+__version__ = "0.8.2"
