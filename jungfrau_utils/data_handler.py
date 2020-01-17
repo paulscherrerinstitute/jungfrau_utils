@@ -197,7 +197,7 @@ class JFDataHandler:
 
         _g = 1 / self._gain
 
-        self._g_all[True] = _g[3:]
+        self._g_all[True] = _g[3:].copy()
 
         _g[3] = _g[2]
         self._g_all[False] = _g
@@ -253,7 +253,7 @@ class JFDataHandler:
 
         _p = self._pedestal.copy()
 
-        self._p_all[True] = _p[3:]
+        self._p_all[True] = _p[3:].copy()
 
         _p[3] = _p[2]
         self._p_all[False] = _p
