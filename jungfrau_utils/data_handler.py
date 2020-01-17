@@ -86,7 +86,7 @@ class JFDataHandler:
 
     def is_stripsel(self):
         """Return true if detector is a stripsel"""
-        return self.detector_name.startswith(("JF05", "JF11"))
+        return self.detector_name.startswith(("JF05", "JF11", "JF12"))
 
     @property
     def detector(self):

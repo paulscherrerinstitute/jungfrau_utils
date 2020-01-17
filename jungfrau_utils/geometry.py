@@ -102,4 +102,10 @@ modules_orig = {
         [0, 0, 90, 90],
         [0, 3117, 0, 3117],
     ),
+
+    "JF12T04V01": (
+        # a vertical gap of 4 pix is artificial, because they are physically separated 2 detectors
+        [0, 0, 90, 90],
+        [0, 3117, 0, 3117],
+    ),
 }
