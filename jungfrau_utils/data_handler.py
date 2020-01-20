@@ -335,15 +335,15 @@ class JFDataHandler:
 
     def get_pixel_mask(self, gap_pixels, geometry):
         """Return pixel mask, shaped according to gap_pixel and geometry flags"""
-        if self.pixel_mask is None:
+        if self._mask is None:
             return None
 
-        res = np.empty(self._shape_in, dtype=self.pixel_mask.dtype)
+        res = np.empty(self._shape_in, dtype=np.bool)
         for i, m in enumerate(self.module_map):
             if m == -1:
                 continue
 
-            module = self._get_module_slice(self.pixel_mask, i)
+            module = self._get_module_slice(self._mask, i)
             module_res = self._get_module_slice(res, m)
             module_res[:] = module
 
