@@ -498,6 +498,12 @@ class JFDataHandler:
                     module_res[:] = module
 
     def _process_stripsel(self, res, image_stack, conversion, geometry, parallel):
+        if geometry:
+            if not parallel:
+                reshape_stripsel = _reshape_stripsel
+            else:
+                reshape_stripsel = _reshape_stripsel_parallel
+
         if conversion:
             proc_func = self._proc_func(parallel=parallel)
 
@@ -525,7 +531,7 @@ class JFDataHandler:
                 module_res = res[
                     :, oy : oy + STRIPSEL_MODULE_SIZE_Y, ox : ox + STRIPSEL_MODULE_SIZE_X
                 ]
-                _reshape_stripsel(module_res, module)
+                reshape_stripsel(module_res, module)
             else:
                 res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X] = module
 
@@ -660,6 +666,43 @@ def _correct_highgain_parallel(res, image, gain, pedestal, mask):
 def _reshape_stripsel(res, image):
     num = image.shape[0]
     for ind in range(num):
+        # first we fill the normal pixels, the gap ones will be overwritten later
+        for yin in range(256):
+            for xin in range(1024):
+                ichip = xin // 256
+                xout = (ichip * 774) + (xin % 256) * 3 + yin % 3
+                # 774 is the chip period, 256*3+6
+                yout = yin // 3
+                res[ind, yout, xout] = image[ind, yin, xin]
+
+        # now the gap pixels
+        for igap in range(3):
+            for yin in range(256):
+                yout = (yin // 6) * 2
+
+                # first the left side of gap
+                xin = igap * 64 + 63
+                xout = igap * 774 + 765 + yin % 6
+                res[ind, yout, xout] = image[ind, yin, xin]
+                res[ind, yout + 1, xout] = image[ind, yin, xin]
+
+                # then the right side is mirrored
+                xin = igap * 64 + 63 + 1
+                xout = igap * 774 + 765 + 11 - yin % 6
+                res[ind, yout, xout] = image[ind, yin, xin]
+                res[ind, yout + 1, xout] = image[ind, yin, xin]
+                # if we want a proper normalization (the area of those pixels is double,
+                # so they see 2x the signal)
+                # res[ind, yout, xout] = res[ind, yout, xout] / 2
+
+    return res
+
+
+@jit(nopython=True, cache=True, parallel=True)
+def _reshape_stripsel_parallel(res, image):
+    num = image.shape[0]
+    # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
+    for ind in prange(num):  # pylint: disable=not-an-iterable
         # first we fill the normal pixels, the gap ones will be overwritten later
         for yin in range(256):
             for xin in range(1024):
