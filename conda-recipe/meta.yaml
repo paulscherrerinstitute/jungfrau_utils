@@ -13,7 +13,6 @@ requirements:
         - setuptools
     run:
         - python
-        - pyzmq
         - h5py
         - numpy
         - numba
