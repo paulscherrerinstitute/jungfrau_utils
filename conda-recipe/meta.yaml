@@ -13,7 +13,7 @@ requirements:
         - setuptools
     run:
         - python
-        - h5py
+        - h5py >=2.9
         - numpy
         - numba
         - bitshuffle
