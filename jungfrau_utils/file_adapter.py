@@ -185,25 +185,8 @@ class File:
             elif isinstance(obj, h5py.Dataset):
                 dset_source = self.file[name]
 
-                args = {
-                    k: getattr(dset_source, k)
-                    for k in (
-                        "shape",
-                        "dtype",
-                        "chunks",
-                        "compression",
-                        "compression_opts",
-                        "scaleoffset",
-                        "shuffle",
-                        "fletcher32",
-                        "fillvalue",
-                    )
-                }
-
-                if dset_source.shape != dset_source.maxshape:
-                    args["maxshape"] = dset_source.maxshape
-
                 if name == f"data/{self.detector_name}/data":  # compress and copy
+                    args = dict()
                     n_images = self["data"].shape[0]
 
                     h5_dest.create_dataset(f"data/{self.detector_name}/n_roi", data=len(roi_x))
@@ -243,7 +226,7 @@ class File:
                             h5_dest[f"{name}_roi_{i}"][batch_slice] = roi_data
 
                 else:  # copy
-                    h5_dest.create_dataset(name, data=dset_source, **args)
+                    h5_dest.create_dataset_like(name, dset_source, data=dset_source)
 
             if name != f"data/{self.detector_name}/data":
                 # copy attributes
@@ -272,24 +255,7 @@ class File:
 
         def export_objects(name):
             dset_source = data_group[name]
-
-            args = {
-                k: getattr(dset_source, k)
-                for k in (
-                    "shape",
-                    "dtype",
-                    "chunks",
-                    "compression",
-                    "compression_opts",
-                    "scaleoffset",
-                    "shuffle",
-                    "fletcher32",
-                    "fillvalue",
-                )
-            }
-
-            if dset_source.shape != dset_source.maxshape:
-                args["maxshape"] = dset_source.maxshape
+            args = dict()
 
             if name == "data":  # compress and copy
                 data = self[index, :, :]
@@ -308,14 +274,14 @@ class File:
                 if compress:
                     args.update(compargs)
 
-                dset_dest = h5_dest.create_dataset(f"/data/{name}", **args)
+                dset_dest = h5_dest.create_dataset_like(f"/data/{name}", dset_source, **args)
                 dset_dest[:] = data
 
             else:  # copy
                 data = dset_source[index, :]
                 args["shape"] = data.shape
                 args["maxshape"] = data.shape
-                h5_dest.create_dataset(f"/data/{name}", data=data, **args)
+                h5_dest.create_dataset_like(f"/data/{name}", dset_source, data=data, **args)
 
         with h5py.File(dest, "w") as h5_dest:
             h5_dest.create_group("/data")
