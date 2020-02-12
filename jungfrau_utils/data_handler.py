@@ -393,13 +393,17 @@ class JFDataHandler:
         self._module_map = value
 
     @_allow_2darray
-    def process(self, images, conversion=True, gap_pixels=True, geometry=True, parallel=False):
+    def process(
+        self, images, conversion=True, mask=True, gap_pixels=True, geometry=True, parallel=False
+    ):
         """Perform jungfrau detector data processing like pedestal correction, gain conversion,
         applying pixel mask, module map, etc.
 
         Args:
             images (ndarray): image stack or single image to be processed
             conversion (bool, optional): convert to keV (apply gain and pedestal corrections).
+                Defaults to True.
+            mask (bool, optional): perform masking of bad pixels (set those values to 0).
                 Defaults to True.
             gap_pixels (bool, optional): add gap pixels between detector submodules.
                 Defaults to True.
@@ -426,7 +430,7 @@ class JFDataHandler:
         res_shape = self.get_shape_out(gap_pixels=gap_pixels, geometry=geometry)
         res = np.zeros((images.shape[0], *res_shape), dtype=res_dtype)
 
-        self._process(res, images, conversion, gap_pixels, geometry, parallel)
+        self._process(res, images, conversion, mask, gap_pixels, geometry, parallel)
 
         # rotate image stack in case of alvra JF06 detector
         if geometry and self.detector_name.startswith("JF06"):
@@ -438,10 +442,10 @@ class JFDataHandler:
         """Whether all data for gain/pedestal conversion is present"""
         return (self.gain is not None) and (self.pedestal is not None)
 
-    def _process(self, res, image_stack, conversion, gap_pixels, geometry, parallel):
+    def _process(self, res, image_stack, conversion, mask, gap_pixels, geometry, parallel):
         if self.is_stripsel():
             # gap_pixels has no effect on stripsel detectors
-            self._process_stripsel(res, image_stack, conversion, geometry, parallel)
+            self._process_stripsel(res, image_stack, conversion, mask, geometry, parallel)
             return
 
         if conversion:
@@ -457,7 +461,7 @@ class JFDataHandler:
             if conversion:
                 module_g = self._get_module_slice(self._g, i, geometry)
                 module_p = self._get_module_slice(self._p, i, geometry)
-                if self._mask is None:
+                if not mask or self._mask is None:
                     module_mask = None
                 else:
                     module_mask = self._get_module_slice(self._mask, i, geometry)
@@ -497,7 +501,7 @@ class JFDataHandler:
                 else:
                     module_res[:] = module
 
-    def _process_stripsel(self, res, image_stack, conversion, geometry, parallel):
+    def _process_stripsel(self, res, image_stack, conversion, mask, geometry, parallel):
         if geometry:
             if not parallel:
                 reshape_stripsel = _reshape_stripsel
@@ -518,7 +522,7 @@ class JFDataHandler:
             if conversion:
                 module_g = self._get_module_slice(self._g, i, geometry)
                 module_p = self._get_module_slice(self._p, i, geometry)
-                if self._mask is None:
+                if not mask or self._mask is None:
                     module_mask = None
                 else:
                     module_mask = self._get_module_slice(self._mask, i, geometry)

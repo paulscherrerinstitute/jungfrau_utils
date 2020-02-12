@@ -18,15 +18,18 @@ image_stack = np.arange(np.prod(STACK_SHAPE), dtype=np.uint16).reshape(STACK_SHA
 image_stack = np.ascontiguousarray(image_stack.transpose(2, 1, 0))
 
 converted_image_stack = ((image_stack & 0b11111111111111).astype(np.float32) - 1) / 10
-converted_image_stack[:, pixel_mask] = 0
+
+converted_image_stack_mask = converted_image_stack.copy()
+converted_image_stack_mask[:, pixel_mask] = 0
 
 image_single = image_stack[0]
 converted_image_single = converted_image_stack[0]
+converted_image_single_mask = converted_image_stack_mask[0]
 
 MM_DATA_SHAPE = (2 * 512, 1024)
 MM_DATA_SHAPE_WITH_GAPS = (2 * (512 + 2), 1024 + 6)
 mm_image_single = image_single[: 2 * 512, :]
-mm_expected_image_single = converted_image_single[: 2 * 512, :]
+mm_expected_image_single = converted_image_single_mask[: 2 * 512, :]
 mm_pixel_mask = pixel_mask[: 2 * 512, :]
 
 
@@ -190,10 +193,10 @@ def test_handler_process_single_image(handler):
     assert res.shape == DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY
 
     # check data for submodules in all 4 corners
-    assert np.allclose(res[:256, :256], converted_image_single[:256, :256])
-    assert np.allclose(res[:256, -256:], converted_image_single[:256, -256:])
-    assert np.allclose(res[-256:, :256], converted_image_single[-256:, :256])
-    assert np.allclose(res[-256:, -256:], converted_image_single[-256:, -256:])
+    assert np.allclose(res[:256, :256], converted_image_single_mask[:256, :256])
+    assert np.allclose(res[:256, -256:], converted_image_single_mask[:256, -256:])
+    assert np.allclose(res[-256:, :256], converted_image_single_mask[-256:, :256])
+    assert np.allclose(res[-256:, -256:], converted_image_single_mask[-256:, -256:])
 
 
 def test_handler_process_single_image_no_gaps(handler):
@@ -204,10 +207,10 @@ def test_handler_process_single_image_no_gaps(handler):
     assert res.shape == DATA_SHAPE_WITH_GEOMETRY
 
     # check data for submodules in all 4 corners
-    assert np.allclose(res[:256, :256], converted_image_single[:256, :256])
-    assert np.allclose(res[:256, -256:], converted_image_single[:256, -256:])
-    assert np.allclose(res[-256:, :256], converted_image_single[-256:, :256])
-    assert np.allclose(res[-256:, -256:], converted_image_single[-256:, -256:])
+    assert np.allclose(res[:256, :256], converted_image_single_mask[:256, :256])
+    assert np.allclose(res[:256, -256:], converted_image_single_mask[:256, -256:])
+    assert np.allclose(res[-256:, :256], converted_image_single_mask[-256:, :256])
+    assert np.allclose(res[-256:, -256:], converted_image_single_mask[-256:, -256:])
 
 
 def test_handler_process_single_image_no_geom(handler):
@@ -216,6 +219,20 @@ def test_handler_process_single_image_no_geom(handler):
     assert res.dtype == np.float32
     assert res.ndim == 2
     assert res.shape == DATA_SHAPE_WITH_GAPS
+
+    # check data for submodules in all 4 corners
+    assert np.allclose(res[:256, :256], converted_image_single_mask[:256, :256])
+    assert np.allclose(res[:256, -256:], converted_image_single_mask[:256, -256:])
+    assert np.allclose(res[-256:, :256], converted_image_single_mask[-256:, :256])
+    assert np.allclose(res[-256:, -256:], converted_image_single_mask[-256:, -256:])
+
+
+def test_handler_process_single_image_no_mask(handler):
+    res = handler.process(image_single, mask=False)
+
+    assert res.dtype == np.float32
+    assert res.ndim == 2
+    assert res.shape == DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY
 
     # check data for submodules in all 4 corners
     assert np.allclose(res[:256, :256], converted_image_single[:256, :256])
@@ -230,7 +247,7 @@ def test_handler_process_no_gaps_no_geom(handler):
     assert res.dtype == np.float32
     assert res.ndim == 2
     assert res.shape == DATA_SHAPE
-    assert np.allclose(res, converted_image_single)
+    assert np.allclose(res, converted_image_single_mask)
 
 
 def test_handler_process_empty_image_stack(handler):
@@ -252,10 +269,10 @@ def test_handler_process_image_stack(handler, stack_size):
     assert res.shape == (stack_size, *DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY)
 
     # check data for submodules in all 4 corners
-    assert np.allclose(res[:, :256, :256], converted_image_stack[:stack_size, :256, :256])
-    assert np.allclose(res[:, :256, -256:], converted_image_stack[:stack_size, :256, -256:])
-    assert np.allclose(res[:, -256:, :256], converted_image_stack[:stack_size, -256:, :256])
-    assert np.allclose(res[:, -256:, -256:], converted_image_stack[:stack_size, -256:, -256:])
+    assert np.allclose(res[:, :256, :256], converted_image_stack_mask[:stack_size, :256, :256])
+    assert np.allclose(res[:, :256, -256:], converted_image_stack_mask[:stack_size, :256, -256:])
+    assert np.allclose(res[:, -256:, :256], converted_image_stack_mask[:stack_size, -256:, :256])
+    assert np.allclose(res[:, -256:, -256:], converted_image_stack_mask[:stack_size, -256:, -256:])
 
 
 @pytest.mark.parametrize("conversion", [True, False])
@@ -282,13 +299,14 @@ def test_handler_process(handler, conversion, gap_pixels, geometry):
         assert res.shape == DATA_SHAPE
 
 
+@pytest.mark.parametrize("mask", [True, False])
 @pytest.mark.parametrize("gap_pixels", [True, False])
 @pytest.mark.parametrize("geometry", [True, False])
 @pytest.mark.parametrize("module_map", [None, np.array([0, 1, 2])])
-def test_handler_process_mm_all(handler, gap_pixels, geometry, module_map):
+def test_handler_process_mm_all(handler, mask, gap_pixels, geometry, module_map):
     handler.module_map = module_map
 
-    res = handler.process(image_single, gap_pixels=gap_pixels, geometry=geometry)
+    res = handler.process(image_single, mask=mask, gap_pixels=gap_pixels, geometry=geometry)
 
     assert res.ndim == 2
     assert res.dtype == np.float32
@@ -303,10 +321,16 @@ def test_handler_process_mm_all(handler, gap_pixels, geometry, module_map):
         assert res.shape == DATA_SHAPE
 
     # check data for submodules in all 4 corners
-    assert np.allclose(res[:256, :256], converted_image_single[:256, :256])
-    assert np.allclose(res[:256, -256:], converted_image_single[:256, -256:])
-    assert np.allclose(res[-256:, :256], converted_image_single[-256:, :256])
-    assert np.allclose(res[-256:, -256:], converted_image_single[-256:, -256:])
+    if mask:
+        assert np.allclose(res[:256, :256], converted_image_single_mask[:256, :256])
+        assert np.allclose(res[:256, -256:], converted_image_single_mask[:256, -256:])
+        assert np.allclose(res[-256:, :256], converted_image_single_mask[-256:, :256])
+        assert np.allclose(res[-256:, -256:], converted_image_single_mask[-256:, -256:])
+    else:
+        assert np.allclose(res[:256, :256], converted_image_single[:256, :256])
+        assert np.allclose(res[:256, -256:], converted_image_single[:256, -256:])
+        assert np.allclose(res[-256:, :256], converted_image_single[-256:, :256])
+        assert np.allclose(res[-256:, -256:], converted_image_single[-256:, -256:])
 
 
 @pytest.mark.parametrize("gap_pixels", [True, False])
