@@ -419,7 +419,7 @@ class JFDataHandler:
                 f"Expected image shape {self._shape_in}, provided image shape {image_shape}."
             )
 
-        if not (conversion or gap_pixels or geometry):
+        if not (conversion or mask or gap_pixels or geometry):
             # no need to continue, return unchanged images
             return images
 
@@ -458,13 +458,14 @@ class JFDataHandler:
             oy, ox = self._get_final_module_coordinates(m, i, geometry, gap_pixels)
             module = self._get_module_slice(image_stack, m, geometry)
 
+            if not mask or self._mask is None:
+                module_mask = None
+            else:
+                module_mask = self._get_module_slice(self._mask, i, geometry)
+
             if conversion:
                 module_g = self._get_module_slice(self._g, i, geometry)
                 module_p = self._get_module_slice(self._p, i, geometry)
-                if not mask or self._mask is None:
-                    module_mask = None
-                else:
-                    module_mask = self._get_module_slice(self._mask, i, geometry)
 
             if gap_pixels:
                 for j in range(CHIP_NUM_Y):
@@ -483,16 +484,19 @@ class JFDataHandler:
                         submod = module[(slice(None), *sread)]
                         submod_res = res[(slice(None), *swrite)]
 
+                        if module_mask is None:
+                            submod_mask = None
+                        else:
+                            submod_mask = module_mask[sread]
+
                         if conversion:
                             submod_g = module_g[(slice(None), *sread)]
                             submod_p = module_p[(slice(None), *sread)]
-                            if module_mask is None:
-                                submod_mask = None
-                            else:
-                                submod_mask = module_mask[sread]
                             proc_func(submod_res, submod, submod_g, submod_p, submod_mask)
                         else:
                             submod_res[:] = submod
+                            if submod_mask is not None:
+                                submod_res[:, submod_mask] = 0
 
             else:
                 module_res = res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X]
@@ -500,6 +504,8 @@ class JFDataHandler:
                     proc_func(module_res, module, module_g, module_p, module_mask)
                 else:
                     module_res[:] = module
+                    if module_mask is not None:
+                        module_res[:, module_mask] = 0
 
     def _process_stripsel(self, res, image_stack, conversion, mask, geometry, parallel):
         if geometry:
@@ -519,17 +525,22 @@ class JFDataHandler:
             oy, ox = self._get_final_module_coordinates(m, i, geometry, False)
             module = self._get_module_slice(image_stack, m, geometry)
 
+            if not mask or self._mask is None:
+                module_mask = None
+            else:
+                module_mask = self._get_module_slice(self._mask, i, geometry)
+
             if conversion:
                 module_g = self._get_module_slice(self._g, i, geometry)
                 module_p = self._get_module_slice(self._p, i, geometry)
-                if not mask or self._mask is None:
-                    module_mask = None
-                else:
-                    module_mask = self._get_module_slice(self._mask, i, geometry)
 
                 module_res = np.empty(shape=module.shape, dtype=np.float32)
                 proc_func(module_res, module, module_g, module_p, module_mask)
                 module = module_res
+            else:
+                if module_mask is not None:
+                    module = module.copy()
+                    module[:, module_mask] = 0
 
             if geometry:
                 module_res = res[
