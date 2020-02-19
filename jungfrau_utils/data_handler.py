@@ -124,7 +124,7 @@ class JFDataHandler:
 
         return shape_y, shape_x
 
-    def get_shape_out(self, gap_pixels, geometry):
+    def get_shape_out(self, gap_pixels=True, geometry=True):
         """Resulting image shape of a detector, based on gap_pixel and geometry flags"""
         if self.is_stripsel():
             return self._get_stripsel_shape_out(geometry=geometry)
@@ -333,7 +333,7 @@ class JFDataHandler:
 
         self._mask_all[True] = mask
 
-    def get_pixel_mask(self, gap_pixels, geometry):
+    def get_pixel_mask(self, gap_pixels=True, geometry=True):
         """Return pixel mask, shaped according to gap_pixel and geometry flags"""
         if self._mask is None:
             return None
@@ -585,7 +585,7 @@ class JFDataHandler:
 
         return out
 
-    def get_gains(self, images, mask, gap_pixels, geometry):
+    def get_gains(self, images, mask=True, gap_pixels=True, geometry=True):
         """Return gain values of images, applying mask, gap_pixel and geometry flags.
         """
         if images.dtype != np.uint16:
@@ -598,7 +598,7 @@ class JFDataHandler:
 
         return gains
 
-    def get_saturated_pixels(self, images, mask, gap_pixels, geometry):
+    def get_saturated_pixels(self, images, mask=True, gap_pixels=True, geometry=True):
         """Return a boolean array of saturated pixels, applying mask, gap_pixel and geometry flags.
         """
         if images.dtype != np.uint16:
