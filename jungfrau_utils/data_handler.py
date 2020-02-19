@@ -585,27 +585,28 @@ class JFDataHandler:
 
         return out
 
-    def get_gains(self, images, gap_pixels, geometry):
-        """Return gain values of images, shaped according to gap_pixel and geometry flags.
+    def get_gains(self, images, mask, gap_pixels, geometry):
+        """Return gain values of images, applying mask, gap_pixel and geometry flags.
         """
         if images.dtype != np.uint16:
             raise TypeError(f"Expected image type {np.uint16}, provided data type {images.dtype}.")
 
         gains = images >> 14
-        gains = self.process(gains, conversion=False, gap_pixels=gap_pixels, geometry=geometry)
+        gains = self.process(
+            gains, conversion=False, mask=mask, gap_pixels=gap_pixels, geometry=geometry
+        )
 
         return gains
 
-    def get_saturated_pixels(self, images, gap_pixels, geometry):
-        """Return a boolean array of saturated pixels, shaped according to gap_pixel and geometry
-        flags.
+    def get_saturated_pixels(self, images, mask, gap_pixels, geometry):
+        """Return a boolean array of saturated pixels, applying mask, gap_pixel and geometry flags.
         """
         if images.dtype != np.uint16:
             raise TypeError(f"Expected image type {np.uint16}, provided data type {images.dtype}.")
 
         saturated_pixels = images == self.get_saturated_value()
         saturated_pixels = self.process(
-            saturated_pixels, conversion=False, gap_pixels=gap_pixels, geometry=geometry
+            saturated_pixels, conversion=False, mask=mask, gap_pixels=gap_pixels, geometry=geometry
         )
 
         return saturated_pixels

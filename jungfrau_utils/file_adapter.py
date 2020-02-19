@@ -27,6 +27,7 @@ class File:
         gain_file="",
         pedestal_file="",
         conversion=True,
+        mask=True,
         gap_pixels=True,
         geometry=True,
         parallel=True,
@@ -40,6 +41,8 @@ class File:
                 Defaults to ''.
             conversion (bool, optional): Apply gain conversion and pedestal correction.
                 Defaults to True.
+            mask (bool, optional): Perform masking of bad pixels (assign them to 0).
+                Defaults to True.
             gap_pixels (bool, optional): Add gap pixels between detector submodules.
                 Defaults to True.
             geometry (bool, optional): Apply geometry correction. Defaults to True.
@@ -51,6 +54,7 @@ class File:
         self.handler = JFDataHandler(self.file["/general/detector_name"][()].decode())
 
         self._conversion = conversion
+        self._mask = mask
         self._gap_pixels = gap_pixels
         self._geometry = geometry
         self._parallel = parallel
@@ -116,6 +120,19 @@ class File:
             value = False
 
         self._conversion = value
+
+    @property
+    def mask(self):
+        """A flag for masking bad pixels"""
+        return self._mask
+
+    @mask.setter
+    def mask(self, value):
+        if self._processed:
+            print("The file is already processed, setting 'mask' to False")
+            value = False
+
+        self._mask = value
 
     @property
     def gap_pixels(self):
@@ -301,6 +318,7 @@ class File:
         data = self.handler.process(
             data,
             conversion=self.conversion,
+            mask=self.mask,
             gap_pixels=self.gap_pixels,
             geometry=self.geometry,
             parallel=self.parallel,

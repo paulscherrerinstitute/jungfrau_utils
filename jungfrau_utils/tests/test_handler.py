@@ -445,7 +445,7 @@ def test_handler_shaped_pixel_mask_mm_missing(handler, gap_pixels, geometry):
 
 
 def test_handler_get_gains(handler):
-    res = handler.get_gains(image_stack, gap_pixels=False, geometry=False)
+    res = handler.get_gains(image_stack, mask=False, gap_pixels=False, geometry=False)
 
     assert (res >= 0).all() and (res <= 3).all()
 
@@ -457,7 +457,7 @@ def test_handler_get_gains(handler):
 def test_handler_get_gains_fail(handler, dtype):
     bad_data = image_stack.astype(dtype)
     with pytest.raises(TypeError):
-        handler.get_gains(bad_data)
+        handler.get_gains(bad_data, mask=False, gap_pixels=False, geometry=False)
 
 
 def test_handler_get_saturated_value(handler):
