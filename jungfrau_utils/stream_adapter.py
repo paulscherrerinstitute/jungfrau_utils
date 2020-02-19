@@ -13,15 +13,18 @@ class StreamAdapter:
         self.handler = None
 
     def process(self, image, metadata):
-        # as a first step, try to set the detector_name
+        # as a first step, try to set the detector_name, skip if detector_name is empty
         detector_name = metadata.get("detector_name")
-        # check if jungfrau data handler is already set for this detector
-        if self.handler is None or self.handler.detector_name != detector_name:
-            try:
-                self.handler = JFDataHandler(detector_name)
-            except KeyError:
-                logging.exception(f"Error creating data handler for detector {detector_name}")
-                self.handler = None
+        if detector_name:
+            # check if jungfrau data handler is already set for this detector
+            if self.handler is None or self.handler.detector_name != detector_name:
+                try:
+                    self.handler = JFDataHandler(detector_name)
+                except KeyError:
+                    logging.exception(f"Error creating data handler for detector {detector_name}")
+                    self.handler = None
+        else:
+            self.handler = None
 
         # return a copy of input image if
         # 1) its data type differs from 'uint16' (probably, it is already been processed)
