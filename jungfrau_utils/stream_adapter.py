@@ -11,6 +11,19 @@ class StreamAdapter:
     def __init__(self):
         # a placeholder for jf data handler to be initiated with detector name
         self.handler = None
+        self._mask_double_pixels = None
+
+    @property
+    def mask_double_pixels(self):
+        """Current flag for masking double pixels"""
+        return self._mask_double_pixels
+
+    @mask_double_pixels.setter
+    def mask_double_pixels(self, value):
+        value = bool(value)
+        self._mask_double_pixels = value
+        if self.handler is not None:
+            self.handler.mask_double_pixels = value
 
     def process(self, image, metadata):
         # as a first step, try to set the detector_name, skip if detector_name is empty
@@ -20,6 +33,8 @@ class StreamAdapter:
             if self.handler is None or self.handler.detector_name != detector_name:
                 try:
                     self.handler = JFDataHandler(detector_name)
+                    if self.mask_double_pixels is not None:
+                        self.handler.mask_double_pixels = self.mask_double_pixels
                 except KeyError:
                     logging.exception(f"Error creating data handler for detector {detector_name}")
                     self.handler = None
