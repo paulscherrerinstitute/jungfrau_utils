@@ -348,7 +348,13 @@ class JFDataHandler:
             module_res[:] = module
 
         res = np.invert(
-            self.process(np.invert(res), conversion=False, gap_pixels=gap_pixels, geometry=geometry)
+            self.process(
+                np.invert(res),
+                conversion=False,
+                mask=False,
+                gap_pixels=gap_pixels,
+                geometry=geometry,
+            )
         )
 
         return res
