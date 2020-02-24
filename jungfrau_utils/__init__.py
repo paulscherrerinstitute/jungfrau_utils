@@ -6,4 +6,4 @@ from jungfrau_utils.file_adapter import File
 from jungfrau_utils.stream_adapter import StreamAdapter
 from jungfrau_utils.swissfel_helpers import locate_gain_file, locate_pedestal_file
 
-__version__ = "0.8.5"
+__version__ = "0.9.0"
