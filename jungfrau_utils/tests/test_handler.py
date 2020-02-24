@@ -196,7 +196,7 @@ def test_handler_process_single_image(handler):
     assert res.ndim == 2
     assert res.shape == DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY
 
-    # check data for submodules in all 4 corners
+    # check data for chips in all 4 corners
     assert np.allclose(res[:256, :256], converted_image_single_mask[:256, :256])
     assert np.allclose(res[:256, -256:], converted_image_single_mask[:256, -256:])
     assert np.allclose(res[-256:, :256], converted_image_single_mask[-256:, :256])
@@ -210,7 +210,7 @@ def test_handler_process_single_image_no_gaps(handler):
     assert res.ndim == 2
     assert res.shape == DATA_SHAPE_WITH_GEOMETRY
 
-    # check data for submodules in all 4 corners
+    # check data for chips in all 4 corners
     assert np.allclose(res[:256, :256], converted_image_single_mask[:256, :256])
     assert np.allclose(res[:256, -256:], converted_image_single_mask[:256, -256:])
     assert np.allclose(res[-256:, :256], converted_image_single_mask[-256:, :256])
@@ -224,7 +224,7 @@ def test_handler_process_single_image_no_geom(handler):
     assert res.ndim == 2
     assert res.shape == DATA_SHAPE_WITH_GAPS
 
-    # check data for submodules in all 4 corners
+    # check data for chips in all 4 corners
     assert np.allclose(res[:256, :256], converted_image_single_mask[:256, :256])
     assert np.allclose(res[:256, -256:], converted_image_single_mask[:256, -256:])
     assert np.allclose(res[-256:, :256], converted_image_single_mask[-256:, :256])
@@ -238,7 +238,7 @@ def test_handler_process_single_image_no_mask(handler):
     assert res.ndim == 2
     assert res.shape == DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY
 
-    # check data for submodules in all 4 corners
+    # check data for chips in all 4 corners
     assert np.allclose(res[:256, :256], converted_image_single[:256, :256])
     assert np.allclose(res[:256, -256:], converted_image_single[:256, -256:])
     assert np.allclose(res[-256:, :256], converted_image_single[-256:, :256])
@@ -272,7 +272,7 @@ def test_handler_process_image_stack(handler, stack_size):
     assert res.ndim == 3
     assert res.shape == (stack_size, *DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY)
 
-    # check data for submodules in all 4 corners
+    # check data for chips in all 4 corners
     assert np.allclose(res[:, :256, :256], converted_image_stack_mask[:stack_size, :256, :256])
     assert np.allclose(res[:, :256, -256:], converted_image_stack_mask[:stack_size, :256, -256:])
     assert np.allclose(res[:, -256:, :256], converted_image_stack_mask[:stack_size, -256:, :256])
@@ -330,7 +330,7 @@ def test_handler_process_mm_all(handler, conversion, mask, gap_pixels, geometry,
     elif not gap_pixels and not geometry:
         assert res.shape == DATA_SHAPE
 
-    # check data for submodules in all 4 corners
+    # check data for chips in all 4 corners
     if conversion:
         if mask:
             assert np.allclose(res[:256, :256], converted_image_single_mask[:256, :256])
@@ -374,7 +374,7 @@ def test_handler_process_mm_missing(handler, gap_pixels, geometry):
     elif not gap_pixels and not geometry:
         assert res.shape == MM_DATA_SHAPE
 
-    # check data for submodules in all 4 corners
+    # check data for chips in all 4 corners
     assert np.allclose(res[:256, :256], mm_expected_image_single[:256, :256])
     assert np.allclose(res[:256, -256:], mm_expected_image_single[:256, -256:])
 
@@ -406,7 +406,7 @@ def test_handler_shaped_pixel_mask(handler, gap_pixels, geometry, module_map):
     elif not gap_pixels and not geometry:
         assert res.shape == DATA_SHAPE
 
-    # check data for submodules in all 4 corners
+    # check data for chips in all 4 corners
     assert np.allclose(res[:256, :256], handler.pixel_mask[:256, :256])
     assert np.allclose(res[:256, -256:], handler.pixel_mask[:256, -256:])
     assert np.allclose(res[-256:, :256], handler.pixel_mask[-256:, :256])
@@ -432,7 +432,7 @@ def test_handler_shaped_pixel_mask_mm_missing(handler, gap_pixels, geometry):
     elif not gap_pixels and not geometry:
         assert res.shape == MM_DATA_SHAPE
 
-    # check data for submodules in all 4 corners
+    # check data for chips in all 4 corners
     assert np.allclose(res[:256, :256], mm_pixel_mask[:256, :256])
     assert np.allclose(res[:256, -256:], mm_pixel_mask[:256, -256:])
 

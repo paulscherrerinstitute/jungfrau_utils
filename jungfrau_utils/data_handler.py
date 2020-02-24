@@ -411,7 +411,7 @@ class JFDataHandler:
                 Defaults to True.
             mask (bool, optional): perform masking of bad pixels (set those values to 0).
                 Defaults to True.
-            gap_pixels (bool, optional): add gap pixels between detector submodules.
+            gap_pixels (bool, optional): add gap pixels between detector chips.
                 Defaults to True.
             geometry (bool, optional): apply detector geometry corrections. Defaults to True.
             parallel (bool, optional): parallelize image stack processing. Defaults to False.
@@ -487,22 +487,22 @@ class JFDataHandler:
                         sread = (slice(ry_s, ry_s + CHIP_SIZE_Y), slice(rx_s, rx_s + CHIP_SIZE_X))
                         swrite = (slice(wy_s, wy_s + CHIP_SIZE_Y), slice(wx_s, wx_s + CHIP_SIZE_X))
 
-                        submod = module[(slice(None), *sread)]
-                        submod_res = res[(slice(None), *swrite)]
+                        chip = module[(slice(None), *sread)]
+                        chip_res = res[(slice(None), *swrite)]
 
                         if module_mask is None:
-                            submod_mask = None
+                            chip_mask = None
                         else:
-                            submod_mask = module_mask[sread]
+                            chip_mask = module_mask[sread]
 
                         if conversion:
-                            submod_g = module_g[(slice(None), *sread)]
-                            submod_p = module_p[(slice(None), *sread)]
-                            proc_func(submod_res, submod, submod_g, submod_p, submod_mask)
+                            chip_g = module_g[(slice(None), *sread)]
+                            chip_p = module_p[(slice(None), *sread)]
+                            proc_func(chip_res, chip, chip_g, chip_p, chip_mask)
                         else:
-                            submod_res[:] = submod
-                            if submod_mask is not None:
-                                submod_res[:, submod_mask] = 0
+                            chip_res[:] = chip
+                            if chip_mask is not None:
+                                chip_res[:, chip_mask] = 0
 
             else:
                 module_res = res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X]

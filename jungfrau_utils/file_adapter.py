@@ -43,7 +43,7 @@ class File:
                 Defaults to True.
             mask (bool, optional): Perform masking of bad pixels (assign them to 0).
                 Defaults to True.
-            gap_pixels (bool, optional): Add gap pixels between detector submodules.
+            gap_pixels (bool, optional): Add gap pixels between detector chips.
                 Defaults to True.
             geometry (bool, optional): Apply geometry correction. Defaults to True.
             parallel (bool, optional): Use parallelized processing. Defaults to True.
