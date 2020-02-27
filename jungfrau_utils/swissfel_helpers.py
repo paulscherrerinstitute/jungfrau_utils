@@ -15,7 +15,7 @@ def locate_gain_file(file_path, verbose=True):
         verbose (bool, optional): Print info about located gain file.
 
     Returns:
-        Path: A path to the located gain file.
+        str: A path to the located gain file.
     """
     file_path = Path(file_path)
     if file_path.parts[1] != "sf":
@@ -32,7 +32,7 @@ def locate_gain_file(file_path, verbose=True):
     if verbose:
         print(f"Auto-located gain file: {gain_file}")
 
-    return gain_file
+    return gain_file.as_posix()
 
 
 def locate_pedestal_file(file_path, verbose=True):
@@ -46,7 +46,7 @@ def locate_pedestal_file(file_path, verbose=True):
         verbose (bool, optional): Print info about located pedestal file.
 
     Returns:
-        Path: A path to the located pedestal file.
+        str: A path to the located pedestal file.
     """
     file_path = Path(file_path)
     if file_path.parts[1] != "sf":
@@ -82,7 +82,7 @@ def locate_pedestal_file(file_path, verbose=True):
             tdelta_str = str(timedelta(seconds=mtime_diff))
         print("    mtime difference: " + tdelta_str)
 
-    return closest_pedestal_file
+    return closest_pedestal_file.as_posix()
 
 
 def _read_detector_name(file_path):

@@ -60,20 +60,16 @@ class File:
         self._parallel = parallel
 
         # Gain file
-        if gain_file:
-            gain_file = Path(gain_file)
-        else:
+        if not gain_file:
             gain_file = locate_gain_file(file_path)
 
-        self.handler.gain_file = gain_file.as_posix()
+        self.handler.gain_file = gain_file
 
         # Pedestal file (with a pixel mask)
-        if pedestal_file:
-            pedestal_file = Path(pedestal_file)
-        else:
+        if not pedestal_file:
             pedestal_file = locate_pedestal_file(file_path)
 
-        self.handler.pedestal_file = pedestal_file.as_posix()
+        self.handler.pedestal_file = pedestal_file
 
         if "module_map" in self.file[f"/data/{self.detector_name}"]:
             # Pick only the first row (module_map of the first frame), because it is not expected

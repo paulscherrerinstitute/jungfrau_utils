@@ -36,13 +36,13 @@ class EscapeAdapter:
 
         # Gain file
         if not gain_file:
-            gain_file = locate_gain_file(file_path).as_posix()
+            gain_file = locate_gain_file(file_path)
 
         self.handler.gain_file = gain_file
 
         # Pedestal file (with a pixel mask)
         if not pedestal_file:
-            pedestal_file = locate_pedestal_file(file_path).as_posix()
+            pedestal_file = locate_pedestal_file(file_path)
 
         self.handler.pedestal_file = pedestal_file
 
