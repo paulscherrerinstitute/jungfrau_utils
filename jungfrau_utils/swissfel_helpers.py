@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import timedelta, datetime
 from pathlib import Path
 
 import h5py
@@ -65,6 +65,7 @@ def locate_pedestal_file(file_path, verbose=True):
             time_diff = jf_file_mtime - entry.stat().st_mtime
             if abs(time_diff) < abs(min_mtime_diff):
                 min_mtime_diff = time_diff
+                pedestal_mtime = entry.stat().st_mtime
                 closest_pedestal_file = entry
 
     if not closest_pedestal_file:
@@ -80,6 +81,9 @@ def locate_pedestal_file(file_path, verbose=True):
             tdelta_str = "-" + str(timedelta(seconds=-mtime_diff))
         else:
             tdelta_str = str(timedelta(seconds=mtime_diff))
+
+        print(f"jungfrau file: {datetime.fromtimestamp(jf_file_mtime).strftime('%H:%M %d.%m.%Y')}")
+        print(f"pedestal file: {datetime.fromtimestamp(pedestal_mtime).strftime('%H:%M %d.%m.%Y')}")
         print("    mtime difference: " + tdelta_str)
 
     return closest_pedestal_file.as_posix()
