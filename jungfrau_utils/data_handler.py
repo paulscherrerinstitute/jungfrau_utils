@@ -718,8 +718,6 @@ def _reshape_stripsel(res, image):
                 # so they see 2x the signal)
                 # res[ind, yout, xout] = res[ind, yout, xout] / 2
 
-    return res
-
 
 @jit(nopython=True, cache=True, parallel=True)
 def _reshape_stripsel_parallel(res, image):
@@ -754,5 +752,3 @@ def _reshape_stripsel_parallel(res, image):
                 # if we want a proper normalization (the area of those pixels is double,
                 # so they see 2x the signal)
                 # res[ind, yout, xout] = res[ind, yout, xout] / 2
-
-    return res
