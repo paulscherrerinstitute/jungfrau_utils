@@ -474,40 +474,8 @@ class JFDataHandler:
                 module_g = None
                 module_p = None
 
-            if gap_pixels:
-                for j in range(CHIP_NUM_Y):
-                    for k in range(CHIP_NUM_X):
-                        # reading positions
-                        ry_s = j * CHIP_SIZE_Y
-                        rx_s = k * CHIP_SIZE_X
-
-                        # writing positions
-                        wy_s = oy + ry_s + j * CHIP_GAP_Y
-                        wx_s = ox + rx_s + k * CHIP_GAP_X
-
-                        sread = (slice(ry_s, ry_s + CHIP_SIZE_Y), slice(rx_s, rx_s + CHIP_SIZE_X))
-                        swrite = (slice(wy_s, wy_s + CHIP_SIZE_Y), slice(wx_s, wx_s + CHIP_SIZE_X))
-
-                        chip = module[(slice(None), *sread)]
-                        chip_res = res[(slice(None), *swrite)]
-
-                        if module_mask is None:
-                            chip_mask = None
-                        else:
-                            chip_mask = module_mask[sread]
-
-                        if conversion:
-                            chip_g = module_g[(slice(None), *sread)]
-                            chip_p = module_p[(slice(None), *sread)]
-                        else:
-                            chip_g = None
-                            chip_p = None
-
-                        proc_func(chip_res, chip, chip_g, chip_p, chip_mask)
-
-            else:
-                module_res = res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X]
-                proc_func(module_res, module, module_g, module_p, module_mask)
+            module_res = res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X]
+            proc_func(module_res, module, module_g, module_p, module_mask, gap_pixels)
 
     def _process_stripsel(self, res, image_stack, conversion, mask, geometry, parallel):
         if geometry:
@@ -539,7 +507,7 @@ class JFDataHandler:
                 module_p = None
 
             module_res = np.empty(shape=module.shape, dtype=np.float32)
-            proc_func(module_res, module, module_g, module_p, module_mask)
+            proc_func(module_res, module, module_g, module_p, module_mask, False)
             module = module_res
 
             if geometry:
@@ -625,71 +593,83 @@ class JFDataHandler:
 
 
 @jit(nopython=True, cache=True)
-def _correct(res, image, gain, pedestal, mask):
+def _correct(res, image, gain, pedestal, mask, gap_pixels):
     num, size_y, size_x = image.shape
     for i1 in range(num):
         for i2 in range(size_y):
             for i3 in range(size_x):
+                ri2 = i2 + i2 // CHIP_SIZE_Y * CHIP_GAP_Y * gap_pixels
+                ri3 = i3 + i3 // CHIP_SIZE_X * CHIP_GAP_X * gap_pixels
+
                 if mask is not None and mask[i2, i3]:
-                    res[i1, i2, i3] = 0
+                    res[i1, ri2, ri3] = 0
                 else:
                     if gain is None or pedestal is None:
-                        res[i1, i2, i3] = image[i1, i2, i3]
+                        res[i1, ri2, ri3] = image[i1, i2, i3]
                     else:
                         gm = image[i1, i2, i3] >> 14
                         val = image[i1, i2, i3] & 0x3FFF
-                        res[i1, i2, i3] = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
+                        res[i1, ri2, ri3] = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
 
 
 @jit(nopython=True, cache=True)
-def _correct_highgain(res, image, gain, pedestal, mask):
+def _correct_highgain(res, image, gain, pedestal, mask, gap_pixels):
     num, size_y, size_x = image.shape
     for i1 in range(num):
         for i2 in range(size_y):
             for i3 in range(size_x):
+                ri2 = i2 + i2 // CHIP_SIZE_Y * CHIP_GAP_Y * gap_pixels
+                ri3 = i3 + i3 // CHIP_SIZE_X * CHIP_GAP_X * gap_pixels
+
                 if mask is not None and mask[i2, i3]:
-                    res[i1, i2, i3] = 0
+                    res[i1, ri2, ri3] = 0
                 else:
                     if gain is None or pedestal is None:
-                        res[i1, i2, i3] = image[i1, i2, i3]
+                        res[i1, ri2, ri3] = image[i1, i2, i3]
                     else:
                         val = image[i1, i2, i3] & 0x3FFF
-                        res[i1, i2, i3] = (val - pedestal[0, i2, i3]) * gain[0, i2, i3]
+                        res[i1, ri2, ri3] = (val - pedestal[0, i2, i3]) * gain[0, i2, i3]
 
 
 @jit(nopython=True, cache=True, parallel=True)
-def _correct_parallel(res, image, gain, pedestal, mask):
+def _correct_parallel(res, image, gain, pedestal, mask, gap_pixels):
     num, size_y, size_x = image.shape
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
     for i1 in prange(num):  # pylint: disable=not-an-iterable
         for i2 in range(size_y):
             for i3 in range(size_x):
+                ri2 = i2 + i2 // CHIP_SIZE_Y * CHIP_GAP_Y * gap_pixels
+                ri3 = i3 + i3 // CHIP_SIZE_X * CHIP_GAP_X * gap_pixels
+
                 if mask is not None and mask[i2, i3]:
-                    res[i1, i2, i3] = 0
+                    res[i1, ri2, ri3] = 0
                 else:
                     if gain is None or pedestal is None:
-                        res[i1, i2, i3] = image[i1, i2, i3]
+                        res[i1, ri2, ri3] = image[i1, i2, i3]
                     else:
                         gm = image[i1, i2, i3] >> 14
                         val = image[i1, i2, i3] & 0x3FFF
-                        res[i1, i2, i3] = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
+                        res[i1, ri2, ri3] = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
 
 
 @jit(nopython=True, cache=True, parallel=True)
-def _correct_highgain_parallel(res, image, gain, pedestal, mask):
+def _correct_highgain_parallel(res, image, gain, pedestal, mask, gap_pixels):
     num, size_y, size_x = image.shape
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
     for i1 in prange(num):  # pylint: disable=not-an-iterable
         for i2 in range(size_y):
             for i3 in range(size_x):
+                ri2 = i2 + i2 // CHIP_SIZE_Y * CHIP_GAP_Y * gap_pixels
+                ri3 = i3 + i3 // CHIP_SIZE_X * CHIP_GAP_X * gap_pixels
+
                 if mask is not None and mask[i2, i3]:
-                    res[i1, i2, i3] = 0
+                    res[i1, ri2, ri3] = 0
                 else:
                     if gain is None or pedestal is None:
-                        res[i1, i2, i3] = image[i1, i2, i3]
+                        res[i1, ri2, ri3] = image[i1, i2, i3]
                     else:
                         val = image[i1, i2, i3] & 0x3FFF
-                        res[i1, i2, i3] = (val - pedestal[0, i2, i3]) * gain[0, i2, i3]
+                        res[i1, ri2, ri3] = (val - pedestal[0, i2, i3]) * gain[0, i2, i3]
 
 
 @jit(nopython=True, cache=True)
