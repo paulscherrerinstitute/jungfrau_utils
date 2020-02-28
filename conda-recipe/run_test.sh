@@ -1,1 +1,1 @@
-$PYTHON -m unittest 
+pytest

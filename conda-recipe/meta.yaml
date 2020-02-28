@@ -18,6 +18,12 @@ requirements:
         - numba
         - conda-forge::bitshuffle
 
+test:
+    source_files:
+        - jungfrau_utils/tests
+    requires:
+        - pytest
+
 build:
   number: 0
   entry_points:
