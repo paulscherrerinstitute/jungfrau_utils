@@ -453,8 +453,7 @@ class JFDataHandler:
             self._process_stripsel(res, image_stack, conversion, mask, geometry, parallel)
             return
 
-        if conversion:
-            proc_func = self._proc_func(parallel=parallel)
+        proc_func = self._proc_func(parallel=parallel)
 
         for i, m in enumerate(self.module_map):
             if m == -1:
@@ -471,6 +470,9 @@ class JFDataHandler:
             if conversion:
                 module_g = self._get_module_slice(self._g, i, geometry)
                 module_p = self._get_module_slice(self._p, i, geometry)
+            else:
+                module_g = None
+                module_p = None
 
             if gap_pixels:
                 for j in range(CHIP_NUM_Y):
@@ -497,20 +499,15 @@ class JFDataHandler:
                         if conversion:
                             chip_g = module_g[(slice(None), *sread)]
                             chip_p = module_p[(slice(None), *sread)]
-                            proc_func(chip_res, chip, chip_g, chip_p, chip_mask)
                         else:
-                            chip_res[:] = chip
-                            if chip_mask is not None:
-                                chip_res[:, chip_mask] = 0
+                            chip_g = None
+                            chip_p = None
+
+                        proc_func(chip_res, chip, chip_g, chip_p, chip_mask)
 
             else:
                 module_res = res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X]
-                if conversion:
-                    proc_func(module_res, module, module_g, module_p, module_mask)
-                else:
-                    module_res[:] = module
-                    if module_mask is not None:
-                        module_res[:, module_mask] = 0
+                proc_func(module_res, module, module_g, module_p, module_mask)
 
     def _process_stripsel(self, res, image_stack, conversion, mask, geometry, parallel):
         if geometry:
@@ -519,8 +516,7 @@ class JFDataHandler:
             else:
                 reshape_stripsel = _reshape_stripsel_parallel
 
-        if conversion:
-            proc_func = self._proc_func(parallel=parallel)
+        proc_func = self._proc_func(parallel=parallel)
 
         for i, m in enumerate(self.module_map):
             if m == -1:
@@ -538,14 +534,13 @@ class JFDataHandler:
             if conversion:
                 module_g = self._get_module_slice(self._g, i, geometry)
                 module_p = self._get_module_slice(self._p, i, geometry)
-
-                module_res = np.empty(shape=module.shape, dtype=np.float32)
-                proc_func(module_res, module, module_g, module_p, module_mask)
-                module = module_res
             else:
-                if module_mask is not None:
-                    module = module.copy()
-                    module[:, module_mask] = 0
+                module_g = None
+                module_p = None
+
+            module_res = np.empty(shape=module.shape, dtype=np.float32)
+            proc_func(module_res, module, module_g, module_p, module_mask)
+            module = module_res
 
             if geometry:
                 module_res = res[
@@ -638,9 +633,12 @@ def _correct(res, image, gain, pedestal, mask):
                 if mask is not None and mask[i2, i3]:
                     res[i1, i2, i3] = 0
                 else:
-                    gm = image[i1, i2, i3] >> 14
-                    val = image[i1, i2, i3] & 0x3FFF
-                    res[i1, i2, i3] = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
+                    if gain is None or pedestal is None:
+                        res[i1, i2, i3] = image[i1, i2, i3]
+                    else:
+                        gm = image[i1, i2, i3] >> 14
+                        val = image[i1, i2, i3] & 0x3FFF
+                        res[i1, i2, i3] = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
 
 
 @jit(nopython=True, cache=True)
@@ -652,8 +650,11 @@ def _correct_highgain(res, image, gain, pedestal, mask):
                 if mask is not None and mask[i2, i3]:
                     res[i1, i2, i3] = 0
                 else:
-                    val = image[i1, i2, i3] & 0x3FFF
-                    res[i1, i2, i3] = (val - pedestal[0, i2, i3]) * gain[0, i2, i3]
+                    if gain is None or pedestal is None:
+                        res[i1, i2, i3] = image[i1, i2, i3]
+                    else:
+                        val = image[i1, i2, i3] & 0x3FFF
+                        res[i1, i2, i3] = (val - pedestal[0, i2, i3]) * gain[0, i2, i3]
 
 
 @jit(nopython=True, cache=True, parallel=True)
@@ -666,9 +667,12 @@ def _correct_parallel(res, image, gain, pedestal, mask):
                 if mask is not None and mask[i2, i3]:
                     res[i1, i2, i3] = 0
                 else:
-                    gm = image[i1, i2, i3] >> 14
-                    val = image[i1, i2, i3] & 0x3FFF
-                    res[i1, i2, i3] = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
+                    if gain is None or pedestal is None:
+                        res[i1, i2, i3] = image[i1, i2, i3]
+                    else:
+                        gm = image[i1, i2, i3] >> 14
+                        val = image[i1, i2, i3] & 0x3FFF
+                        res[i1, i2, i3] = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
 
 
 @jit(nopython=True, cache=True, parallel=True)
@@ -681,8 +685,11 @@ def _correct_highgain_parallel(res, image, gain, pedestal, mask):
                 if mask is not None and mask[i2, i3]:
                     res[i1, i2, i3] = 0
                 else:
-                    val = image[i1, i2, i3] & 0x3FFF
-                    res[i1, i2, i3] = (val - pedestal[0, i2, i3]) * gain[0, i2, i3]
+                    if gain is None or pedestal is None:
+                        res[i1, i2, i3] = image[i1, i2, i3]
+                    else:
+                        val = image[i1, i2, i3] & 0x3FFF
+                        res[i1, i2, i3] = (val - pedestal[0, i2, i3]) * gain[0, i2, i3]
 
 
 @jit(nopython=True, cache=True)
