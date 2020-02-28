@@ -280,30 +280,6 @@ def test_handler_process_image_stack(handler, stack_size):
 
 
 @pytest.mark.parametrize("conversion", [True, False])
-@pytest.mark.parametrize("gap_pixels", [True, False])
-@pytest.mark.parametrize("geometry", [True, False])
-def test_handler_process(handler, conversion, gap_pixels, geometry):
-    res = handler.process(
-        image_single, conversion=conversion, gap_pixels=gap_pixels, geometry=geometry
-    )
-
-    assert res.ndim == 2
-    if conversion:
-        assert res.dtype == np.float32
-    else:
-        assert res.dtype == np.uint16
-
-    if gap_pixels and geometry:
-        assert res.shape == DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY
-    elif not gap_pixels and geometry:
-        assert res.shape == DATA_SHAPE_WITH_GEOMETRY
-    elif gap_pixels and not geometry:
-        assert res.shape == DATA_SHAPE_WITH_GAPS
-    elif not gap_pixels and not geometry:
-        assert res.shape == DATA_SHAPE
-
-
-@pytest.mark.parametrize("conversion", [True, False])
 @pytest.mark.parametrize("mask", [True, False])
 @pytest.mark.parametrize("gap_pixels", [True, False])
 @pytest.mark.parametrize("geometry", [True, False])
