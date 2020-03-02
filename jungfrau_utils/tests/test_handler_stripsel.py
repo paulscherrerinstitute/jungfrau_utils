@@ -166,7 +166,8 @@ def test_handler_can_convert(empty_handler):
 
 
 def test_handler_process_single_image(handler):
-    res = handler.process(image_single)
+    with pytest.warns(RuntimeWarning):
+        res = handler.process(image_single)
 
     assert res.dtype == np.float32
     assert res.ndim == 2
@@ -182,7 +183,8 @@ def test_handler_process_single_image_no_gaps(handler):
 
 
 def test_handler_process_single_image_no_geom(handler):
-    res = handler.process(image_single, geometry=False)
+    with pytest.warns(RuntimeWarning):
+        res = handler.process(image_single, geometry=False)
 
     assert res.dtype == np.float32
     assert res.ndim == 2
@@ -190,7 +192,8 @@ def test_handler_process_single_image_no_geom(handler):
 
 
 def test_handler_process_single_image_no_mask(handler):
-    res = handler.process(image_single, mask=False)
+    with pytest.warns(RuntimeWarning):
+        res = handler.process(image_single, mask=False)
 
     assert res.dtype == np.float32
     assert res.ndim == 2
@@ -208,7 +211,8 @@ def test_handler_process_no_gaps_no_geom(handler):
 
 def test_handler_process_empty_image_stack(handler):
     stack = image_stack[:0]
-    res = handler.process(stack)
+    with pytest.warns(RuntimeWarning):
+        res = handler.process(stack)
 
     assert res.dtype == np.float32
     assert res.ndim == 3
@@ -218,7 +222,9 @@ def test_handler_process_empty_image_stack(handler):
 @pytest.mark.parametrize("stack_size", [1, 5])
 def test_handler_process_image_stack(handler, stack_size):
     stack = image_stack[:stack_size]
-    res = handler.process(stack)
+
+    with pytest.warns(RuntimeWarning):
+        res = handler.process(stack)
 
     assert res.dtype == np.float32
     assert res.ndim == 3
@@ -230,9 +236,19 @@ def test_handler_process_image_stack(handler, stack_size):
 @pytest.mark.parametrize("gap_pixels", [True, False])
 @pytest.mark.parametrize("geometry", [True, False])
 def test_handler_process(handler, conversion, mask, gap_pixels, geometry):
-    res = handler.process(
-        image_single, conversion=conversion, mask=mask, gap_pixels=gap_pixels, geometry=geometry
-    )
+    if gap_pixels:
+        with pytest.warns(RuntimeWarning):
+            res = handler.process(
+                image_single,
+                conversion=conversion,
+                mask=mask,
+                gap_pixels=gap_pixels,
+                geometry=geometry,
+            )
+    else:
+        res = handler.process(
+            image_single, conversion=conversion, mask=mask, gap_pixels=gap_pixels, geometry=geometry
+        )
 
     assert res.ndim == 2
     if conversion:
@@ -253,7 +269,11 @@ def test_handler_process(handler, conversion, mask, gap_pixels, geometry):
 @pytest.mark.parametrize("gap_pixels", [True, False])
 @pytest.mark.parametrize("geometry", [True, False])
 def test_handler_shaped_pixel_mask(handler, gap_pixels, geometry):
-    res = handler.get_pixel_mask(gap_pixels=gap_pixels, geometry=geometry)
+    if gap_pixels:
+        with pytest.warns(RuntimeWarning):
+            res = handler.get_pixel_mask(gap_pixels=gap_pixels, geometry=geometry)
+    else:
+        res = handler.get_pixel_mask(gap_pixels=gap_pixels, geometry=geometry)
 
     assert res.ndim == 2
     assert res.dtype == np.bool

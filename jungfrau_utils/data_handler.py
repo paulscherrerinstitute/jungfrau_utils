@@ -1,4 +1,5 @@
 import re
+import warnings
 from collections import namedtuple
 from functools import wraps
 
@@ -7,7 +8,6 @@ import numpy as np
 from numba import jit, prange
 
 from .geometry import modules_orig
-
 
 CHIP_SIZE_X = 256
 CHIP_SIZE_Y = 256
@@ -431,6 +431,10 @@ class JFDataHandler:
         if conversion and not self.can_convert():
             raise RuntimeError("Gain and/or pedestal values are not set.")
 
+        if self.is_stripsel() and gap_pixels:
+            warnings.warn("'gap_pixels' flag has no effect on stripsel detectors", RuntimeWarning)
+            gap_pixels = False
+
         res_dtype = np.float32 if conversion else images.dtype
         res_shape = self.get_shape_out(gap_pixels=gap_pixels, geometry=geometry)
         res = np.zeros((images.shape[0], *res_shape), dtype=res_dtype)
@@ -449,7 +453,6 @@ class JFDataHandler:
 
     def _process(self, res, image_stack, conversion, mask, gap_pixels, geometry, parallel):
         if self.is_stripsel():
-            # gap_pixels has no effect on stripsel detectors
             self._process_stripsel(res, image_stack, conversion, mask, geometry, parallel)
             return
 
