@@ -23,8 +23,8 @@ CHIP_GAP_Y = 2
 
 # 256 not divisible by 3, so we round up to 86
 # 18 since we have 6 more pixels in H per gap
-STRIPSEL_MODULE_SIZE_X = 1024 * 3 + 18  # = 3090
-STRIPSEL_MODULE_SIZE_Y = 86
+STRIPSEL_SIZE_X = 1024 * 3 + 18  # = 3090
+STRIPSEL_SIZE_Y = 86
 
 
 def _allow_2darray(func):
@@ -116,8 +116,8 @@ class JFDataHandler:
     def _get_stripsel_shape_out(self, geometry):
         if geometry:
             modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
-            shape_x = max(modules_orig_x) + STRIPSEL_MODULE_SIZE_X
-            shape_y = max(modules_orig_y) + STRIPSEL_MODULE_SIZE_Y
+            shape_x = max(modules_orig_x) + STRIPSEL_SIZE_X
+            shape_y = max(modules_orig_y) + STRIPSEL_SIZE_Y
         else:
             shape_y, shape_x = self._shape_in
 
@@ -462,9 +462,9 @@ class JFDataHandler:
         """Whether all data for gain/pedestal conversion is present"""
         return (self.gain is not None) and (self.pedestal is not None)
 
-    def _process(self, res, image_stack, conversion, mask, gap_pixels, geometry, parallel):
+    def _process(self, res, images, conversion, mask, gap_pixels, geometry, parallel):
         if self.is_stripsel() and geometry:
-            module_conv_shape = (image_stack.shape[0], *self._get_shape_n_modules(1))
+            module_conv_shape = (images.shape[0], *self._get_shape_n_modules(1))
             module_conv = np.empty(shape=module_conv_shape, dtype=np.float32)
             reshape_stripsel = self._reshape_stripsel(parallel=parallel)
 
@@ -475,19 +475,15 @@ class JFDataHandler:
                 continue
 
             oy, ox = self._get_final_module_coordinates(m, i, geometry, gap_pixels)
-            module = self._get_module_slice(image_stack, m, geometry)
+            module = self._get_module_slice(images, m, geometry)
             module_mask = self._get_module_slice(self._mask, i, geometry) if mask else None
             module_g = self._get_module_slice(self._g, i, geometry) if conversion else None
             module_p = self._get_module_slice(self._p, i, geometry) if conversion else None
 
             if self.is_stripsel() and geometry:
                 proc_func(module_conv, module, module_g, module_p, module_mask, gap_pixels)
-
-                module_res = res[
-                    :, oy : oy + STRIPSEL_MODULE_SIZE_Y, ox : ox + STRIPSEL_MODULE_SIZE_X
-                ]
+                module_res = res[:, oy : oy + STRIPSEL_SIZE_Y, ox : ox + STRIPSEL_SIZE_X]
                 reshape_stripsel(module_res, module_conv)
-
             else:
                 module_res = res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X]
                 proc_func(module_res, module, module_g, module_p, module_mask, gap_pixels)
