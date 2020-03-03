@@ -452,12 +452,14 @@ class JFDataHandler:
         return (self.gain is not None) and (self.pedestal is not None)
 
     def _process(self, res, image_stack, conversion, mask, gap_pixels, geometry, parallel):
-        if self.is_stripsel():
-            if geometry:
-                if not parallel:
-                    reshape_stripsel = _reshape_stripsel
-                else:
-                    reshape_stripsel = _reshape_stripsel_parallel
+        if self.is_stripsel() and geometry:
+            module_conv_shape = (image_stack.shape[0], *self._get_shape_n_modules(1))
+            module_conv = np.empty(shape=module_conv_shape, dtype=np.float32)
+
+            if not parallel:
+                reshape_stripsel = _reshape_stripsel
+            else:
+                reshape_stripsel = _reshape_stripsel_parallel
 
         proc_func = self._proc_func(parallel=parallel)
 
@@ -480,18 +482,14 @@ class JFDataHandler:
                 module_g = None
                 module_p = None
 
-            if self.is_stripsel():
-                module_res = np.empty(shape=module.shape, dtype=np.float32)
-                proc_func(module_res, module, module_g, module_p, module_mask, gap_pixels)
-                module = module_res
+            if self.is_stripsel() and geometry:
+                proc_func(module_conv, module, module_g, module_p, module_mask, gap_pixels)
 
-                if geometry:
-                    module_res = res[
-                        :, oy : oy + STRIPSEL_MODULE_SIZE_Y, ox : ox + STRIPSEL_MODULE_SIZE_X
-                    ]
-                    reshape_stripsel(module_res, module)
-                else:
-                    res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X] = module
+                module_res = res[
+                    :, oy : oy + STRIPSEL_MODULE_SIZE_Y, ox : ox + STRIPSEL_MODULE_SIZE_X
+                ]
+                reshape_stripsel(module_res, module_conv)
+
             else:
                 module_res = res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X]
                 proc_func(module_res, module, module_g, module_p, module_mask, gap_pixels)
