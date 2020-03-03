@@ -314,11 +314,11 @@ class JFDataHandler:
                 f"Expected pixel_mask shape {pm_shape}, provided pixel_mask shape {value.shape}."
             )
 
-        self._pixel_mask = value.astype(np.bool, copy=False)
+        self._pixel_mask = value
 
-        self._mask_all[False] = self._pixel_mask
+        mask = value.astype(np.bool, copy=True)
 
-        mask = self._pixel_mask.copy()
+        self._mask_all[False] = mask.copy()
 
         for m in range(self.detector.n_modules):
             module_mask = self._get_module_slice(mask, m)
