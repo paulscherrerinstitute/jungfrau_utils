@@ -5,7 +5,7 @@ from functools import wraps
 
 import h5py
 import numpy as np
-from numba import jit, prange
+from numba import njit, prange
 
 from .geometry import modules_orig
 
@@ -566,7 +566,7 @@ class JFDataHandler:
         return saturated_value
 
 
-@jit(nopython=True, cache=True)
+@njit(cache=True)
 def _correct(res, image, gain, pedestal, mask, gap_pixels):
     num, size_y, size_x = image.shape
     for i1 in range(num):
@@ -586,7 +586,7 @@ def _correct(res, image, gain, pedestal, mask, gap_pixels):
                         res[i1, ri2, ri3] = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
 
 
-@jit(nopython=True, cache=True)
+@njit(cache=True)
 def _correct_highgain(res, image, gain, pedestal, mask, gap_pixels):
     num, size_y, size_x = image.shape
     for i1 in range(num):
@@ -605,7 +605,7 @@ def _correct_highgain(res, image, gain, pedestal, mask, gap_pixels):
                         res[i1, ri2, ri3] = (val - pedestal[0, i2, i3]) * gain[0, i2, i3]
 
 
-@jit(nopython=True, cache=True, parallel=True)
+@njit(cache=True, parallel=True)
 def _correct_parallel(res, image, gain, pedestal, mask, gap_pixels):
     num, size_y, size_x = image.shape
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
@@ -626,7 +626,7 @@ def _correct_parallel(res, image, gain, pedestal, mask, gap_pixels):
                         res[i1, ri2, ri3] = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
 
 
-@jit(nopython=True, cache=True, parallel=True)
+@njit(cache=True, parallel=True)
 def _correct_highgain_parallel(res, image, gain, pedestal, mask, gap_pixels):
     num, size_y, size_x = image.shape
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
@@ -646,7 +646,7 @@ def _correct_highgain_parallel(res, image, gain, pedestal, mask, gap_pixels):
                         res[i1, ri2, ri3] = (val - pedestal[0, i2, i3]) * gain[0, i2, i3]
 
 
-@jit(nopython=True, cache=True)
+@njit(cache=True)
 def _reshape_stripsel(res, image):
     num = image.shape[0]
     for ind in range(num):
@@ -680,7 +680,7 @@ def _reshape_stripsel(res, image):
                 # res[ind, yout, xout] = res[ind, yout, xout] / 2
 
 
-@jit(nopython=True, cache=True, parallel=True)
+@njit(cache=True, parallel=True)
 def _reshape_stripsel_parallel(res, image):
     num = image.shape[0]
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
