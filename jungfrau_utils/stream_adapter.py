@@ -53,7 +53,10 @@ class StreamAdapter:
         # skip conversion step if jungfrau data handler cannot do it, thus avoiding Exception raise
         conversion = self.handler.can_convert()
 
-        return self.handler.process(image, conversion=conversion)
+        # skip masking step if pixel_mask is None
+        mask = self.handler.pixel_mask is not None
+
+        return self.handler.process(image, conversion=conversion, mask=mask)
 
     def _update_handler(self, md_dict):
         # gain file

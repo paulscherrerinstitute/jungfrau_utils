@@ -431,6 +431,9 @@ class JFDataHandler:
         if conversion and not self.can_convert():
             raise RuntimeError("Gain and/or pedestal values are not set.")
 
+        if mask and self._mask is None:
+            raise RuntimeError("Pixel mask values are not set.")
+
         if self.is_stripsel() and gap_pixels:
             warnings.warn("'gap_pixels' flag has no effect on stripsel detectors", RuntimeWarning)
             gap_pixels = False
@@ -470,10 +473,10 @@ class JFDataHandler:
             oy, ox = self._get_final_module_coordinates(m, i, geometry, gap_pixels)
             module = self._get_module_slice(image_stack, m, geometry)
 
-            if not mask or self._mask is None:
-                module_mask = None
-            else:
+            if mask:
                 module_mask = self._get_module_slice(self._mask, i, geometry)
+            else:
+                module_mask = None
 
             if conversion:
                 module_g = self._get_module_slice(self._g, i, geometry)
