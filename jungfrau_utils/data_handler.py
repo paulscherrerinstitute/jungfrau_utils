@@ -292,6 +292,14 @@ class JFDataHandler:
 
         return proc_func
 
+    def _reshape_stripsel(self, parallel):
+        if not parallel:
+            reshape_stripsel = _reshape_stripsel
+        else:
+            reshape_stripsel = _reshape_stripsel_parallel
+
+        return reshape_stripsel
+
     @property
     def pixel_mask(self):
         """Current pixel mask"""
@@ -458,11 +466,7 @@ class JFDataHandler:
         if self.is_stripsel() and geometry:
             module_conv_shape = (image_stack.shape[0], *self._get_shape_n_modules(1))
             module_conv = np.empty(shape=module_conv_shape, dtype=np.float32)
-
-            if not parallel:
-                reshape_stripsel = _reshape_stripsel
-            else:
-                reshape_stripsel = _reshape_stripsel_parallel
+            reshape_stripsel = self._reshape_stripsel(parallel=parallel)
 
         proc_func = self._proc_func(parallel=parallel)
 
@@ -472,18 +476,9 @@ class JFDataHandler:
 
             oy, ox = self._get_final_module_coordinates(m, i, geometry, gap_pixels)
             module = self._get_module_slice(image_stack, m, geometry)
-
-            if mask:
-                module_mask = self._get_module_slice(self._mask, i, geometry)
-            else:
-                module_mask = None
-
-            if conversion:
-                module_g = self._get_module_slice(self._g, i, geometry)
-                module_p = self._get_module_slice(self._p, i, geometry)
-            else:
-                module_g = None
-                module_p = None
+            module_mask = self._get_module_slice(self._mask, i, geometry) if mask else None
+            module_g = self._get_module_slice(self._g, i, geometry) if conversion else None
+            module_p = self._get_module_slice(self._p, i, geometry) if conversion else None
 
             if self.is_stripsel() and geometry:
                 proc_func(module_conv, module, module_g, module_p, module_mask, gap_pixels)
