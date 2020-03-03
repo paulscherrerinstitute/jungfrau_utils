@@ -453,8 +453,11 @@ class JFDataHandler:
 
     def _process(self, res, image_stack, conversion, mask, gap_pixels, geometry, parallel):
         if self.is_stripsel():
-            self._process_stripsel(res, image_stack, conversion, mask, geometry, parallel)
-            return
+            if geometry:
+                if not parallel:
+                    reshape_stripsel = _reshape_stripsel
+                else:
+                    reshape_stripsel = _reshape_stripsel_parallel
 
         proc_func = self._proc_func(parallel=parallel)
 
@@ -477,49 +480,21 @@ class JFDataHandler:
                 module_g = None
                 module_p = None
 
-            module_res = res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X]
-            proc_func(module_res, module, module_g, module_p, module_mask, gap_pixels)
+            if self.is_stripsel():
+                module_res = np.empty(shape=module.shape, dtype=np.float32)
+                proc_func(module_res, module, module_g, module_p, module_mask, gap_pixels)
+                module = module_res
 
-    def _process_stripsel(self, res, image_stack, conversion, mask, geometry, parallel):
-        if geometry:
-            if not parallel:
-                reshape_stripsel = _reshape_stripsel
+                if geometry:
+                    module_res = res[
+                        :, oy : oy + STRIPSEL_MODULE_SIZE_Y, ox : ox + STRIPSEL_MODULE_SIZE_X
+                    ]
+                    reshape_stripsel(module_res, module)
+                else:
+                    res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X] = module
             else:
-                reshape_stripsel = _reshape_stripsel_parallel
-
-        proc_func = self._proc_func(parallel=parallel)
-
-        for i, m in enumerate(self.module_map):
-            if m == -1:
-                continue
-
-            # gap_pixels has no effect on stripsel detectors
-            oy, ox = self._get_final_module_coordinates(m, i, geometry, False)
-            module = self._get_module_slice(image_stack, m, geometry)
-
-            if not mask or self._mask is None:
-                module_mask = None
-            else:
-                module_mask = self._get_module_slice(self._mask, i, geometry)
-
-            if conversion:
-                module_g = self._get_module_slice(self._g, i, geometry)
-                module_p = self._get_module_slice(self._p, i, geometry)
-            else:
-                module_g = None
-                module_p = None
-
-            module_res = np.empty(shape=module.shape, dtype=np.float32)
-            proc_func(module_res, module, module_g, module_p, module_mask, False)
-            module = module_res
-
-            if geometry:
-                module_res = res[
-                    :, oy : oy + STRIPSEL_MODULE_SIZE_Y, ox : ox + STRIPSEL_MODULE_SIZE_X
-                ]
-                reshape_stripsel(module_res, module)
-            else:
-                res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X] = module
+                module_res = res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X]
+                proc_func(module_res, module, module_g, module_p, module_mask, gap_pixels)
 
     def _get_final_module_coordinates(self, m, i, geometry, gap_pixels):
         if geometry:
