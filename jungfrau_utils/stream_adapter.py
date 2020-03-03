@@ -2,7 +2,7 @@ import logging
 
 import numpy as np
 
-from .data_handler import JFDataHandler
+from jungfrau_utils.data_handler import JFDataHandler
 
 logger = logging.getLogger(__name__)
 

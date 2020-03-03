@@ -5,8 +5,8 @@ import h5py
 import numpy as np
 from bitshuffle.h5 import H5_COMPRESS_LZ4, H5FILTER  # pylint: disable=no-name-in-module
 
-from .data_handler import JFDataHandler
-from .swissfel_helpers import locate_gain_file, locate_pedestal_file
+from jungfrau_utils.data_handler import JFDataHandler
+from jungfrau_utils.swissfel_helpers import locate_gain_file, locate_pedestal_file
 
 # bitshuffle hdf5 filter params
 BLOCK_SIZE = 0

@@ -5,7 +5,7 @@ import numpy as np
 from numba import jit
 from numpy import ma
 
-from .geometry import modules_orig
+from jungfrau_utils.geometry import modules_orig
 
 warnings.filterwarnings("default", category=DeprecationWarning)
 

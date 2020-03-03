@@ -7,7 +7,7 @@ import h5py
 import numpy as np
 from numba import njit, prange
 
-from .geometry import modules_orig
+from jungfrau_utils.geometry import modules_orig
 
 CHIP_SIZE_X = 256
 CHIP_SIZE_Y = 256

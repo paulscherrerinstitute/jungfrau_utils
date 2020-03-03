@@ -1,7 +1,7 @@
 import h5py
 
 from jungfrau_utils.data_handler import JFDataHandler
-from .swissfel_helpers import locate_gain_file, locate_pedestal_file
+from jungfrau_utils.swissfel_helpers import locate_gain_file, locate_pedestal_file
 
 
 class EscapeAdapter:
