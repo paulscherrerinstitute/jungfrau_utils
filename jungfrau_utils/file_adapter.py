@@ -240,19 +240,20 @@ class File:
         with h5py.File(dest, "w") as h5_dest:
             self.file.visititems(copy_objects)
 
-    def export_plain_data(
-        self, dest, index=slice(None, None), compress=False, factor=None, dtype=None
-    ):
+    def export_plain_data(self, dest, index=None, compress=False, factor=None, dtype=None):
         """Export data in a separate plain hdf5 file
 
         Args:
             dest (str): Destination file path
-            index (list, slice): List of image indexes to save. Defaults to slice(None, None).
+            index (list): List of image indexes to save. Export all images if None.
+                Defaults to None.
             compress (bool, optional): Apply bitshuffle+lz4 compression. Defaults to False.
             factor (float, optional): Divide all values by a factor. Defaults to None.
             dtype (np.dtype, optional): Resulting image data type. Defaults to None.
         """
-        if isinstance(index, int):
+        if index is None:
+            index = slice(None, None)
+        elif isinstance(index, int):
             index = [index]
 
         data_group = self.file[f"/data/{self.detector_name}"]
