@@ -200,6 +200,15 @@ class File:
                             f"data/{self.detector_name}/roi_{i}", data=[roiy, roix]
                         )
 
+                        # save a pixel mask for roi
+                        pixel_mask_roi = self.handler.get_pixel_mask(
+                            gap_pixels=self.gap_pixels, geometry=self.geometry
+                        )
+                        h5_dest.create_dataset(
+                            f"data/{self.detector_name}/pixel_mask_roi_{i}",
+                            data=pixel_mask_roi[slice(*roiy), slice(*roix)],
+                        )
+
                         # prepare ROI datasets
                         roi_shape = (roiy[1] - roiy[0], roix[1] - roix[0])
 
