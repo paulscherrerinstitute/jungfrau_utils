@@ -311,7 +311,7 @@ class File:
             # image index and roi
             ind, roi = item[0], item[1:]
 
-        data = self.file[f"/data/{self.detector_name}/data"][ind]
+        data = self.file[f"/data/{self.detector_name}/data"][:][ind]
         data = self.handler.process(
             data,
             conversion=self.conversion,
