@@ -152,6 +152,17 @@ class JFDataHandler:
 
         return shape_y, shape_x
 
+    def get_dtype_out(self, dtype_in, conversion=True):
+        """Resulting image dtype of a detector, based on input dtype and a conversion flag"""
+        if conversion:
+            if dtype_in != np.uint16:
+                raise TypeError(f"Only images of type {np.uint16} can be converted.")
+            dtype_out = np.float32
+        else:
+            dtype_out = dtype_in
+
+        return dtype_out
+
     @property
     def gain_file(self):
         """Return gain filepath"""
@@ -446,7 +457,7 @@ class JFDataHandler:
             warnings.warn("'gap_pixels' flag has no effect on stripsel detectors", RuntimeWarning)
             gap_pixels = False
 
-        res_dtype = np.float32 if conversion else images.dtype
+        res_dtype = self.get_dtype_out(images.dtype, conversion=conversion)
         res_shape = self.get_shape_out(gap_pixels=gap_pixels, geometry=geometry)
         res = np.zeros((images.shape[0], *res_shape), dtype=res_dtype)
 
