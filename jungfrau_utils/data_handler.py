@@ -113,16 +113,6 @@ class JFDataHandler:
     def _shape_in(self):
         return self._get_shape_n_modules(self._number_active_modules)
 
-    def _get_stripsel_shape_out(self, geometry):
-        if geometry:
-            modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
-            shape_x = max(modules_orig_x) + STRIPSEL_SIZE_X
-            shape_y = max(modules_orig_y) + STRIPSEL_SIZE_Y
-        else:
-            shape_y, shape_x = self._shape_in
-
-        return shape_y, shape_x
-
     def get_shape_out(self, gap_pixels=True, geometry=True):
         """Resulting image shape of a detector, based on gap_pixel and geometry flags"""
         if self.is_stripsel():
@@ -148,6 +138,16 @@ class JFDataHandler:
                 shape_y += (CHIP_NUM_Y - 1) * CHIP_GAP_Y * self._number_active_modules
 
         elif not geometry and not gap_pixels:
+            shape_y, shape_x = self._shape_in
+
+        return shape_y, shape_x
+
+    def _get_stripsel_shape_out(self, geometry):
+        if geometry:
+            modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
+            shape_x = max(modules_orig_x) + STRIPSEL_SIZE_X
+            shape_y = max(modules_orig_y) + STRIPSEL_SIZE_Y
+        else:
             shape_y, shape_x = self._shape_in
 
         return shape_y, shape_x
@@ -287,29 +287,6 @@ class JFDataHandler:
     @property
     def _p(self):
         return self._p_all[self.highgain]
-
-    def _proc_func(self, parallel):
-        if not self.highgain and not parallel:
-            proc_func = _correct
-
-        elif not self.highgain and parallel:
-            proc_func = _correct_parallel
-
-        elif self.highgain and not parallel:
-            proc_func = _correct_highgain
-
-        elif self.highgain and parallel:
-            proc_func = _correct_highgain_parallel
-
-        return proc_func
-
-    def _reshape_stripsel(self, parallel):
-        if not parallel:
-            reshape_stripsel = _reshape_stripsel
-        else:
-            reshape_stripsel = _reshape_stripsel_parallel
-
-        return reshape_stripsel
 
     @property
     def pixel_mask(self):
@@ -457,8 +434,8 @@ class JFDataHandler:
             warnings.warn("'gap_pixels' flag has no effect on stripsel detectors", RuntimeWarning)
             gap_pixels = False
 
-        res_dtype = self.get_dtype_out(images.dtype, conversion=conversion)
         res_shape = self.get_shape_out(gap_pixels=gap_pixels, geometry=geometry)
+        res_dtype = self.get_dtype_out(images.dtype, conversion=conversion)
         res = np.zeros((images.shape[0], *res_shape), dtype=res_dtype)
 
         self._process(res, images, conversion, mask, gap_pixels, geometry, parallel)
@@ -571,6 +548,29 @@ class JFDataHandler:
             saturated_value = 0b1100000000000000  # = 49152
 
         return saturated_value
+
+    def _proc_func(self, parallel):
+        if not self.highgain and not parallel:
+            proc_func = _correct
+
+        elif not self.highgain and parallel:
+            proc_func = _correct_parallel
+
+        elif self.highgain and not parallel:
+            proc_func = _correct_highgain
+
+        elif self.highgain and parallel:
+            proc_func = _correct_highgain_parallel
+
+        return proc_func
+
+    def _reshape_stripsel(self, parallel):
+        if not parallel:
+            reshape_stripsel = _reshape_stripsel
+        else:
+            reshape_stripsel = _reshape_stripsel_parallel
+
+        return reshape_stripsel
 
 
 @njit(cache=True)
