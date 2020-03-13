@@ -217,7 +217,9 @@ class File:
                         args["chunks"] = (1, *roi_shape)
 
                         if dtype is None:
-                            args["dtype"] = self["data"].dtype
+                            args["dtype"] = self.handler.get_dtype_out(
+                                self["data"].dtype, conversion=self.conversion
+                            )
                         else:
                             args["dtype"] = dtype
 
