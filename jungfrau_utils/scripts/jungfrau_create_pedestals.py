@@ -43,7 +43,7 @@ def main():
     parser.add_argument("--frames_average", type=int, default=1000, help="for pedestal in each gain average over last frames_average frames, reducing weight of previous")
     parser.add_argument("--directory", default="./", help="Output directory where to store pixelmask and gain file")
     parser.add_argument("--gain_check", type=int, default=1, help="check that gain setting in each of the module corresponds to the general gain switch, (0 - dont check)")
-    parser.add_argument("--add-pixel-mask", default=None, help="add additional masked pixels from external, specified file")
+    parser.add_argument("--add_pixel_mask", default=None, help="add additional masked pixels from external, specified file")
     args = parser.parse_args()
 
     if not (os.path.isfile(args.filename) and os.access(args.filename, os.R_OK)):
@@ -178,6 +178,7 @@ def main():
        if (os.path.isfile(args.add_pixel_mask) and os.access(args.add_pixel_mask, os.R_OK)):
            additional_pixel_mask_file = h5py.File(args.add_pixel_mask, "r")
            additional_pixel_mask = np.array(additional_pixel_mask_file["pixel_mask"])
+           log.info("Will add additional masked pixels from file %s , number %d " % (args.add_pixel_mask, np.sum(additional_pixel_mask == 1)))
            if additional_pixel_mask.shape == pixelMask.shape:
                pixelMask[additional_pixel_mask == 1] |= (1 << 5)
            else:
