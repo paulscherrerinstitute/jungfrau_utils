@@ -262,28 +262,29 @@ class File:
             factor (float, optional): Divide all values by a factor. Defaults to None.
             dtype (np.dtype, optional): Resulting image data type. Defaults to None.
         """
+        shape_y, shape_x = self.handler.get_shape_out(self.gap_pixels, self.geometry)
+
         if index is None:
-            index = slice(None, None)
+            index = range(0, self.file[f"/data/{self.detector_name}/data"].shape[0])
         elif isinstance(index, int):
             index = [index]
 
         data_group = self.file[f"/data/{self.detector_name}"]
+        len_index = len(index)
 
         def export_objects(name):
             dset_source = data_group[name]
             args = dict()
 
             if name == "data":  # compress and copy
-                data = self[index, :, :]
-                if factor:
-                    data = np.round(data / factor)
-
-                args["shape"] = data.shape
-                args["maxshape"] = data.shape
-                args["chunks"] = (1, *data.shape[1:])
+                args["shape"] = (len_index, shape_y, shape_x)
+                args["maxshape"] = (len_index, shape_y, shape_x)
+                args["chunks"] = (1, shape_y, shape_x)
 
                 if dtype is None:
-                    args["dtype"] = data.dtype
+                    args["dtype"] = self.handler.get_dtype_out(
+                        self["data"].dtype, conversion=self.conversion
+                    )
                 else:
                     args["dtype"] = dtype
 
@@ -291,7 +292,15 @@ class File:
                     args.update(compargs)
 
                 dset_dest = h5_dest.create_dataset_like(f"/data/{name}", dset_source, **args)
-                dset_dest[:] = data
+
+                for ind in range(0, len_index, BATCH_SIZE):
+                    batch_slice = slice(ind, min(ind + BATCH_SIZE, len_index))
+                    batch_data = self[index[batch_slice], :, :]
+
+                    if factor:
+                        batch_data = np.round(batch_data / factor)
+
+                    dset_dest[batch_slice, :, :] = batch_data
 
             else:  # copy
                 data = dset_source[index, :]
