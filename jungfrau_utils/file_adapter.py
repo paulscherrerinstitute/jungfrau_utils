@@ -1,4 +1,5 @@
 import os
+from itertools import islice
 from pathlib import Path
 
 import h5py
@@ -295,7 +296,7 @@ class File:
 
                 for ind in range(0, len_index, BATCH_SIZE):
                     batch_slice = slice(ind, min(ind + BATCH_SIZE, len_index))
-                    batch_data = self[index[batch_slice], :, :]
+                    batch_data = self[list(index[batch_slice]), :, :]
 
                     if factor:
                         batch_data = np.round(batch_data / factor)
@@ -331,7 +332,21 @@ class File:
             # image index and roi
             ind, roi = item[0], item[1:]
 
-        data = self.file[f"/data/{self.detector_name}/data"][ind]
+        # Avoid a stride-bottleneck, see https://github.com/h5py/h5py/issues/977
+        dset = self.file[f"/data/{self.detector_name}/data"]
+        if isinstance(ind, slice) and ind.step is not None and ind.step != 1:
+            ind = list(islice(range(dset.shape[0]), ind.start, ind.stop, ind.step))
+            data = np.empty(shape=(len(ind), *dset.shape[1:]), dtype=dset.dtype)
+            for i, j in enumerate(ind):
+                data[i] = dset[j]
+        elif isinstance(ind, (list, tuple)):
+            data = np.empty(shape=(len(ind), *dset.shape[1:]), dtype=dset.dtype)
+            for i, j in enumerate(ind):
+                data[i] = dset[j]
+        else:
+            data = dset[ind]
+
+        # Process data
         data = self.handler.process(
             data,
             conversion=self.conversion,
