@@ -264,6 +264,8 @@ class File:
             dtype (np.dtype, optional): Resulting image data type. Defaults to None.
         """
         shape_y, shape_x = self.handler.get_shape_out(self.gap_pixels, self.geometry)
+        if self.detector_name.startswith("JF06"):
+            shape_y, shape_x = shape_x, shape_y
 
         if index is None:
             index = range(0, self.file[f"/data/{self.detector_name}/data"].shape[0])
