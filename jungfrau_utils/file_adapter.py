@@ -342,7 +342,7 @@ class File:
             data = np.empty(shape=(len(ind), *dset.shape[1:]), dtype=dset.dtype)
             for i, j in enumerate(ind):
                 data[i] = dset[j]
-        elif isinstance(ind, (list, tuple)):
+        elif isinstance(ind, (list, tuple, range)):
             data = np.empty(shape=(len(ind), *dset.shape[1:]), dtype=dset.dtype)
             for i, j in enumerate(ind):
                 data[i] = dset[j]
