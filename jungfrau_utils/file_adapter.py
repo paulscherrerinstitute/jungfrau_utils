@@ -326,13 +326,14 @@ class File:
             # metadata entry (lazy)
             return self.file[f"/data/{self.detector_name}/{item}"]
 
-        elif isinstance(item, (int, slice)):
-            # single image index or slice, no roi
-            ind, roi = item, ()
-
-        else:
-            # image index and roi
+        if isinstance(item, tuple):
+            # multiple arguments: first is index, the rest is roi
             ind, roi = item[0], item[1:]
+        elif isinstance(item, (int, slice, list, range)):
+            # single image index, no roi
+            ind, roi = item, ()
+        else:
+            raise TypeError("Unknown selection type.")
 
         # Avoid a stride-bottleneck, see https://github.com/h5py/h5py/issues/977
         dset = self.file[f"/data/{self.detector_name}/data"]
