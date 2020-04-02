@@ -1,4 +1,5 @@
 import os
+from functools import partial
 from itertools import islice
 from pathlib import Path
 
@@ -170,6 +171,156 @@ class File:
     def _processed(self):
         # TODO: generalize this check for data reduction case, where dtype can be different
         return self.file[f"/data/{self.detector_name}/data"].dtype == np.float32
+
+    @property
+    def _data_dataset(self):
+        return f"data/{self.detector_name}/data"
+
+    def export(self, dest, index=None, roi=None, compress=False, factor=None, dtype=None):
+        """Export processed data into a separate hdf5 file.
+
+        Args:
+            dest (str): Destination hdf5 file path.
+            index (iterable): An iterable with indexes of images to be exported.
+                Export all images if None. Defaults to None.
+            roi (tuple): A tuple of image ROI tuples in a form (bottom, top, left, right).
+                Export whole images if None. Defaults to None.
+            compress (bool, optional): Apply bitshuffle+lz4 compression. Defaults to False.
+            factor (float, optional): Divide all pixel values by a factor and round the result.
+                Keep the original data if None. Defaults to None.
+            dtype (np.dtype, optional): Resulting image data type. Use dtype of the processed data
+                if None. Defaults to None.
+        """
+        with h5py.File(dest, "w") as h5_dest:
+            # a function for 'visititems' should have the args (name, object)
+            self.file.visititems(
+                partial(
+                    self._visititems,
+                    h5_dest=h5_dest,
+                    index=index,
+                    roi=roi,
+                    compress=compress,
+                    factor=factor,
+                    dtype=dtype,
+                )
+            )
+
+    def _visititems(self, name, obj, h5_dest, index, roi, compress, factor, dtype):
+        if isinstance(obj, h5py.Group):
+            h5_dest.create_group(name)
+
+        elif isinstance(obj, h5py.Dataset):
+            dset_source = self.file[name]
+
+            if name == self._data_dataset:
+                self._process_data(h5_dest, index, roi, compress, factor, dtype)
+
+            else:
+                if name.startswith("data"):
+                    # datasets with data per image, so indexing should be applied
+                    if index is None:
+                        index = slice(None)
+                    data = dset_source[index, :]
+                    args = {"shape": data.shape, "maxshape": data.shape}
+                    h5_dest.create_dataset_like(name, dset_source, data=data, **args)
+                else:
+                    h5_dest.create_dataset_like(name, dset_source, data=dset_source)
+
+        else:
+            raise TypeError(f"Unknown h5py object type {obj}")
+
+        # copy attributes if it's not a dataset with the actual data
+        if name != self._data_dataset:
+            for key, value in self.file[name].attrs.items():
+                h5_dest[name].attrs[key] = value
+
+    def _process_data(self, h5_dest, index, roi, compress, factor, dtype):
+        args = dict()
+        if index is None:
+            n_images = self["data"].shape[0]
+        else:
+            n_images = len(index)
+
+        if roi is None:
+            image_shape = self.handler.get_shape_out(self.gap_pixels, self.geometry)
+            # TODO: this is not ideal, find a way to avoid the 2 next lines
+            if self.detector_name.startswith("JF06"):
+                image_shape = image_shape[1], image_shape[0]
+
+            args["shape"] = (n_images, *image_shape)
+            args["maxshape"] = (n_images, *image_shape)
+            args["chunks"] = (1, *image_shape)
+
+            if dtype is None:
+                args["dtype"] = self.handler.get_dtype_out(
+                    self["data"].dtype, conversion=self.conversion
+                )
+            else:
+                args["dtype"] = dtype
+
+            if compress:
+                args.update(compargs)
+
+            h5_dest.create_dataset_like(self._data_dataset, self.file[self._data_dataset], **args)
+
+        else:
+            h5_dest.create_dataset(f"data/{self.detector_name}/n_roi", data=len(roi))
+            for i, (roi_y1, roi_y2, roi_x1, roi_x2) in enumerate(roi):
+                h5_dest.create_dataset(
+                    f"data/{self.detector_name}/roi_{i}", data=[(roi_y1, roi_y2), (roi_x1, roi_x2)]
+                )
+
+                # save a pixel mask for ROI
+                pixel_mask_roi = self.handler.get_pixel_mask(
+                    gap_pixels=self.gap_pixels, geometry=self.geometry
+                )
+                h5_dest.create_dataset(
+                    f"data/{self.detector_name}/pixel_mask_roi_{i}",
+                    data=pixel_mask_roi[slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)],
+                )
+
+                # prepare ROI datasets
+                roi_shape = (roi_y2 - roi_y1, roi_x2 - roi_x1)
+
+                args["shape"] = (n_images, *roi_shape)
+                args["maxshape"] = (n_images, *roi_shape)
+                args["chunks"] = (1, *roi_shape)
+
+                if dtype is None:
+                    args["dtype"] = self.handler.get_dtype_out(
+                        self["data"].dtype, conversion=self.conversion
+                    )
+                else:
+                    args["dtype"] = dtype
+
+                if compress:
+                    args.update(compargs)
+
+                h5_dest.create_dataset(f"{self._data_dataset}_roi_{i}", **args)
+
+        # process and write data in batches
+        for ind in range(0, n_images, BATCH_SIZE):
+            batch_slice = slice(ind, min(ind + BATCH_SIZE, n_images))
+
+            if index is None:
+                batch_data = self[batch_slice]
+            else:
+                batch_data = self[index[batch_slice]]
+
+            if roi is None:
+                if factor is not None:
+                    batch_data = np.round(batch_data / factor)
+
+                h5_dest[self._data_dataset][batch_slice] = batch_data
+
+            else:
+                for i, (roi_y1, roi_y2, roi_x1, roi_x2) in enumerate(roi):
+                    roi_data = batch_data[:, slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)]
+
+                    if factor is not None:
+                        roi_data = np.round(roi_data / factor)
+
+                    h5_dest[f"{self._data_dataset}_roi_{i}"][batch_slice] = roi_data
 
     def save_roi(self, dest, roi_x, roi_y, compress=False, factor=None, dtype=None):
         """Save data in a separate hdf5 file
