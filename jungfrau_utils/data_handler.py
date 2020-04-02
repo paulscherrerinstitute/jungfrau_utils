@@ -473,7 +473,13 @@ class JFDataHandler:
                 module_res = res[:, oy : oy + STRIPSEL_SIZE_Y, ox : ox + STRIPSEL_SIZE_X]
                 reshape_stripsel(module_res, module_conv)
             else:
-                module_res = res[:, oy : oy + MODULE_SIZE_Y, ox : ox + MODULE_SIZE_X]
+                module_res_size_y = MODULE_SIZE_Y
+                module_res_size_x = MODULE_SIZE_X
+                if gap_pixels:
+                    module_res_size_y += (CHIP_NUM_Y - 1) * CHIP_GAP_Y
+                    module_res_size_x += (CHIP_NUM_X - 1) * CHIP_GAP_X
+
+                module_res = res[:, oy : oy + module_res_size_y, ox : ox + module_res_size_x]
                 proc_func(module_res, module, module_g, module_p, module_mask, gap_pixels)
 
     def _get_final_module_coordinates(self, m, i, geometry, gap_pixels):
