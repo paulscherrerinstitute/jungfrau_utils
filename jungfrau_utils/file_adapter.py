@@ -1,4 +1,5 @@
 import os
+import warnings
 from functools import partial
 from itertools import islice
 from pathlib import Path
@@ -9,6 +10,8 @@ from bitshuffle.h5 import H5_COMPRESS_LZ4, H5FILTER  # pylint: disable=no-name-i
 
 from jungfrau_utils.data_handler import JFDataHandler
 from jungfrau_utils.swissfel_helpers import locate_gain_file, locate_pedestal_file
+
+warnings.filterwarnings("default", category=DeprecationWarning)
 
 # bitshuffle hdf5 filter params
 BLOCK_SIZE = 0
@@ -333,6 +336,11 @@ class File:
             factor (float, optional): Divide all values by a factor. Defaults to None.
             dtype (np.dtype, optional): Resulting image data type. Defaults to None.
         """
+        warnings.warn(
+            "The function 'save_roi' is deprecated and will be removed in jungfrau_utils/1.0. "
+            "Use the 'export' funtion instead.",
+            DeprecationWarning,
+        )
 
         def copy_objects(name, obj):
             if isinstance(obj, h5py.Group):
@@ -414,6 +422,12 @@ class File:
             factor (float, optional): Divide all values by a factor. Defaults to None.
             dtype (np.dtype, optional): Resulting image data type. Defaults to None.
         """
+        warnings.warn(
+            "The function 'export_plain_data' is deprecated and will be removed in jungfrau_utils/1.0. "
+            "Use the 'export' funtion instead.",
+            DeprecationWarning,
+        )
+
         shape_y, shape_x = self.handler.get_shape_out(self.gap_pixels, self.geometry)
         if self.detector_name.startswith("JF06"):
             shape_y, shape_x = shape_x, shape_y
