@@ -20,8 +20,6 @@ compargs = {"compression": H5FILTER, "compression_opts": (BLOCK_SIZE, H5_COMPRES
 # a better fix would be to use bitshuffle compiled without omp support
 os.environ["OMP_NUM_THREADS"] = "1"
 
-BATCH_SIZE = 1000
-
 
 class File:
     """Jungfrau file"""
@@ -179,7 +177,9 @@ class File:
     def _data_dataset(self):
         return f"data/{self.detector_name}/data"
 
-    def export(self, dest, index=None, roi=None, compress=False, factor=None, dtype=None):
+    def export(
+        self, dest, index=None, roi=None, compress=False, factor=None, dtype=None, batch_size=1000
+    ):
         """Export processed data into a separate hdf5 file.
 
         Args:
@@ -193,6 +193,8 @@ class File:
                 Keep the original data if None. Defaults to None.
             dtype (np.dtype, optional): Resulting image data type. Use dtype of the processed data
                 if None. Defaults to None.
+            batch_size (int, optional): Process images in batches of that size in order to avoid
+                running out of memory. Defaults to 1000.
         """
         with h5py.File(dest, "w") as h5_dest:
             # a function for 'visititems' should have the args (name, object)
@@ -205,10 +207,11 @@ class File:
                     compress=compress,
                     factor=factor,
                     dtype=dtype,
+                    batch_size=batch_size,
                 )
             )
 
-    def _visititems(self, name, obj, h5_dest, index, roi, compress, factor, dtype):
+    def _visititems(self, name, obj, h5_dest, index, roi, compress, factor, dtype, batch_size):
         if isinstance(obj, h5py.Group):
             h5_dest.create_group(name)
 
@@ -216,7 +219,7 @@ class File:
             dset_source = self.file[name]
 
             if name == self._data_dataset:
-                self._process_data(h5_dest, index, roi, compress, factor, dtype)
+                self._process_data(h5_dest, index, roi, compress, factor, dtype, batch_size)
 
             else:
                 if name.startswith("data"):
@@ -237,7 +240,7 @@ class File:
             for key, value in self.file[name].attrs.items():
                 h5_dest[name].attrs[key] = value
 
-    def _process_data(self, h5_dest, index, roi, compress, factor, dtype):
+    def _process_data(self, h5_dest, index, roi, compress, factor, dtype, batch_size):
         args = dict()
         if index is None:
             n_images = self["data"].shape[0]
@@ -302,8 +305,8 @@ class File:
                 h5_dest.create_dataset(f"{self._data_dataset}_roi_{i}", **args)
 
         # process and write data in batches
-        for ind in range(0, n_images, BATCH_SIZE):
-            batch_slice = slice(ind, min(ind + BATCH_SIZE, n_images))
+        for ind in range(0, n_images, batch_size):
+            batch_slice = slice(ind, min(ind + batch_size, n_images))
 
             if index is None:
                 batch_data = self[batch_slice]
@@ -325,7 +328,9 @@ class File:
 
                     h5_dest[f"{self._data_dataset}_roi_{i}"][batch_slice] = roi_data
 
-    def save_roi(self, dest, roi_x, roi_y, compress=False, factor=None, dtype=None):
+    def save_roi(
+        self, dest, roi_x, roi_y, compress=False, factor=None, dtype=None, batch_size=1000
+    ):
         """Save data in a separate hdf5 file
 
         Args:
@@ -335,6 +340,8 @@ class File:
             compress (bool, optional): Apply bitshuffle+lz4 compression. Defaults to False.
             factor (float, optional): Divide all values by a factor. Defaults to None.
             dtype (np.dtype, optional): Resulting image data type. Defaults to None.
+            batch_size (int, optional): Process images in batches of that size in order to avoid
+                running out of memory. Defaults to 1000.
         """
         warnings.warn(
             "The function 'save_roi' is deprecated and will be removed in jungfrau_utils/1.0. "
@@ -388,8 +395,8 @@ class File:
 
                         h5_dest.create_dataset(f"{name}_roi_{i}", **args)
 
-                    for ind in range(0, n_images, BATCH_SIZE):
-                        batch_slice = slice(ind, min(ind + BATCH_SIZE, n_images))
+                    for ind in range(0, n_images, batch_size):
+                        batch_slice = slice(ind, min(ind + batch_size, n_images))
                         batch_data = self[batch_slice]
 
                         for i, (roix, roiy) in enumerate(zip(roi_x, roi_y)):
@@ -411,7 +418,9 @@ class File:
         with h5py.File(dest, "w") as h5_dest:
             self.file.visititems(copy_objects)
 
-    def export_plain_data(self, dest, index=None, compress=False, factor=None, dtype=None):
+    def export_plain_data(
+        self, dest, index=None, compress=False, factor=None, dtype=None, batch_size=1000
+    ):
         """Export data in a separate plain hdf5 file
 
         Args:
@@ -421,6 +430,8 @@ class File:
             compress (bool, optional): Apply bitshuffle+lz4 compression. Defaults to False.
             factor (float, optional): Divide all values by a factor. Defaults to None.
             dtype (np.dtype, optional): Resulting image data type. Defaults to None.
+            batch_size (int, optional): Process images in batches of that size in order to avoid
+                running out of memory. Defaults to 1000.
         """
         warnings.warn(
             "The function 'export_plain_data' is deprecated and will be removed in jungfrau_utils/1.0. "
@@ -461,8 +472,8 @@ class File:
 
                 dset_dest = h5_dest.create_dataset_like(f"/data/{name}", dset_source, **args)
 
-                for ind in range(0, len_index, BATCH_SIZE):
-                    batch_slice = slice(ind, min(ind + BATCH_SIZE, len_index))
+                for ind in range(0, len_index, batch_size):
+                    batch_slice = slice(ind, min(ind + batch_size, len_index))
                     batch_data = self[list(index[batch_slice]), :, :]
 
                     if factor:
