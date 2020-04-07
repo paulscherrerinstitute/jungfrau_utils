@@ -15,7 +15,8 @@ class StreamAdapter:
 
     @property
     def mask_double_pixels(self):
-        """Current flag for masking double pixels"""
+        """Current flag for masking double pixels.
+        """
         return self._mask_double_pixels
 
     @mask_double_pixels.setter
@@ -26,6 +27,15 @@ class StreamAdapter:
             self.handler.mask_double_pixels = value
 
     def process(self, image, metadata):
+        """Perform jungfrau detector data processing on an image received via stream.
+
+        Args:
+            image (ndarray): An image to be processed.
+            metadata (dict): A corresponding image metadata.
+
+        Returns:
+            ndarray: Resulting image.
+        """
         # as a first step, try to set the detector_name, skip if detector_name is empty
         detector_name = metadata.get("detector_name")
         if detector_name:

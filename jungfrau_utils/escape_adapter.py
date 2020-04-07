@@ -48,15 +48,18 @@ class EscapeAdapter:
 
     @property
     def process(self):
-        """Escape represents jungfrau files as a single array and only needs the process function"""
+        """Escape represents jungfrau files as a single array and only needs the process function.
+        """
         return self.handler.process
 
     @property
     def gain_file(self):
-        """Gain file path (readonly)"""
+        """Gain file path (readonly).
+        """
         return self.handler.gain_file
 
     @property
     def pedestal_file(self):
-        """Pedestal file path (readonly)"""
+        """Pedestal file path (readonly).
+        """
         return self.handler.pedestal_file

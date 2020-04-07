@@ -35,12 +35,12 @@ class File:
         geometry=True,
         parallel=True,
     ):
-        """Create a new Jungfrau file wrapper
+        """Create a new Jungfrau file wrapper.
 
         Args:
-            file_path (str): path to Jungfrau file
-            gain_file (str, optional): path to gain file. Auto-locate if empty. Defaults to ''.
-            pedestal_file (str, optional): path to pedestal file. Auto-locate if empty.
+            file_path (str): Path to Jungfrau file
+            gain_file (str, optional): Path to gain file. Auto-locate if empty. Defaults to ''.
+            pedestal_file (str, optional): Path to pedestal file. Auto-locate if empty.
                 Defaults to ''.
             conversion (bool, optional): Apply gain conversion and pedestal correction.
                 Defaults to True.
@@ -94,22 +94,26 @@ class File:
 
     @property
     def detector_name(self):
-        """Detector name (readonly)"""
+        """Detector name (readonly).
+        """
         return self.handler.detector_name
 
     @property
     def gain_file(self):
-        """Gain file path (readonly)"""
+        """Gain file path (readonly).
+        """
         return self.handler.gain_file
 
     @property
     def pedestal_file(self):
-        """Pedestal file path (readonly)"""
+        """Pedestal file path (readonly).
+        """
         return self.handler.pedestal_file
 
     @property
     def conversion(self):
-        """A flag for applying pedestal correction and gain conversion"""
+        """A flag for applying pedestal correction and gain conversion.
+        """
         return self._conversion
 
     @conversion.setter
@@ -122,7 +126,8 @@ class File:
 
     @property
     def mask(self):
-        """A flag for masking bad pixels"""
+        """A flag for masking bad pixels.
+        """
         return self._mask
 
     @mask.setter
@@ -135,7 +140,8 @@ class File:
 
     @property
     def gap_pixels(self):
-        """A flag for adding gap pixels"""
+        """A flag for adding gap pixels.
+        """
         return self._gap_pixels
 
     @gap_pixels.setter
@@ -148,7 +154,8 @@ class File:
 
     @property
     def geometry(self):
-        """A flag for applying geometry"""
+        """A flag for applying geometry.
+        """
         return self._geometry
 
     @geometry.setter
@@ -161,7 +168,8 @@ class File:
 
     @property
     def parallel(self):
-        """A flag for using parallelization"""
+        """A flag for using parallelization.
+        """
         return self._parallel
 
     @parallel.setter
@@ -550,7 +558,8 @@ class File:
         return r
 
     def close(self):
-        """Close Jungfrau file"""
+        """Close Jungfrau file.
+        """
         if self.file.id:
             self.file.close()
 
