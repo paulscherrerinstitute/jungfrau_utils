@@ -63,13 +63,14 @@ class JFDataHandler:
         self._gain_file = ""
         self._pedestal_file = ""
 
+        # these values store the original gains/pedestal values
         self._gain = None
         self._pedestal = None
         self._pixel_mask = None
 
         self._highgain = False
 
-        # gain and pedestal arrays to be used for the actual data conversion
+        # gain and pedestal arrays with better memory layout for the actual data conversion
         self._g_all = {True: None, False: None}
         self._p_all = {True: None, False: None}
 
@@ -80,16 +81,19 @@ class JFDataHandler:
 
     @property
     def detector_name(self):
-        """Detector name (readonly)"""
+        """Detector name (readonly).
+        """
         return self._detector_name
 
     def is_stripsel(self):
-        """Return true if detector is a stripsel"""
+        """Return true if detector is a stripsel.
+        """
         return self.detector_name.startswith(("JF05", "JF10", "JF11", "JF12"))
 
     @property
     def detector(self):
-        """A namedtuple of detector parameters extracted from its name (readonly)"""
+        """A namedtuple of detector parameters extracted from its name (readonly).
+        """
         det = namedtuple("Detector", ["id", "n_modules", "version"])
         return det(*(int(d) for d in re.findall(r"\d+", self.detector_name)))
 
@@ -114,7 +118,15 @@ class JFDataHandler:
         return self._get_shape_n_modules(self._number_active_modules)
 
     def get_shape_out(self, gap_pixels=True, geometry=True):
-        """Resulting image shape of a detector, based on gap_pixel and geometry flags"""
+        """Return final image shape of a detector, based on gap_pixel and geometry flags
+
+        Args:
+            gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
+            geometry (bool, optional): Apply detector geometry corrections. Defaults to True.
+
+        Returns:
+            tuple: Height and width of a resulting image.
+        """
         if self.is_stripsel():
             return self._get_stripsel_shape_out(geometry=geometry)
 
@@ -153,7 +165,16 @@ class JFDataHandler:
         return shape_y, shape_x
 
     def get_dtype_out(self, dtype_in, conversion=True):
-        """Resulting image dtype of a detector, based on input dtype and a conversion flag"""
+        """Resulting image dtype of a detector, based on input dtype and a conversion flag.
+
+        Args:
+            dtype_in (dtype): dtype of an input data.
+            conversion (bool, optional): Whether data is expected to be converted to keV (apply gain
+                and pedestal corrections). Defaults to True.
+
+        Returns:
+            dtype: dtype of a resulting image.
+        """
         if conversion:
             if dtype_in != np.uint16:
                 raise TypeError(f"Only images of type {np.uint16} can be converted.")
@@ -165,7 +186,8 @@ class JFDataHandler:
 
     @property
     def gain_file(self):
-        """Return gain filepath"""
+        """Return current gain filepath.
+        """
         return self._gain_file
 
     @gain_file.setter
@@ -186,7 +208,8 @@ class JFDataHandler:
 
     @property
     def gain(self):
-        """Current gain values"""
+        """Current gain values.
+        """
         return self._gain
 
     @gain.setter
@@ -214,7 +237,8 @@ class JFDataHandler:
 
     @property
     def pedestal_file(self):
-        """Return pedestal filepath"""
+        """Return current pedestal filepath.
+        """
         return self._pedestal_file
 
     @pedestal_file.setter
@@ -238,7 +262,8 @@ class JFDataHandler:
 
     @property
     def pedestal(self):
-        """Current pedestal values"""
+        """Current pedestal values.
+        """
         return self._pedestal
 
     @pedestal.setter
@@ -270,7 +295,8 @@ class JFDataHandler:
 
     @property
     def highgain(self):
-        """Current flag for highgain"""
+        """Current flag for highgain.
+        """
         return self._highgain
 
     @highgain.setter
@@ -290,7 +316,8 @@ class JFDataHandler:
 
     @property
     def pixel_mask(self):
-        """Current pixel mask"""
+        """Current raw pixel mask values.
+        """
         return self._pixel_mask
 
     @pixel_mask.setter
@@ -329,7 +356,15 @@ class JFDataHandler:
         self._mask_all[True] = mask
 
     def get_pixel_mask(self, gap_pixels=True, geometry=True):
-        """Return pixel mask, shaped according to gap_pixel and geometry flags"""
+        """Return pixel mask, shaped according to gap_pixel and geometry flags.
+
+        Args:
+            gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
+            geometry (bool, optional): Apply detector geometry corrections. Defaults to True.
+
+        Returns:
+            ndarray: Resulting pixel mask.
+        """
         if self._mask is None:
             return None
 
@@ -356,7 +391,8 @@ class JFDataHandler:
 
     @property
     def mask_double_pixels(self):
-        """Current flag for masking double pixels"""
+        """Current flag for masking double pixels.
+        """
         return self._mask_double_pixels
 
     @mask_double_pixels.setter
@@ -372,7 +408,8 @@ class JFDataHandler:
 
     @property
     def module_map(self):
-        """Current module map"""
+        """Current module map.
+        """
         return self._module_map
 
     @module_map.setter
@@ -401,18 +438,17 @@ class JFDataHandler:
         applying pixel mask, module map, etc.
 
         Args:
-            images (ndarray): image stack or single image to be processed
-            conversion (bool, optional): convert to keV (apply gain and pedestal corrections).
+            images (ndarray): Image stack or single image to be processed
+            conversion (bool, optional): Convert to keV (apply gain and pedestal corrections).
                 Defaults to True.
-            mask (bool, optional): perform masking of bad pixels (set those values to 0).
+            mask (bool, optional): Perform masking of bad pixels (set those values to 0).
                 Defaults to True.
-            gap_pixels (bool, optional): add gap pixels between detector chips.
-                Defaults to True.
-            geometry (bool, optional): apply detector geometry corrections. Defaults to True.
-            parallel (bool, optional): parallelize image stack processing. Defaults to False.
+            gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
+            geometry (bool, optional): Apply detector geometry corrections. Defaults to True.
+            parallel (bool, optional): Parallelize image stack processing. Defaults to False.
 
         Returns:
-            ndarray: resulting image stack or single image
+            ndarray: Resulting image stack or single image
         """
         image_shape = images.shape[-2:]
         if image_shape != self._shape_in:
@@ -447,7 +483,11 @@ class JFDataHandler:
         return res
 
     def can_convert(self):
-        """Whether all data for gain/pedestal conversion is present"""
+        """Whether all data for gain/pedestal conversion is present.
+
+        Returns:
+            bool: Return true if all data for gain/pedestal conversion is present.
+        """
         return (self.gain is not None) and (self.pedestal is not None)
 
     def _process(self, res, images, conversion, mask, gap_pixels, geometry, parallel):
@@ -518,7 +558,17 @@ class JFDataHandler:
         return out
 
     def get_gains(self, images, mask=True, gap_pixels=True, geometry=True):
-        """Return gain values of images, applying mask, gap_pixel and geometry flags.
+        """Return gain values of images, based on mask, gap_pixel and geometry flags.
+
+        Args:
+            images (ndarray): Images to be processed.
+            mask (bool, optional): Perform masking of bad pixels (set those values to 0).
+                Defaults to True.
+            gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
+            geometry (bool, optional): Apply detector geometry corrections. Defaults to True.
+
+        Returns:
+            ndarray: Gain values of pixels.
         """
         if images.dtype != np.uint16:
             raise TypeError(f"Expected image type {np.uint16}, provided data type {images.dtype}.")
@@ -531,7 +581,17 @@ class JFDataHandler:
         return gains
 
     def get_saturated_pixels(self, images, mask=True, gap_pixels=True, geometry=True):
-        """Return coordinates of saturated pixels, respecting mask, gap_pixel and geometry flags.
+        """Return coordinates of saturated pixels, based on mask, gap_pixel and geometry flags.
+
+        Args:
+            images (ndarray): Images to be processed.
+            mask (bool, optional): Perform masking of bad pixels (set those values to 0).
+                Defaults to True.
+            gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
+            geometry (bool, optional): Apply detector geometry corrections. Defaults to True.
+
+        Returns:
+            tuple: Indices of saturated pixels.
         """
         if images.dtype != np.uint16:
             raise TypeError(f"Expected image type {np.uint16}, provided data type {images.dtype}.")
@@ -547,6 +607,9 @@ class JFDataHandler:
 
     def get_saturated_value(self):
         """Get a value for saturated pixels.
+
+        Returns:
+            int: A saturated pixel value.
         """
         if self.highgain:
             saturated_value = 0b0011111111111111  # = 16383
