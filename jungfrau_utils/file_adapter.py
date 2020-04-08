@@ -317,9 +317,9 @@ class File:
             batch_slice = slice(ind, min(ind + batch_size, n_images))
 
             if index is None:
-                batch_data = self[batch_slice]
+                batch_data = self[batch_slice, :, :]
             else:
-                batch_data = self[index[batch_slice]]
+                batch_data = self[index[batch_slice], :, :]
 
             if roi is None:
                 if factor is not None:
