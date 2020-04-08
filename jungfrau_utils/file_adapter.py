@@ -194,8 +194,8 @@ class File:
             dest (str): Destination hdf5 file path.
             index (iterable): An iterable with indexes of images to be exported.
                 Export all images if None. Defaults to None.
-            roi (tuple): A tuple of image ROI tuples in a form (bottom, top, left, right).
-                Export whole images if None. Defaults to None.
+            roi (tuple): A single tuple, or a tuple of tuples with image ROIs in a form
+                (bottom, top, left, right). Export whole images if None. Defaults to None.
             compress (bool, optional): Apply bitshuffle+lz4 compression. Defaults to False.
             factor (float, optional): Divide all pixel values by a factor and round the result.
                 Keep the original data if None. Defaults to None.
@@ -278,6 +278,10 @@ class File:
             h5_dest.create_dataset_like(self._data_dataset, self.file[self._data_dataset], **args)
 
         else:
+            if len(roi) == 4 and all(isinstance(v, int) for v in roi):
+                # this is a single tuple with coordinates, so wrap it in another tuple
+                roi = (roi, )
+
             h5_dest.create_dataset(f"data/{self.detector_name}/n_roi", data=len(roi))
             for i, (roi_y1, roi_y2, roi_x1, roi_x2) in enumerate(roi):
                 h5_dest.create_dataset(
