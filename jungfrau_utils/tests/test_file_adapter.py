@@ -251,3 +251,77 @@ def test_file_get_fancy_index_range_image(file_adapter):
     assert np.allclose(res[:, :256, -256:], converted_image_stack_mask[indices, :256, -256:])
     assert np.allclose(res[:, -256:, :256], converted_image_stack_mask[indices, -256:, :256])
     assert np.allclose(res[:, -256:, -256:], converted_image_stack_mask[indices, -256:, -256:])
+
+
+def test_file_export(file_adapter, tmpdir_factory):
+    exported_file = tmpdir_factory.mktemp("export").join("test.h5")
+    file_adapter.export(exported_file)
+
+    with h5py.File(exported_file, "r") as h5f:
+        res = h5f[f"/data/{DETECTOR_NAME}/data"]
+        assert np.allclose(res[:, :256, :256], converted_image_stack_mask[:, :256, :256])
+        assert np.allclose(res[:, :256, -256:], converted_image_stack_mask[:, :256, -256:])
+        assert np.allclose(res[:, -256:, :256], converted_image_stack_mask[:, -256:, :256])
+        assert np.allclose(res[:, -256:, -256:], converted_image_stack_mask[:, -256:, -256:])
+
+
+def test_file_export_index1(file_adapter, tmpdir_factory):
+    indices = [0, 2, 4]
+    exported_file = tmpdir_factory.mktemp("export").join("test.h5")
+    file_adapter.export(exported_file, index=indices)
+
+    with h5py.File(exported_file, "r") as h5f:
+        res = h5f[f"/data/{DETECTOR_NAME}/data"]
+        assert np.allclose(res[:, :256, :256], converted_image_stack_mask[indices, :256, :256])
+        assert np.allclose(res[:, :256, -256:], converted_image_stack_mask[indices, :256, -256:])
+        assert np.allclose(res[:, -256:, :256], converted_image_stack_mask[indices, -256:, :256])
+        assert np.allclose(res[:, -256:, -256:], converted_image_stack_mask[indices, -256:, -256:])
+
+
+def test_file_export_index2(file_adapter, tmpdir_factory):
+    indices = (0, 2, 4)
+    exported_file = tmpdir_factory.mktemp("export").join("test.h5")
+    file_adapter.export(exported_file, index=indices)
+
+    with h5py.File(exported_file, "r") as h5f:
+        res = h5f[f"/data/{DETECTOR_NAME}/data"]
+        assert np.allclose(res[:, :256, :256], converted_image_stack_mask[indices, :256, :256])
+        assert np.allclose(res[:, :256, -256:], converted_image_stack_mask[indices, :256, -256:])
+        assert np.allclose(res[:, -256:, :256], converted_image_stack_mask[indices, -256:, :256])
+        assert np.allclose(res[:, -256:, -256:], converted_image_stack_mask[indices, -256:, -256:])
+
+
+def test_file_export_index3(file_adapter, tmpdir_factory):
+    indices = range(0, 5, 2)
+    exported_file = tmpdir_factory.mktemp("export").join("test.h5")
+    file_adapter.export(exported_file, index=indices)
+
+    with h5py.File(exported_file, "r") as h5f:
+        res = h5f[f"/data/{DETECTOR_NAME}/data"]
+        assert np.allclose(res[:, :256, :256], converted_image_stack_mask[indices, :256, :256])
+        assert np.allclose(res[:, :256, -256:], converted_image_stack_mask[indices, :256, -256:])
+        assert np.allclose(res[:, -256:, :256], converted_image_stack_mask[indices, -256:, :256])
+        assert np.allclose(res[:, -256:, -256:], converted_image_stack_mask[indices, -256:, -256:])
+
+
+def test_file_export_roi1(file_adapter, tmpdir_factory):
+    roi = ((0, 256, 0, 256), )
+    exported_file = tmpdir_factory.mktemp("export").join("test.h5")
+    file_adapter.export(exported_file, roi=roi)
+
+    with h5py.File(exported_file, "r") as h5f:
+        res = h5f[f"/data/{DETECTOR_NAME}/data_roi_0"]
+        assert np.allclose(res[:], converted_image_stack_mask[:, :256, :256])
+
+
+def test_file_export_roi2(file_adapter, tmpdir_factory):
+    roi = ((0, 256, 0, 256), (16, 32, 64, 128))
+    exported_file = tmpdir_factory.mktemp("export").join("test.h5")
+    file_adapter.export(exported_file, roi=roi)
+
+    with h5py.File(exported_file, "r") as h5f:
+        res = h5f[f"/data/{DETECTOR_NAME}/data_roi_0"]
+        assert np.allclose(res[:], converted_image_stack_mask[:, :256, :256])
+
+        res = h5f[f"/data/{DETECTOR_NAME}/data_roi_1"]
+        assert np.allclose(res[:], converted_image_stack_mask[:, 16:32, 64:128])
