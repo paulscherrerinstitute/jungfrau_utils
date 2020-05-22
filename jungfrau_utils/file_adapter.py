@@ -22,7 +22,19 @@ os.environ["OMP_NUM_THREADS"] = "1"
 
 
 class File:
-    """Jungfrau file"""
+    """Jungfrau file wrapper.
+
+    Args:
+        file_path (str): Path to Jungfrau file
+        gain_file (str, optional): Path to gain file. Auto-locate if empty. Defaults to ''.
+        pedestal_file (str, optional): Path to pedestal file. Auto-locate if empty. Defaults to ''.
+        conversion (bool, optional): Apply gain conversion and pedestal correction.
+            Defaults to True.
+        mask (bool, optional): Perform masking of bad pixels (assign them to 0). Defaults to True.
+        gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
+        geometry (bool, optional): Apply geometry correction. Defaults to True.
+        parallel (bool, optional): Use parallelized processing. Defaults to True.
+    """
 
     def __init__(
         self,
@@ -35,22 +47,6 @@ class File:
         geometry=True,
         parallel=True,
     ):
-        """Create a new Jungfrau file wrapper.
-
-        Args:
-            file_path (str): Path to Jungfrau file
-            gain_file (str, optional): Path to gain file. Auto-locate if empty. Defaults to ''.
-            pedestal_file (str, optional): Path to pedestal file. Auto-locate if empty.
-                Defaults to ''.
-            conversion (bool, optional): Apply gain conversion and pedestal correction.
-                Defaults to True.
-            mask (bool, optional): Perform masking of bad pixels (assign them to 0).
-                Defaults to True.
-            gap_pixels (bool, optional): Add gap pixels between detector chips.
-                Defaults to True.
-            geometry (bool, optional): Apply geometry correction. Defaults to True.
-            parallel (bool, optional): Use parallelized processing. Defaults to True.
-        """
         self.file_path = Path(file_path)
 
         self.file = h5py.File(self.file_path, "r")
@@ -280,7 +276,7 @@ class File:
         else:
             if len(roi) == 4 and all(isinstance(v, int) for v in roi):
                 # this is a single tuple with coordinates, so wrap it in another tuple
-                roi = (roi, )
+                roi = (roi,)
 
             h5_dest.create_dataset(f"data/{self.detector_name}/n_roi", data=len(roi))
             for i, (roi_y1, roi_y2, roi_x1, roi_x2) in enumerate(roi):

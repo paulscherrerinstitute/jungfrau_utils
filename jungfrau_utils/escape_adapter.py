@@ -5,16 +5,16 @@ from jungfrau_utils.swissfel_helpers import locate_gain_file, locate_pedestal_fi
 
 
 class EscapeAdapter:
-    def __init__(self, file_path, gain_file="", pedestal_file=""):
-        """Escape adapter for jungfrau data handler.
+    """Adapter to interface jungfrau data handler with escape library.
 
-        Args:
-            file_path (str): Path to Jungfrau file, which metadata should be used for jungfrau
-                data handler setup.
-            gain_file (str, optional): Path to gain file. Auto-locate if empty. Defaults to "".
-            pedestal_file (str, optional): Path to pedestal file. Auto-locate if empty.
-                Defaults to "".
-        """
+    Args:
+        file_path (str): Path to Jungfrau file, which metadata should be used for jungfrau data
+            handler setup.
+        gain_file (str, optional): Path to gain file. Auto-locate if empty. Defaults to "".
+        pedestal_file (str, optional): Path to pedestal file. Auto-locate if empty. Defaults to "".
+    """
+
+    def __init__(self, file_path, gain_file="", pedestal_file=""):
         with h5py.File(file_path, "r") as h5f:
             detector_name = h5f["/general/detector_name"][()].decode()
             self.handler = JFDataHandler(detector_name)

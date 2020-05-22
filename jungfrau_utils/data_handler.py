@@ -47,13 +47,14 @@ def _allow_2darray(func):
 
 
 class JFDataHandler:
-    def __init__(self, detector_name):
-        """Create an object to perform jungfrau detector data handling like pedestal correction,
-        gain conversion, pixel mask, module map, etc.
+    """A class to perform jungfrau detector data handling like pedestal correction,
+    gain conversion, pixel mask, module map, etc.
 
-        Args:
-            detector_name (str): name of a detector in the form JF<id>T<nmod>V<version>
-        """
+    Args:
+        detector_name (str): name of a detector in the form JF<id>T<nmod>V<version>
+    """
+
+    def __init__(self, detector_name):
         # detector_name needs to be a valid name
         if detector_name in modules_orig:
             self._detector_name = detector_name
