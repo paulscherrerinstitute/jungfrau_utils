@@ -8,7 +8,7 @@ def locate_gain_file(file_path, verbose=True):
     """Locate gain file in default location at swissfel.
 
     The default gain file location is
-    '/sf/<beamline>/config/jungfrau/gainMaps/<detector>/gains.h5'.
+    ``/sf/<beamline>/config/jungfrau/gainMaps/<detector>/gains.h5``.
 
     Args:
         file_path (str or Path): File path of a jungfrau data file.
@@ -39,7 +39,7 @@ def locate_pedestal_file(file_path, verbose=True):
     """Locate pedestal file in default location at swissfel.
 
     The default processed pedestal files path for a particula p-group is
-    '/sf/<beamline>/data/<p-group>/res/JF_pedestals/'.
+    ``/sf/<beamline>/data/<p-group>/res/JF_pedestals/``.
 
     Args:
         file_path (str or Path): File path of a jungfrau data file.

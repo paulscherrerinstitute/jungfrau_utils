@@ -51,7 +51,7 @@ class JFDataHandler:
     gain conversion, pixel mask, module map, etc.
 
     Args:
-        detector_name (str): name of a detector in the form JF<id>T<nmod>V<version>
+        detector_name (str): name of a detector in the form ``JF<id>T<nmod>V<version>``
     """
 
     def __init__(self, detector_name):
