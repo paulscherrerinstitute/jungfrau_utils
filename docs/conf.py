@@ -16,6 +16,7 @@ sys.path.insert(0, os.path.abspath('..'))
 project = "jungfrau_utils"
 author = "Paul Scherrer Institute"
 
+release = "0.11.1"
 
 # -- General configuration ---------------------------------------------------
 
