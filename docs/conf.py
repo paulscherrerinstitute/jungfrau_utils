@@ -10,13 +10,13 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath('..'))
 
-
 # -- Project information -----------------------------------------------------
 
 project = "jungfrau_utils"
 author = "Paul Scherrer Institute"
 
-release = "0.11.1"
+import jungfrau_utils  # pylint: disable=wrong-import-position
+release = jungfrau_utils.__version__
 
 # -- General configuration ---------------------------------------------------
 
