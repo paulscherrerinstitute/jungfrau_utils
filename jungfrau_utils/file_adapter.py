@@ -254,7 +254,7 @@ class File:
         if roi is None:
             image_shape = self.handler.get_shape_out(self.gap_pixels, self.geometry)
             # TODO: this is not ideal, find a way to avoid the 2 next lines
-            if self.detector_name.startswith("JF06"):
+            if self.geometry and self.detector_name.startswith("JF06"):
                 image_shape = image_shape[1], image_shape[0]
 
             args["shape"] = (n_images, *image_shape)
