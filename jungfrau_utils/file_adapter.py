@@ -182,7 +182,14 @@ class File:
         return f"data/{self.detector_name}/data"
 
     def export(
-        self, dest, index=None, roi=None, compress=False, factor=None, dtype=None, batch_size=1000
+        self,
+        dest,
+        index=None,
+        roi=None,
+        compression=False,
+        factor=None,
+        dtype=None,
+        batch_size=1000,
     ):
         """Export processed data into a separate hdf5 file.
 
@@ -192,7 +199,7 @@ class File:
                 Export all images if None. Defaults to None.
             roi (tuple): A single tuple, or a tuple of tuples with image ROIs in a form
                 (bottom, top, left, right). Export whole images if None. Defaults to None.
-            compress (bool, optional): Apply bitshuffle+lz4 compression. Defaults to False.
+            compression (bool, optional): Apply bitshuffle+lz4 compression. Defaults to False.
             factor (float, optional): Divide all pixel values by a factor and round the result.
                 Keep the original data if None. Defaults to None.
             dtype (np.dtype, optional): Resulting image data type. Use dtype of the processed data
@@ -208,14 +215,14 @@ class File:
                     h5_dest=h5_dest,
                     index=index,
                     roi=roi,
-                    compress=compress,
+                    compression=compression,
                     factor=factor,
                     dtype=dtype,
                     batch_size=batch_size,
                 )
             )
 
-    def _visititems(self, name, obj, h5_dest, index, roi, compress, factor, dtype, batch_size):
+    def _visititems(self, name, obj, h5_dest, index, roi, compression, factor, dtype, batch_size):
         if isinstance(obj, h5py.Group):
             h5_dest.create_group(name)
 
@@ -223,7 +230,7 @@ class File:
             dset_source = self.file[name]
 
             if name == self._data_dataset:
-                self._process_data(h5_dest, index, roi, compress, factor, dtype, batch_size)
+                self._process_data(h5_dest, index, roi, compression, factor, dtype, batch_size)
 
             else:
                 if name.startswith("data"):
@@ -244,7 +251,7 @@ class File:
             for key, value in self.file[name].attrs.items():
                 h5_dest[name].attrs[key] = value
 
-    def _process_data(self, h5_dest, index, roi, compress, factor, dtype, batch_size):
+    def _process_data(self, h5_dest, index, roi, compression, factor, dtype, batch_size):
         args = dict()
         if index is None:
             n_images = self["data"].shape[0]
@@ -268,7 +275,7 @@ class File:
             else:
                 args["dtype"] = dtype
 
-            if compress:
+            if compression:
                 args.update(compargs)
 
             h5_dest.create_dataset_like(self._data_dataset, self.file[self._data_dataset], **args)
@@ -307,7 +314,7 @@ class File:
                 else:
                     args["dtype"] = dtype
 
-                if compress:
+                if compression:
                     args.update(compargs)
 
                 h5_dest.create_dataset(f"{self._data_dataset}_roi_{i}", **args)
