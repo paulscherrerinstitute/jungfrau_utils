@@ -328,19 +328,15 @@ class File:
             else:
                 batch_data = self[index[batch_slice], :, :]
 
+            if factor is not None:
+                batch_data /= factor
+                np.rint(batch_data, out=batch_data)
+
             if roi is None:
-                if factor is not None:
-                    batch_data = np.round(batch_data / factor)
-
                 h5_dest[self._data_dataset][batch_slice] = batch_data
-
             else:
                 for i, (roi_y1, roi_y2, roi_x1, roi_x2) in enumerate(roi):
                     roi_data = batch_data[:, slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)]
-
-                    if factor is not None:
-                        roi_data = np.round(roi_data / factor)
-
                     h5_dest[f"{self._data_dataset}_roi_{i}"][batch_slice] = roi_data
 
     def __enter__(self):
