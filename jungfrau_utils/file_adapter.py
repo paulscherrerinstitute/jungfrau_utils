@@ -353,7 +353,7 @@ class File:
         if isinstance(item, tuple):
             # multiple arguments: first is index, the rest is roi
             ind, roi = item[0], item[1:]
-        elif isinstance(item, (int, slice, list, range)):
+        elif isinstance(item, (int, slice, range, list, np.ndarray)):
             # single image index, no roi
             ind, roi = item, ()
         else:
@@ -366,7 +366,7 @@ class File:
             data = np.empty(shape=(len(ind), *dset.shape[1:]), dtype=dset.dtype)
             for i, j in enumerate(ind):
                 data[i] = dset[j]
-        elif isinstance(ind, (list, tuple, range)):
+        elif isinstance(ind, (list, tuple, range, np.ndarray)):
             data = np.empty(shape=(len(ind), *dset.shape[1:]), dtype=dset.dtype)
             for i, j in enumerate(ind):
                 data[i] = dset[j]
