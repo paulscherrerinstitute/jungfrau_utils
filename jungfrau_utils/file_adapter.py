@@ -360,18 +360,23 @@ class File:
             raise TypeError("Unknown selection type.")
 
         # Avoid a stride-bottleneck, see https://github.com/h5py/h5py/issues/977
+        if isinstance(ind, int):
+            is_index_consecutive = True
+        elif isinstance(ind, (slice, range)):
+            is_index_consecutive = ind.step is None or ind.step == 1
+        elif isinstance(ind, (list, tuple, np.ndarray)):
+            is_index_consecutive = np.sum(np.diff(ind)) == len(ind) - 1
+
         dset = self.file[f"/data/{self.detector_name}/data"]
-        if isinstance(ind, slice) and ind.step is not None and ind.step != 1:
-            ind = list(islice(range(dset.shape[0]), ind.start, ind.stop, ind.step))
-            data = np.empty(shape=(len(ind), *dset.shape[1:]), dtype=dset.dtype)
-            for i, j in enumerate(ind):
-                data[i] = dset[j]
-        elif isinstance(ind, (list, tuple, range, np.ndarray)):
-            data = np.empty(shape=(len(ind), *dset.shape[1:]), dtype=dset.dtype)
-            for i, j in enumerate(ind):
-                data[i] = dset[j]
-        else:
+        if is_index_consecutive:
             data = dset[ind]
+        else:
+            if isinstance(ind, slice):
+                ind = list(islice(range(dset.shape[0]), ind.start, ind.stop, ind.step))
+
+            data = np.empty(shape=(len(ind), *dset.shape[1:]), dtype=dset.dtype)
+            for i, j in enumerate(ind):
+                data[i] = dset[j]
 
         # Process data
         data = self.handler.process(
