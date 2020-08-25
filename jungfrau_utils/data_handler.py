@@ -165,13 +165,15 @@ class JFDataHandler:
 
         return shape_y, shape_x
 
-    def get_dtype_out(self, dtype_in, conversion=True):
+    def get_dtype_out(self, dtype_in, conversion=True, factor=None):
         """Resulting image dtype of a detector, based on input dtype and a conversion flag.
 
         Args:
             dtype_in (dtype): dtype of an input data.
             conversion (bool, optional): Whether data is expected to be converted to keV (apply gain
                 and pedestal corrections). Defaults to True.
+            factor (float, optional): Whether data is expected to be divided by a factor.
+                No data division if None. Defaults to None.
 
         Returns:
             dtype: dtype of a resulting image.
@@ -179,7 +181,11 @@ class JFDataHandler:
         if conversion:
             if dtype_in != np.uint16:
                 raise TypeError(f"Only images of type {np.uint16} can be converted.")
-            dtype_out = np.float32
+
+            if factor is None:
+                dtype_out = np.float32
+            else:
+                dtype_out = np.int32
         else:
             dtype_out = dtype_in
 
@@ -433,7 +439,14 @@ class JFDataHandler:
 
     @_allow_2darray
     def process(
-        self, images, conversion=True, mask=True, gap_pixels=True, geometry=True, parallel=False
+        self,
+        images,
+        conversion=True,
+        mask=True,
+        gap_pixels=True,
+        geometry=True,
+        parallel=False,
+        factor=None,
     ):
         """Perform jungfrau detector data processing like pedestal correction, gain conversion,
         applying pixel mask, module map, etc.
@@ -447,6 +460,9 @@ class JFDataHandler:
             gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
             geometry (bool, optional): Apply detector geometry corrections. Defaults to True.
             parallel (bool, optional): Parallelize image stack processing. Defaults to False.
+            factor (float, optional): If conversion is True, use this factor to divide converted
+                values. The output values are also rounded and casted to np.int32 dtype. Keep the
+                original values if None. Defaults to None.
 
         Returns:
             ndarray: Resulting image stack or single image
@@ -472,10 +488,10 @@ class JFDataHandler:
             gap_pixels = False
 
         res_shape = self.get_shape_out(gap_pixels=gap_pixels, geometry=geometry)
-        res_dtype = self.get_dtype_out(images.dtype, conversion=conversion)
+        res_dtype = self.get_dtype_out(images.dtype, conversion=conversion, factor=factor)
         res = np.zeros((images.shape[0], *res_shape), dtype=res_dtype)
 
-        self._process(res, images, conversion, mask, gap_pixels, geometry, parallel)
+        self._process(res, images, conversion, mask, gap_pixels, geometry, parallel, factor)
 
         # rotate image stack in case of alvra JF06 detector
         if geometry and self.detector_name.startswith("JF06"):
@@ -491,7 +507,7 @@ class JFDataHandler:
         """
         return (self.gain is not None) and (self.pedestal is not None)
 
-    def _process(self, res, images, conversion, mask, gap_pixels, geometry, parallel):
+    def _process(self, res, images, conversion, mask, gap_pixels, geometry, parallel, factor):
         if self.is_stripsel() and geometry:
             module_conv_shape = (images.shape[0], *self._get_shape_n_modules(1))
             module_conv = np.empty(shape=module_conv_shape, dtype=np.float32)
@@ -510,7 +526,7 @@ class JFDataHandler:
             module_p = self._get_module_slice(self._p, i, geometry) if conversion else None
 
             if self.is_stripsel() and geometry:
-                proc_func(module_conv, module, module_g, module_p, module_mask, gap_pixels)
+                proc_func(module_conv, module, module_g, module_p, module_mask, factor, gap_pixels)
                 module_res = res[:, oy : oy + STRIPSEL_SIZE_Y, ox : ox + STRIPSEL_SIZE_X]
                 reshape_stripsel(module_res, module_conv)
             else:
@@ -521,7 +537,7 @@ class JFDataHandler:
                     module_res_size_x += (CHIP_NUM_X - 1) * CHIP_GAP_X
 
                 module_res = res[:, oy : oy + module_res_size_y, ox : ox + module_res_size_x]
-                proc_func(module_res, module, module_g, module_p, module_mask, gap_pixels)
+                proc_func(module_res, module, module_g, module_p, module_mask, factor, gap_pixels)
 
     def _get_final_module_coordinates(self, m, i, geometry, gap_pixels):
         if geometry:
@@ -644,7 +660,7 @@ class JFDataHandler:
 
 
 @njit(cache=True)
-def _correct(res, image, gain, pedestal, mask, gap_pixels):
+def _correct(res, image, gain, pedestal, mask, factor, gap_pixels):
     num, size_y, size_x = image.shape
     for i1 in range(num):
         for i2 in range(size_y):
@@ -660,11 +676,15 @@ def _correct(res, image, gain, pedestal, mask, gap_pixels):
                     else:
                         gm = image[i1, i2, i3] >> 14
                         val = image[i1, i2, i3] & 0x3FFF
-                        res[i1, ri2, ri3] = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
+                        tmp_res = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
+                        if factor is None:
+                            res[i1, ri2, ri3] = tmp_res
+                        else:
+                            res[i1, ri2, ri3] = round(tmp_res / factor)
 
 
 @njit(cache=True)
-def _correct_highgain(res, image, gain, pedestal, mask, gap_pixels):
+def _correct_highgain(res, image, gain, pedestal, mask, factor, gap_pixels):
     num, size_y, size_x = image.shape
     for i1 in range(num):
         for i2 in range(size_y):
@@ -679,11 +699,15 @@ def _correct_highgain(res, image, gain, pedestal, mask, gap_pixels):
                         res[i1, ri2, ri3] = image[i1, i2, i3]
                     else:
                         val = image[i1, i2, i3] & 0x3FFF
-                        res[i1, ri2, ri3] = (val - pedestal[0, i2, i3]) * gain[0, i2, i3]
+                        tmp_res = (val - pedestal[0, i2, i3]) * gain[0, i2, i3]
+                        if factor is None:
+                            res[i1, ri2, ri3] = tmp_res
+                        else:
+                            res[i1, ri2, ri3] = round(tmp_res / factor)
 
 
 @njit(cache=True, parallel=True)
-def _correct_parallel(res, image, gain, pedestal, mask, gap_pixels):
+def _correct_parallel(res, image, gain, pedestal, mask, factor, gap_pixels):
     num, size_y, size_x = image.shape
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
     for i1 in prange(num):  # pylint: disable=not-an-iterable
@@ -700,11 +724,15 @@ def _correct_parallel(res, image, gain, pedestal, mask, gap_pixels):
                     else:
                         gm = image[i1, i2, i3] >> 14
                         val = image[i1, i2, i3] & 0x3FFF
-                        res[i1, ri2, ri3] = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
+                        tmp_res = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
+                        if factor is None:
+                            res[i1, ri2, ri3] = tmp_res
+                        else:
+                            res[i1, ri2, ri3] = round(tmp_res / factor)
 
 
 @njit(cache=True, parallel=True)
-def _correct_highgain_parallel(res, image, gain, pedestal, mask, gap_pixels):
+def _correct_highgain_parallel(res, image, gain, pedestal, mask, factor, gap_pixels):
     num, size_y, size_x = image.shape
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
     for i1 in prange(num):  # pylint: disable=not-an-iterable
@@ -720,7 +748,11 @@ def _correct_highgain_parallel(res, image, gain, pedestal, mask, gap_pixels):
                         res[i1, ri2, ri3] = image[i1, i2, i3]
                     else:
                         val = image[i1, i2, i3] & 0x3FFF
-                        res[i1, ri2, ri3] = (val - pedestal[0, i2, i3]) * gain[0, i2, i3]
+                        tmp_res = (val - pedestal[0, i2, i3]) * gain[0, i2, i3]
+                        if factor is None:
+                            res[i1, ri2, ri3] = tmp_res
+                        else:
+                            res[i1, ri2, ri3] = round(tmp_res / factor)
 
 
 @njit(cache=True)

@@ -34,6 +34,9 @@ class File:
         gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
         geometry (bool, optional): Apply geometry correction. Defaults to True.
         parallel (bool, optional): Use parallelized processing. Defaults to True.
+        factor (float, optional): If conversion is True, use this factor to divide converted
+            values. The output values are also rounded and casted to np.int32 dtype. Keep the
+            original values if None. Defaults to None.
     """
 
     def __init__(
@@ -46,6 +49,7 @@ class File:
         gap_pixels=True,
         geometry=True,
         parallel=True,
+        factor=None,
     ):
         self.file_path = Path(file_path)
 
@@ -57,6 +61,7 @@ class File:
         self._gap_pixels = gap_pixels
         self._geometry = geometry
         self._parallel = parallel
+        self._factor = factor
 
         # Gain file
         if not gain_file:
@@ -173,6 +178,16 @@ class File:
         self._parallel = value
 
     @property
+    def factor(self):
+        """A factor value.
+        """
+        return self._factor
+
+    @factor.setter
+    def factor(self, value):
+        self._factor = value
+
+    @property
     def _processed(self):
         # TODO: generalize this check for data reduction case, where dtype can be different
         return self.file[f"/data/{self.detector_name}/data"].dtype == np.float32
@@ -181,16 +196,7 @@ class File:
     def _data_dataset(self):
         return f"data/{self.detector_name}/data"
 
-    def export(
-        self,
-        dest,
-        index=None,
-        roi=None,
-        compression=False,
-        factor=None,
-        dtype=None,
-        batch_size=1000,
-    ):
+    def export(self, dest, index=None, roi=None, compression=False, dtype=None, batch_size=1000):
         """Export processed data into a separate hdf5 file.
 
         Args:
@@ -200,8 +206,6 @@ class File:
             roi (tuple): A single tuple, or a tuple of tuples with image ROIs in a form
                 (bottom, top, left, right). Export whole images if None. Defaults to None.
             compression (bool, optional): Apply bitshuffle+lz4 compression. Defaults to False.
-            factor (float, optional): Divide all pixel values by a factor and round the result.
-                Keep the original data if None. Defaults to None.
             dtype (np.dtype, optional): Resulting image data type. Use dtype of the processed data
                 if None. Defaults to None.
             batch_size (int, optional): Process images in batches of that size in order to avoid
@@ -216,13 +220,12 @@ class File:
                     index=index,
                     roi=roi,
                     compression=compression,
-                    factor=factor,
                     dtype=dtype,
                     batch_size=batch_size,
                 )
             )
 
-    def _visititems(self, name, obj, h5_dest, index, roi, compression, factor, dtype, batch_size):
+    def _visititems(self, name, obj, h5_dest, index, roi, compression, dtype, batch_size):
         if isinstance(obj, h5py.Group):
             h5_dest.create_group(name)
 
@@ -230,7 +233,7 @@ class File:
             dset_source = self.file[name]
 
             if name == self._data_dataset:
-                self._process_data(h5_dest, index, roi, compression, factor, dtype, batch_size)
+                self._process_data(h5_dest, index, roi, compression, dtype, batch_size)
 
             else:
                 if name.startswith("data"):
@@ -251,7 +254,7 @@ class File:
             for key, value in self.file[name].attrs.items():
                 h5_dest[name].attrs[key] = value
 
-    def _process_data(self, h5_dest, index, roi, compression, factor, dtype, batch_size):
+    def _process_data(self, h5_dest, index, roi, compression, dtype, batch_size):
         args = dict()
         if index is None:
             n_images = self["data"].shape[0]
@@ -270,7 +273,7 @@ class File:
 
             if dtype is None:
                 args["dtype"] = self.handler.get_dtype_out(
-                    self["data"].dtype, conversion=self.conversion
+                    self["data"].dtype, conversion=self.conversion, factor=self.factor
                 )
             else:
                 args["dtype"] = dtype
@@ -309,7 +312,7 @@ class File:
 
                 if dtype is None:
                     args["dtype"] = self.handler.get_dtype_out(
-                        self["data"].dtype, conversion=self.conversion
+                        self["data"].dtype, conversion=self.conversion, factor=self.factor
                     )
                 else:
                     args["dtype"] = dtype
@@ -327,10 +330,6 @@ class File:
                 batch_data = self[batch_slice, :, :]
             else:
                 batch_data = self[index[batch_slice], :, :]
-
-            if factor is not None:
-                batch_data /= factor
-                np.rint(batch_data, out=batch_data)
 
             if roi is None:
                 h5_dest[self._data_dataset][batch_slice] = batch_data
@@ -386,6 +385,7 @@ class File:
             gap_pixels=self.gap_pixels,
             geometry=self.geometry,
             parallel=self.parallel,
+            factor=self.factor,
         )
 
         if roi:
