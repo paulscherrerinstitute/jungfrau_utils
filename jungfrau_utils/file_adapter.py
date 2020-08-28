@@ -34,9 +34,6 @@ class File:
         gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
         geometry (bool, optional): Apply geometry correction. Defaults to True.
         parallel (bool, optional): Use parallelized processing. Defaults to True.
-        factor (float, optional): If conversion is True, use this factor to divide converted
-            values. The output values are also rounded and casted to np.int32 dtype. Keep the
-            original values if None. Defaults to None.
     """
 
     def __init__(
@@ -49,7 +46,6 @@ class File:
         gap_pixels=True,
         geometry=True,
         parallel=True,
-        factor=None,
     ):
         self.file_path = Path(file_path)
 
@@ -61,9 +57,6 @@ class File:
         self._gap_pixels = gap_pixels
         self._geometry = geometry
         self._parallel = parallel
-
-        # Factor
-        self.handler.factor = factor
 
         # Gain file
         if not gain_file:
@@ -180,16 +173,6 @@ class File:
         self._parallel = value
 
     @property
-    def factor(self):
-        """A factor value.
-        """
-        return self.handler.factor
-
-    @factor.setter
-    def factor(self, value):
-        self.handler.factor = value
-
-    @property
     def _processed(self):
         # TODO: generalize this check for data reduction case, where dtype can be different
         return self.file[f"/data/{self.detector_name}/data"].dtype == np.float32
@@ -198,7 +181,16 @@ class File:
     def _data_dataset(self):
         return f"data/{self.detector_name}/data"
 
-    def export(self, dest, index=None, roi=None, compression=False, dtype=None, batch_size=1000):
+    def export(
+        self,
+        dest,
+        index=None,
+        roi=None,
+        compression=False,
+        factor=None,
+        dtype=None,
+        batch_size=1000,
+    ):
         """Export processed data into a separate hdf5 file.
 
         Args:
@@ -208,11 +200,16 @@ class File:
             roi (tuple): A single tuple, or a tuple of tuples with image ROIs in a form
                 (bottom, top, left, right). Export whole images if None. Defaults to None.
             compression (bool, optional): Apply bitshuffle+lz4 compression. Defaults to False.
+            factor (float, optional): If conversion is True, use this factor to divide converted
+                values. The output values are also rounded and casted to np.int32 dtype. Keep the
+                original values if None. Defaults to None.
             dtype (np.dtype, optional): Resulting image data type. Use dtype of the processed data
                 if None. Defaults to None.
             batch_size (int, optional): Process images in batches of that size in order to avoid
                 running out of memory. Defaults to 1000.
         """
+        self.handler.factor = factor
+
         with h5py.File(dest, "w") as h5_dest:
             # a function for 'visititems' should have the args (name, object)
             self.file.visititems(
