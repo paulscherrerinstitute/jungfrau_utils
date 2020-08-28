@@ -61,7 +61,9 @@ class File:
         self._gap_pixels = gap_pixels
         self._geometry = geometry
         self._parallel = parallel
-        self._factor = factor
+
+        # Factor
+        self.handler.factor = factor
 
         # Gain file
         if not gain_file:
@@ -181,11 +183,11 @@ class File:
     def factor(self):
         """A factor value.
         """
-        return self._factor
+        return self.handler.factor
 
     @factor.setter
     def factor(self, value):
-        self._factor = value
+        self.handler.factor = value
 
     @property
     def _processed(self):
@@ -273,7 +275,7 @@ class File:
 
             if dtype is None:
                 args["dtype"] = self.handler.get_dtype_out(
-                    self["data"].dtype, conversion=self.conversion, factor=self.factor
+                    self["data"].dtype, conversion=self.conversion
                 )
             else:
                 args["dtype"] = dtype
@@ -312,7 +314,7 @@ class File:
 
                 if dtype is None:
                     args["dtype"] = self.handler.get_dtype_out(
-                        self["data"].dtype, conversion=self.conversion, factor=self.factor
+                        self["data"].dtype, conversion=self.conversion
                     )
                 else:
                     args["dtype"] = dtype
@@ -385,7 +387,6 @@ class File:
             gap_pixels=self.gap_pixels,
             geometry=self.geometry,
             parallel=self.parallel,
-            factor=self.factor,
         )
 
         if roi:

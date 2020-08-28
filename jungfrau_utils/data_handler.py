@@ -69,6 +69,7 @@ class JFDataHandler:
         self._pedestal = None
         self._pixel_mask = None
 
+        self._factor = None
         self._highgain = False
 
         # gain and pedestal arrays with better memory layout for the actual data conversion
@@ -165,15 +166,13 @@ class JFDataHandler:
 
         return shape_y, shape_x
 
-    def get_dtype_out(self, dtype_in, conversion=True, factor=None):
+    def get_dtype_out(self, dtype_in, conversion=True):
         """Resulting image dtype of a detector, based on input dtype and a conversion flag.
 
         Args:
             dtype_in (dtype): dtype of an input data.
             conversion (bool, optional): Whether data is expected to be converted to keV (apply gain
                 and pedestal corrections). Defaults to True.
-            factor (float, optional): Whether data is expected to be divided by a factor.
-                No data division if None. Defaults to None.
 
         Returns:
             dtype: dtype of a resulting image.
@@ -182,7 +181,7 @@ class JFDataHandler:
             if dtype_in != np.uint16:
                 raise TypeError(f"Only images of type {np.uint16} can be converted.")
 
-            if factor is None:
+            if self.factor is None:
                 dtype_out = np.float32
             else:
                 dtype_out = np.int32
@@ -234,8 +233,13 @@ class JFDataHandler:
 
         # convert _gain values to float32
         self._gain = value.astype(np.float32, copy=False)
+        self._update_g_all()
 
-        _g = 1 / self._gain
+    def _update_g_all(self):
+        if self.factor is None:
+            _g = 1 / self.gain
+        else:
+            _g = 1 / self.factor / self.gain
 
         self._g_all[True] = _g[3:].copy()
 
@@ -299,6 +303,28 @@ class JFDataHandler:
 
         _p[3] = _p[2]
         self._p_all[False] = _p
+
+    @property
+    def factor(self):
+        """A factor value.
+
+        If conversion is True, use this factor to divide converted values. The output values are
+        also rounded and casted to np.int32 dtype. Keep the original values if None.
+        """
+        return self._factor
+
+    @factor.setter
+    def factor(self, value):
+        if value is not None:
+            value = float(value)
+
+        if self._factor == value:
+            return
+
+        self._factor = value
+
+        if self.gain is not None:
+            self._update_g_all()
 
     @property
     def highgain(self):
@@ -439,14 +465,7 @@ class JFDataHandler:
 
     @_allow_2darray
     def process(
-        self,
-        images,
-        conversion=True,
-        mask=True,
-        gap_pixels=True,
-        geometry=True,
-        parallel=False,
-        factor=None,
+        self, images, conversion=True, mask=True, gap_pixels=True, geometry=True, parallel=False
     ):
         """Perform jungfrau detector data processing like pedestal correction, gain conversion,
         applying pixel mask, module map, etc.
@@ -460,9 +479,6 @@ class JFDataHandler:
             gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
             geometry (bool, optional): Apply detector geometry corrections. Defaults to True.
             parallel (bool, optional): Parallelize image stack processing. Defaults to False.
-            factor (float, optional): If conversion is True, use this factor to divide converted
-                values. The output values are also rounded and casted to np.int32 dtype. Keep the
-                original values if None. Defaults to None.
 
         Returns:
             ndarray: Resulting image stack or single image
@@ -488,10 +504,10 @@ class JFDataHandler:
             gap_pixels = False
 
         res_shape = self.get_shape_out(gap_pixels=gap_pixels, geometry=geometry)
-        res_dtype = self.get_dtype_out(images.dtype, conversion=conversion, factor=factor)
+        res_dtype = self.get_dtype_out(images.dtype, conversion=conversion)
         res = np.zeros((images.shape[0], *res_shape), dtype=res_dtype)
 
-        self._process(res, images, conversion, mask, gap_pixels, geometry, parallel, factor)
+        self._process(res, images, conversion, mask, gap_pixels, geometry, parallel)
 
         # rotate image stack in case of alvra JF06 detector
         if geometry and self.detector_name.startswith("JF06"):
@@ -507,13 +523,14 @@ class JFDataHandler:
         """
         return (self.gain is not None) and (self.pedestal is not None)
 
-    def _process(self, res, images, conversion, mask, gap_pixels, geometry, parallel, factor):
+    def _process(self, res, images, conversion, mask, gap_pixels, geometry, parallel):
         if self.is_stripsel() and geometry:
             module_conv_shape = (images.shape[0], *self._get_shape_n_modules(1))
             module_conv = np.empty(shape=module_conv_shape, dtype=np.float32)
             reshape_stripsel = self._reshape_stripsel(parallel=parallel)
 
         proc_func = self._proc_func(parallel=parallel)
+        factor = self.factor
 
         for i, m in enumerate(self.module_map):
             if m == -1:
@@ -680,7 +697,7 @@ def _correct(res, image, gain, pedestal, mask, factor, gap_pixels):
                         if factor is None:
                             res[i1, ri2, ri3] = tmp_res
                         else:
-                            res[i1, ri2, ri3] = round(tmp_res / factor)
+                            res[i1, ri2, ri3] = round(tmp_res)
 
 
 @njit(cache=True)
@@ -703,7 +720,7 @@ def _correct_highgain(res, image, gain, pedestal, mask, factor, gap_pixels):
                         if factor is None:
                             res[i1, ri2, ri3] = tmp_res
                         else:
-                            res[i1, ri2, ri3] = round(tmp_res / factor)
+                            res[i1, ri2, ri3] = round(tmp_res)
 
 
 @njit(cache=True, parallel=True)
@@ -728,7 +745,7 @@ def _correct_parallel(res, image, gain, pedestal, mask, factor, gap_pixels):
                         if factor is None:
                             res[i1, ri2, ri3] = tmp_res
                         else:
-                            res[i1, ri2, ri3] = round(tmp_res / factor)
+                            res[i1, ri2, ri3] = round(tmp_res)
 
 
 @njit(cache=True, parallel=True)
@@ -752,7 +769,7 @@ def _correct_highgain_parallel(res, image, gain, pedestal, mask, factor, gap_pix
                         if factor is None:
                             res[i1, ri2, ri3] = tmp_res
                         else:
-                            res[i1, ri2, ri3] = round(tmp_res / factor)
+                            res[i1, ri2, ri3] = round(tmp_res)
 
 
 @njit(cache=True)
