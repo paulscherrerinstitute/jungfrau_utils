@@ -1,9 +1,11 @@
 import os
+import struct
 import warnings
 from functools import partial
 from itertools import islice
 from pathlib import Path
 
+import bitshuffle
 import h5py
 import numpy as np
 from bitshuffle.h5 import H5_COMPRESS_LZ4, H5FILTER  # pylint: disable=no-name-in-module
@@ -14,7 +16,7 @@ from jungfrau_utils.swissfel_helpers import locate_gain_file, locate_pedestal_fi
 warnings.filterwarnings("default", category=DeprecationWarning)
 
 # bitshuffle hdf5 filter params
-BLOCK_SIZE = 0
+BLOCK_SIZE = 2048
 compargs = {"compression": H5FILTER, "compression_opts": (BLOCK_SIZE, H5_COMPRESS_LZ4)}
 # limit bitshuffle omp to a single thread
 # a better fix would be to use bitshuffle compiled without omp support
@@ -331,7 +333,15 @@ class File:
                 batch_data = self[index[batch_slice], :, :]
 
             if roi is None:
-                h5_dest[self._data_dataset][batch_slice] = batch_data
+                bytes_number_of_elements = struct.pack(">q", image_shape[0] * image_shape[1] * 4)
+                bytes_block_size = struct.pack(">i", BLOCK_SIZE * 4)
+                header = bytes_number_of_elements + bytes_block_size
+
+                for i, im in enumerate(batch_data):
+                    compressed = bitshuffle.compress_lz4(im, BLOCK_SIZE)
+                    byte_array = header + compressed.tobytes()
+                    h5_dest[self._data_dataset].id.write_direct_chunk((ind + i, 0, 0), byte_array)
+
             else:
                 for i, (roi_y1, roi_y2, roi_x1, roi_x2) in enumerate(roi):
                     roi_data = batch_data[:, slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)]
