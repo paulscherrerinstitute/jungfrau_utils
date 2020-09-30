@@ -465,7 +465,14 @@ class JFDataHandler:
 
     @_allow_2darray
     def process(
-        self, images, conversion=True, mask=True, gap_pixels=True, geometry=True, parallel=False
+        self,
+        images,
+        conversion=True,
+        mask=True,
+        gap_pixels=True,
+        geometry=True,
+        parallel=False,
+        out=None,
     ):
         """Perform jungfrau detector data processing like pedestal correction, gain conversion,
         applying pixel mask, module map, etc.
@@ -479,6 +486,9 @@ class JFDataHandler:
             gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
             geometry (bool, optional): Apply detector geometry corrections. Defaults to True.
             parallel (bool, optional): Parallelize image stack processing. Defaults to False.
+            out (ndarray, optional): If provided, the destination to place the result. The shape
+                must be correct, matching that of what the function would have returned if no out
+                argument were specified. Defaults to None.
 
         Returns:
             ndarray: Resulting image stack or single image
@@ -503,17 +513,18 @@ class JFDataHandler:
             warnings.warn("'gap_pixels' flag has no effect on stripsel detectors", RuntimeWarning)
             gap_pixels = False
 
-        res_shape = self.get_shape_out(gap_pixels=gap_pixels, geometry=geometry)
-        res_dtype = self.get_dtype_out(images.dtype, conversion=conversion)
-        res = np.zeros((images.shape[0], *res_shape), dtype=res_dtype)
+        if out is None:
+            out_shape = self.get_shape_out(gap_pixels=gap_pixels, geometry=geometry)
+            out_dtype = self.get_dtype_out(images.dtype, conversion=conversion)
+            out = np.zeros((images.shape[0], *out_shape), dtype=out_dtype)
 
-        self._process(res, images, conversion, mask, gap_pixels, geometry, parallel)
+        self._process(out, images, conversion, mask, gap_pixels, geometry, parallel)
 
         # rotate image stack in case of alvra JF06 detector
         if geometry and self.detector_name.startswith("JF06"):
-            res = np.rot90(res, axes=(1, 2))
+            out = np.rot90(out, axes=(1, 2))
 
-        return res
+        return out
 
     def can_convert(self):
         """Whether all data for gain/pedestal conversion is present.
