@@ -328,6 +328,8 @@ class File:
 
         # prepare buffers to be reused for every batch
         if roi is None:
+            read_buffer = np.empty((batch_size, *dset.shape[1:]), dtype=dset.dtype)
+
             out_shape = self.handler.get_shape_out(
                 gap_pixels=self.gap_pixels, geometry=self.geometry
             )
@@ -343,19 +345,20 @@ class File:
             else:
                 batch_ind = index[batch_range]
 
+            read_buffer_view = read_buffer[: len(batch_ind)]
             out_buffer_view = out_buffer[: len(batch_ind)]
 
+            # Avoid a stride-bottleneck, see https://github.com/h5py/h5py/issues/977
             if np.sum(np.diff(batch_ind)) == len(batch_ind) - 1:
                 # consecutive index values
-                batch_data = dset[batch_ind]
+                dset.read_direct(read_buffer_view, source_sel=np.s_[batch_ind])
             else:
-                batch_data = np.empty(shape=(len(batch_ind), *dset.shape[1:]), dtype=dset.dtype)
                 for i, j in enumerate(batch_ind):
-                    batch_data[i] = dset[j]
+                    dset.read_direct(read_buffer_view, source_sel=np.s_[j], dest_sel=np.s_[i])
 
             # Process data
             self.handler.process(
-                batch_data,
+                read_buffer_view,
                 conversion=self.conversion,
                 mask=self.mask,
                 gap_pixels=self.gap_pixels,
