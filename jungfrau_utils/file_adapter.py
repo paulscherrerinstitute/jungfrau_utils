@@ -326,6 +326,14 @@ class File:
 
         dset = self.file[f"/data/{self.detector_name}/data"]
 
+        # prepare buffers to be reused for every batch
+        if roi is None:
+            out_shape = self.handler.get_shape_out(
+                gap_pixels=self.gap_pixels, geometry=self.geometry
+            )
+            out_dtype = self.handler.get_dtype_out(dset.dtype, conversion=self.conversion)
+            out_buffer = np.zeros((batch_size, *out_shape), dtype=out_dtype)
+
         # process and write data in batches
         for ind in range(0, n_images, batch_size):
             batch_range = range(ind, min(ind + batch_size, n_images))
@@ -334,6 +342,8 @@ class File:
                 batch_ind = batch_range
             else:
                 batch_ind = index[batch_range]
+
+            out_buffer_view = out_buffer[: len(batch_ind)]
 
             if np.sum(np.diff(batch_ind)) == len(batch_ind) - 1:
                 # consecutive index values
@@ -344,13 +354,14 @@ class File:
                     batch_data[i] = dset[j]
 
             # Process data
-            batch_data = self.handler.process(
+            self.handler.process(
                 batch_data,
                 conversion=self.conversion,
                 mask=self.mask,
                 gap_pixels=self.gap_pixels,
                 geometry=self.geometry,
                 parallel=self.parallel,
+                out=out_buffer_view,
             )
 
             if roi is None:
@@ -358,14 +369,14 @@ class File:
                 bytes_block_size = struct.pack(">i", BLOCK_SIZE * 4)
                 header = bytes_number_of_elements + bytes_block_size
 
-                for i, im in enumerate(batch_data):
+                for i, im in enumerate(out_buffer_view):
                     compressed = bitshuffle.compress_lz4(im, BLOCK_SIZE)
                     byte_array = header + compressed.tobytes()
                     h5_dest[self._data_dataset].id.write_direct_chunk((ind + i, 0, 0), byte_array)
 
             else:
                 for i, (roi_y1, roi_y2, roi_x1, roi_x2) in enumerate(roi):
-                    roi_data = batch_data[:, slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)]
+                    roi_data = out_buffer_view[:, slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)]
                     h5_dest[f"{self._data_dataset}_roi_{i}"][batch_range] = roi_data
 
     def __enter__(self):
