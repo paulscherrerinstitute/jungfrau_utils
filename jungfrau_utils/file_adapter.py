@@ -260,6 +260,7 @@ class File:
         if index is None:
             n_images = self["data"].shape[0]
         else:
+            index = np.array(index)
             n_images = len(index)
 
         if roi is None:
@@ -323,14 +324,34 @@ class File:
 
                 h5_dest.create_dataset(f"{self._data_dataset}_roi_{i}", **args)
 
+        dset = self.file[f"/data/{self.detector_name}/data"]
+
         # process and write data in batches
         for ind in range(0, n_images, batch_size):
-            batch_slice = slice(ind, min(ind + batch_size, n_images))
+            batch_range = range(ind, min(ind + batch_size, n_images))
 
             if index is None:
-                batch_data = self[batch_slice, :, :]
+                batch_ind = batch_range
             else:
-                batch_data = self[index[batch_slice], :, :]
+                batch_ind = index[batch_range]
+
+            if np.sum(np.diff(batch_ind)) == len(batch_ind) - 1:
+                # consecutive index values
+                batch_data = dset[batch_ind]
+            else:
+                batch_data = np.empty(shape=(len(batch_ind), *dset.shape[1:]), dtype=dset.dtype)
+                for i, j in enumerate(batch_ind):
+                    batch_data[i] = dset[j]
+
+            # Process data
+            batch_data = self.handler.process(
+                batch_data,
+                conversion=self.conversion,
+                mask=self.mask,
+                gap_pixels=self.gap_pixels,
+                geometry=self.geometry,
+                parallel=self.parallel,
+            )
 
             if roi is None:
                 bytes_number_of_elements = struct.pack(">q", image_shape[0] * image_shape[1] * 4)
@@ -345,7 +366,7 @@ class File:
             else:
                 for i, (roi_y1, roi_y2, roi_x1, roi_x2) in enumerate(roi):
                     roi_data = batch_data[:, slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)]
-                    h5_dest[f"{self._data_dataset}_roi_{i}"][batch_slice] = roi_data
+                    h5_dest[f"{self._data_dataset}_roi_{i}"][batch_range] = roi_data
 
     def __enter__(self):
         return self
