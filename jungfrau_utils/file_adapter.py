@@ -327,8 +327,8 @@ class File:
         out_buffer = np.zeros((batch_size, *out_shape), dtype=out_dtype)
 
         # process and write data in batches
-        for ind in range(0, n_images, batch_size):
-            batch_range = range(ind, min(ind + batch_size, n_images))
+        for batch_start_ind in range(0, n_images, batch_size):
+            batch_range = range(batch_start_ind, min(batch_start_ind + batch_size, n_images))
 
             if index is None:
                 batch_ind = batch_range
@@ -362,10 +362,13 @@ class File:
                 bytes_block_size = struct.pack(">i", BLOCK_SIZE * 4)
                 header = bytes_number_of_elements + bytes_block_size
 
-                for i, im in enumerate(out_buffer_view):
-                    compressed = bitshuffle.compress_lz4(im, BLOCK_SIZE)
-                    byte_array = header + compressed.tobytes()
-                    h5_dest[self._data_dataset].id.write_direct_chunk((ind + i, 0, 0), byte_array)
+                for pos, im in zip(batch_range, out_buffer_view):
+                    if compression:
+                        byte_array = header + bitshuffle.compress_lz4(im, BLOCK_SIZE).tobytes()
+                    else:
+                        byte_array = im.tobytes()
+
+                    h5_dest[self._data_dataset].id.write_direct_chunk((pos, 0, 0), byte_array)
 
             else:
                 for i, (roi_y1, roi_y2, roi_x1, roi_x2) in enumerate(roi):
