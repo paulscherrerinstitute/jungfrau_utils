@@ -320,14 +320,11 @@ class File:
         dset = self.file[f"/data/{self.detector_name}/data"]
 
         # prepare buffers to be reused for every batch
-        if roi is None:
-            read_buffer = np.empty((batch_size, *dset.shape[1:]), dtype=dset.dtype)
+        read_buffer = np.empty((batch_size, *dset.shape[1:]), dtype=dset.dtype)
 
-            out_shape = self.handler.get_shape_out(
-                gap_pixels=self.gap_pixels, geometry=self.geometry
-            )
-            out_dtype = self.handler.get_dtype_out(dset.dtype, conversion=self.conversion)
-            out_buffer = np.zeros((batch_size, *out_shape), dtype=out_dtype)
+        out_shape = self.handler.get_shape_out(gap_pixels=self.gap_pixels, geometry=self.geometry)
+        out_dtype = self.handler.get_dtype_out(dset.dtype, conversion=self.conversion)
+        out_buffer = np.zeros((batch_size, *out_shape), dtype=out_dtype)
 
         # process and write data in batches
         for ind in range(0, n_images, batch_size):
