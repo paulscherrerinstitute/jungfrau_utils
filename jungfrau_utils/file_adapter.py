@@ -184,14 +184,7 @@ class File:
         return f"data/{self.detector_name}/data"
 
     def export(
-        self,
-        dest,
-        index=None,
-        roi=None,
-        compression=False,
-        factor=None,
-        dtype=None,
-        batch_size=1000,
+        self, dest, index=None, roi=None, compression=False, factor=None, dtype=None, batch_size=100
     ):
         """Export processed data into a separate hdf5 file.
 
@@ -208,7 +201,7 @@ class File:
             dtype (np.dtype, optional): Resulting image data type. Use dtype of the processed data
                 if None. Defaults to None.
             batch_size (int, optional): Process images in batches of that size in order to avoid
-                running out of memory. Defaults to 1000.
+                running out of memory. Defaults to 100.
         """
         self.handler.factor = factor
 
