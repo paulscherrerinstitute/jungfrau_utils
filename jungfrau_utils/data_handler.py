@@ -801,20 +801,20 @@ def _reshape_stripsel(res, image):
             for yin in range(256):
                 yout = (yin // 6) * 2
 
-                # first the left side of gap
-                xin = igap * 64 + 63
-                xout = igap * 774 + 765 + yin % 6
-                res[ind, yout, xout] = image[ind, yin, xin]
-                res[ind, yout + 1, xout] = image[ind, yin, xin]
-
-                # then the right side is mirrored
-                xin = igap * 64 + 63 + 1
-                xout = igap * 774 + 765 + 11 - yin % 6
-                res[ind, yout, xout] = image[ind, yin, xin]
-                res[ind, yout + 1, xout] = image[ind, yin, xin]
                 # if we want a proper normalization (the area of those pixels is double,
                 # so they see 2x the signal)
-                # res[ind, yout, xout] = res[ind, yout, xout] / 2
+
+                # first the left side of gap
+                xin = igap * 256 + 255
+                xout = igap * 774 + 765 + yin % 6
+                res[ind, yout, xout] = image[ind, yin, xin] / 2
+                res[ind, yout + 1, xout] = image[ind, yin, xin] / 2
+
+                # then the right side is mirrored
+                xin = igap * 256 + 255 + 1
+                xout = igap * 774 + 765 + 11 - yin % 6
+                res[ind, yout, xout] = image[ind, yin, xin] / 2
+                res[ind, yout + 1, xout] = image[ind, yin, xin] / 2
 
 
 @njit(cache=True, parallel=True)
@@ -836,17 +836,17 @@ def _reshape_stripsel_parallel(res, image):
             for yin in range(256):
                 yout = (yin // 6) * 2
 
-                # first the left side of gap
-                xin = igap * 64 + 63
-                xout = igap * 774 + 765 + yin % 6
-                res[ind, yout, xout] = image[ind, yin, xin]
-                res[ind, yout + 1, xout] = image[ind, yin, xin]
-
-                # then the right side is mirrored
-                xin = igap * 64 + 63 + 1
-                xout = igap * 774 + 765 + 11 - yin % 6
-                res[ind, yout, xout] = image[ind, yin, xin]
-                res[ind, yout + 1, xout] = image[ind, yin, xin]
                 # if we want a proper normalization (the area of those pixels is double,
                 # so they see 2x the signal)
-                # res[ind, yout, xout] = res[ind, yout, xout] / 2
+
+                # first the left side of gap
+                xin = igap * 256 + 255
+                xout = igap * 774 + 765 + yin % 6
+                res[ind, yout, xout] = image[ind, yin, xin] / 2
+                res[ind, yout + 1, xout] = image[ind, yin, xin] / 2
+
+                # then the right side is mirrored
+                xin = igap * 256 + 255 + 1
+                xout = igap * 774 + 765 + 11 - yin % 6
+                res[ind, yout, xout] = image[ind, yin, xin] / 2
+                res[ind, yout + 1, xout] = image[ind, yin, xin] / 2
