@@ -152,9 +152,8 @@ modules_orig = {
     ),
 
     "JF11T04V01": (
-        # a vertical gap of 4 pix is artificial, because they are physically separated 2 detectors
-        [0, 0, 90, 90],
-        [0, 3117, 0, 3117],
+        [0, 0, 0, 0],
+        [9306, 6198, 3108, 0],
     ),
 
     "JF12T04V01": (
