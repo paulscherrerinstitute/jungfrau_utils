@@ -513,6 +513,12 @@ class JFDataHandler:
             warnings.warn("'gap_pixels' flag has no effect on stripsel detectors", RuntimeWarning)
             gap_pixels = False
 
+        if self.is_stripsel() and self.mask_double_pixels:
+            warnings.warn(
+                "'mask_double_pixels' flag has no effect on stripsel detectors", RuntimeWarning
+            )
+            self.mask_double_pixels = False
+
         if out is None:
             out_shape = self.get_shape_out(gap_pixels=gap_pixels, geometry=geometry)
             out_dtype = self.get_dtype_out(images.dtype, conversion=conversion)
