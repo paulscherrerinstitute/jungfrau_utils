@@ -22,9 +22,11 @@ CHIP_GAP_X = 2
 CHIP_GAP_Y = 2
 
 # 256 not divisible by 3, so we round up to 86
+# the last 4 pixels can be omitted, so the final height is (256 - 4) / 3 = 84
+
 # 18 since we have 6 more pixels in H per gap
 STRIPSEL_SIZE_X = 1024 * 3 + 18  # = 3090
-STRIPSEL_SIZE_Y = 86
+STRIPSEL_SIZE_Y = 84
 
 
 def _allow_2darray(func):
@@ -794,7 +796,7 @@ def _reshape_stripsel(res, image):
     num = image.shape[0]
     for ind in range(num):
         # first we fill the normal pixels, the gap ones will be overwritten later
-        for yin in range(256):
+        for yin in range(252):
             for xin in range(1024):
                 ichip = xin // 256
                 xout = (ichip * 774) + (xin % 256) * 3 + yin % 3
@@ -804,7 +806,7 @@ def _reshape_stripsel(res, image):
 
         # now the gap pixels
         for igap in range(3):
-            for yin in range(256):
+            for yin in range(252):
                 yout = (yin // 6) * 2
 
                 # if we want a proper normalization (the area of those pixels is double,
@@ -829,7 +831,7 @@ def _reshape_stripsel_parallel(res, image):
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
     for ind in prange(num):  # pylint: disable=not-an-iterable
         # first we fill the normal pixels, the gap ones will be overwritten later
-        for yin in range(256):
+        for yin in range(252):
             for xin in range(1024):
                 ichip = xin // 256
                 xout = (ichip * 774) + (xin % 256) * 3 + yin % 3
@@ -839,7 +841,7 @@ def _reshape_stripsel_parallel(res, image):
 
         # now the gap pixels
         for igap in range(3):
-            for yin in range(256):
+            for yin in range(252):
                 yout = (yin // 6) * 2
 
                 # if we want a proper normalization (the area of those pixels is double,

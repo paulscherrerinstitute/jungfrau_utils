@@ -9,7 +9,7 @@ STACK_SHAPE = (5, *DATA_SHAPE)
 
 # gap_pixels don't affect stripsel processing
 DATA_SHAPE_WITH_GAPS = DATA_SHAPE
-DATA_SHAPE_WITH_GEOMETRY = (86, 1024 * 3 + 18)
+DATA_SHAPE_WITH_GEOMETRY = (84, 1024 * 3 + 18)
 DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY = DATA_SHAPE_WITH_GEOMETRY
 
 pedestal = np.ones((4, *DATA_SHAPE)).astype(np.float32)
