@@ -1,0 +1,25 @@
+name: Deployment
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  publish-conda-package:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Prepare
+      run: |
+        $CONDA/bin/conda install --quiet --yes conda-build anaconda-client
+        $CONDA/bin/conda config --append channels conda-forge
+        $CONDA/bin/conda config --set anaconda_upload yes
+
+    - name: Build and upload
+      env:
+        ANACONDA_TOKEN: ${{ secrets.ANACONDA_TOKEN }}
+      run: |
+        $CONDA/bin/conda build --token $ANACONDA_TOKEN conda-recipe

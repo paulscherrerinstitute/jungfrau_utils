@@ -9,10 +9,10 @@ source:
 
 requirements:
     build:
-        - python
+        - python {{ python }}
         - setuptools
     run:
-        - python
+        - python {{ python }}
         - h5py >=2.9
         - numpy
         - numba
