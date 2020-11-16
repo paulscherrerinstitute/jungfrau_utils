@@ -3,14 +3,19 @@
 import argparse
 import os
 import re
+import subprocess
 
 
 def main():
+    branch = subprocess.check_output("git rev-parse --abbrev-ref HEAD", shell=True).decode().strip()
+    if branch != "master":
+        print("Aborting, not on 'master' branch.")
+        return
+
     filepath = "jungfrau_utils/__init__.py"
 
     parser = argparse.ArgumentParser()
     parser.add_argument("level", type=str, choices=["patch", "minor", "major"])
-    parser.add_argument("tag_msg", type=str, help="tag message")
     args = parser.parse_args()
 
     with open(filepath) as f:
@@ -35,7 +40,7 @@ def main():
         f.write(re.sub(r'__version__ = "(.*?)"', f'__version__ = "{new_version}"', file_content))
 
     os.system(f"git commit {filepath} -m 'Updating for version {new_version}'")
-    os.system(f"git tag -a {new_version} -m '{args.tag_msg}'")
+    os.system(f"git tag -a {new_version} -m 'Release {new_version}'")
 
 
 if __name__ == "__main__":
