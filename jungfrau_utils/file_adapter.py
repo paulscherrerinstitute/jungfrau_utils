@@ -60,6 +60,10 @@ class File:
         self._geometry = geometry
         self._parallel = parallel
 
+        # No need for any further setup if the file is already processed
+        if self._processed:
+            return
+
         # Gain file
         if not gain_file:
             gain_file = locate_gain_file(file_path)
@@ -117,8 +121,8 @@ class File:
     @conversion.setter
     def conversion(self, value):
         if self._processed:
-            print("The file is already processed, setting 'conversion' to False")
-            value = False
+            print("The file is already processed, setting 'conversion' has no effect.")
+            return
 
         self._conversion = value
 
@@ -131,8 +135,8 @@ class File:
     @mask.setter
     def mask(self, value):
         if self._processed:
-            print("The file is already processed, setting 'mask' to False")
-            value = False
+            print("The file is already processed, setting 'mask' has no effect.")
+            return
 
         self._mask = value
 
@@ -145,8 +149,8 @@ class File:
     @gap_pixels.setter
     def gap_pixels(self, value):
         if self._processed:
-            print("The file is already processed, setting 'gap_pixels' to False")
-            value = False
+            print("The file is already processed, setting 'gap_pixels' has no effect.")
+            return
 
         self._gap_pixels = value
 
@@ -159,8 +163,8 @@ class File:
     @geometry.setter
     def geometry(self, value):
         if self._processed:
-            print("The file is already processed, setting 'geometry' to False")
-            value = False
+            print("The file is already processed, setting 'geometry' has no effect.")
+            return
 
         self._geometry = value
 
@@ -172,12 +176,15 @@ class File:
 
     @parallel.setter
     def parallel(self, value):
+        if self._processed:
+            print("The file is already processed, setting 'parallel' has no effect.")
+            return
+
         self._parallel = value
 
     @property
     def _processed(self):
-        # TODO: generalize this check for data reduction case, where dtype can be different
-        return self.file[f"/data/{self.detector_name}/data"].dtype == np.float32
+        return f"/data/{self.detector_name}/conversion_factor" in self.file
 
     @property
     def _data_dataset(self):
@@ -203,6 +210,9 @@ class File:
             batch_size (int, optional): Process images in batches of that size in order to avoid
                 running out of memory. Defaults to 100.
         """
+        if self._processed:
+            raise RuntimeError("Can not run export, the file is already processed.")
+
         self.handler.factor = factor
 
         with h5py.File(dest, "w") as h5_dest:
@@ -416,15 +426,20 @@ class File:
             for i, j in enumerate(ind):
                 data[i] = dset[j]
 
-        # Process data
-        data = self.handler.process(
-            data,
-            conversion=self.conversion,
-            mask=self.mask,
-            gap_pixels=self.gap_pixels,
-            geometry=self.geometry,
-            parallel=self.parallel,
-        )
+        if self._processed:
+            # recover keV values if there was a factor used upon exporting
+            conversion_factor = self.file[f"/data/{self.detector_name}/conversion_factor"]
+            if not np.isnan(conversion_factor):
+                data = np.multiply(data, conversion_factor, dtype=np.float32)
+        else:
+            data = self.handler.process(
+                data,
+                conversion=self.conversion,
+                mask=self.mask,
+                gap_pixels=self.gap_pixels,
+                geometry=self.geometry,
+                parallel=self.parallel,
+            )
 
         if roi:
             if data.ndim == 3:
