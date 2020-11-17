@@ -268,7 +268,12 @@ class File:
 
         h5_dest[f"data/{self.detector_name}/conversion_factor"] = self.handler.factor or np.NaN
 
+        pixel_mask = self.handler.get_pixel_mask(gap_pixels=self.gap_pixels, geometry=self.geometry)
+
         if roi is None:
+            # save a pixel mask
+            h5_dest[f"data/{self.detector_name}/pixel_mask"] = np.invert(pixel_mask)
+
             image_shape = self.handler.get_shape_out(self.gap_pixels, self.geometry)
             # TODO: this is not ideal, find a way to avoid the 2 next lines
             if self.geometry and self.detector_name.startswith("JF06"):
@@ -302,12 +307,9 @@ class File:
                 )
 
                 # save a pixel mask for ROI
-                pixel_mask_roi = self.handler.get_pixel_mask(
-                    gap_pixels=self.gap_pixels, geometry=self.geometry
-                )
                 h5_dest.create_dataset(
                     f"data/{self.detector_name}/pixel_mask_roi_{i}",
-                    data=pixel_mask_roi[slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)],
+                    data=np.invert(pixel_mask[slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)]),
                 )
 
                 # prepare ROI datasets
