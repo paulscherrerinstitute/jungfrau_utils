@@ -52,7 +52,7 @@ class File:
         self.file_path = Path(file_path)
 
         self.file = h5py.File(self.file_path, "r")
-        self.handler = JFDataHandler(self.file["/general/detector_name"][()].decode())
+        self.handler = JFDataHandler(self.file["general/detector_name"][()].decode())
 
         self._conversion = conversion
         self._mask = mask
@@ -76,11 +76,11 @@ class File:
 
         self.handler.pedestal_file = pedestal_file
 
-        if "module_map" in self.file[f"/data/{self.detector_name}"]:
+        if "module_map" in self.file[f"data/{self.detector_name}"]:
             # Pick only the first row (module_map of the first frame), because it is not expected
             # that module_map ever changes during a run. In fact, it is forseen in the future that
             # this data will be saved as a single row for the whole run.
-            module_map = self.file[f"/data/{self.detector_name}/module_map"][0, :]
+            module_map = self.file[f"data/{self.detector_name}/module_map"][0, :]
         else:
             module_map = None
 
@@ -90,7 +90,7 @@ class File:
         # value can be different for later pulses and this needs to be taken care of. Currently,
         # _allow_n_images decorator applies a function in a loop, making it impossible to change
         # highgain for separate images in a 3D stack.
-        daq_rec = self.file[f"/data/{self.detector_name}/daq_rec"][0]
+        daq_rec = self.file[f"data/{self.detector_name}/daq_rec"][0]
 
         self.handler.highgain = daq_rec & 0b1
 
@@ -184,7 +184,7 @@ class File:
 
     @property
     def _processed(self):
-        return f"/data/{self.detector_name}/conversion_factor" in self.file
+        return f"data/{self.detector_name}/conversion_factor" in self.file
 
     @property
     def _data_dataset(self):
@@ -266,7 +266,7 @@ class File:
             index = np.array(index)
             n_images = len(index)
 
-        h5_dest[f"/data/{self.detector_name}/conversion_factor"] = self.handler.factor or np.NaN
+        h5_dest[f"data/{self.detector_name}/conversion_factor"] = self.handler.factor or np.NaN
 
         if roi is None:
             image_shape = self.handler.get_shape_out(self.gap_pixels, self.geometry)
@@ -329,7 +329,7 @@ class File:
 
                 h5_dest.create_dataset(f"{self._data_dataset}_roi_{i}", **args)
 
-        dset = self.file[f"/data/{self.detector_name}/data"]
+        dset = self.file[self._data_dataset]
 
         # prepare buffers to be reused for every batch
         read_buffer = np.empty((batch_size, *dset.shape[1:]), dtype=dset.dtype)
@@ -396,7 +396,7 @@ class File:
     def __getitem__(self, item):
         if isinstance(item, str):
             # metadata entry (lazy)
-            return self.file[f"/data/{self.detector_name}/{item}"]
+            return self.file[f"data/{self.detector_name}/{item}"]
 
         if isinstance(item, tuple):
             # multiple arguments: first is index, the rest is roi
@@ -415,7 +415,7 @@ class File:
         elif isinstance(ind, (list, tuple, np.ndarray)):
             is_index_consecutive = np.sum(np.diff(ind)) == len(ind) - 1
 
-        dset = self.file[f"/data/{self.detector_name}/data"]
+        dset = self.file[self._data_dataset]
         if is_index_consecutive:
             data = dset[ind]
         else:
@@ -428,7 +428,7 @@ class File:
 
         if self._processed:
             # recover keV values if there was a factor used upon exporting
-            conversion_factor = self.file[f"/data/{self.detector_name}/conversion_factor"]
+            conversion_factor = self.file[f"data/{self.detector_name}/conversion_factor"]
             if not np.isnan(conversion_factor):
                 data = np.multiply(data, conversion_factor, dtype=np.float32)
         else:
