@@ -256,6 +256,8 @@ class File:
             index = np.array(index)
             n_images = len(index)
 
+        h5_dest[f"/data/{self.detector_name}/conversion_factor"] = self.handler.factor or np.NaN
+
         if roi is None:
             image_shape = self.handler.get_shape_out(self.gap_pixels, self.geometry)
             # TODO: this is not ideal, find a way to avoid the 2 next lines
