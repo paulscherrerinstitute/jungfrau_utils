@@ -378,15 +378,19 @@ class JFDataHandler:
 
         self._mask_all[False] = mask.copy()
 
-        for m in range(self.detector.n_modules):
-            module_mask = self._get_module_slice(mask, m)
-            for n in range(CHIP_NUM_X):
-                module_mask[:, CHIP_SIZE_X * n] = True
-                module_mask[:, CHIP_SIZE_X * (n + 1) - 1] = True
+        if self.is_stripsel():
+            # TODO: implement stripsel double pixel masking
+            ...
+        else:
+            for m in range(self.detector.n_modules):
+                module_mask = self._get_module_slice(mask, m)
+                for n in range(CHIP_NUM_X):
+                    module_mask[:, CHIP_SIZE_X * n] = True
+                    module_mask[:, CHIP_SIZE_X * (n + 1) - 1] = True
 
-            for n in range(CHIP_NUM_Y):
-                module_mask[CHIP_SIZE_Y * n, :] = True
-                module_mask[CHIP_SIZE_Y * (n + 1) - 1, :] = True
+                for n in range(CHIP_NUM_Y):
+                    module_mask[CHIP_SIZE_Y * n, :] = True
+                    module_mask[CHIP_SIZE_Y * (n + 1) - 1, :] = True
 
         self._mask_all[True] = mask
 
