@@ -1,6 +1,6 @@
 # Description
 
-`jungrau_utils` collects a set of scripts for operating and doing first analysis of the Jungfrau detectors. This includes:
+`jungfrau_utils` collects a set of scripts for operating and doing first analysis of the Jungfrau detectors. This includes:
 
 * a python environment called `jungfrau_client`, for controllig the detector from Alvra and Bernina
 * a set of scripts for calibrations (running a pedestal run, converting gain maps, ...)
