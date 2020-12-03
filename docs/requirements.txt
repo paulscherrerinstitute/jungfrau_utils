@@ -1,4 +1,0 @@
-h5py>=2.9
-numpy
-numba
-bitshuffle==0.3.5
