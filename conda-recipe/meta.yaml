@@ -26,12 +26,6 @@ test:
 
 build:
   number: 0
-  entry_points:
-    - jungfrau_convert_gainmaps = jungfrau_utils.scripts.jungfrau_convert_gainmaps:main
-    - jungfrau_run_pedestals = jungfrau_utils.scripts.jungfrau_run_pedestals:main
-    - jungfrau_print_pixelmask = jungfrau_utils.scripts.jungfrau_print_pixelmask:main
-    - jungfrau_create_pedestals = jungfrau_utils.scripts.jungfrau_create_pedestals:main
-    - jungfrau_run = jungfrau_utils.scripts.jungfrau_run:main
 
 about:
    home: https://github.com/paulscherrerinstitute/jungfrau_utils
