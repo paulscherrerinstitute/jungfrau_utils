@@ -8,7 +8,7 @@ def locate_gain_file(file_path, verbose=True):
     """Locate gain file in default location at swissfel.
 
     The default gain file location is
-    ``/sf/<beamline>/config/jungfrau/gainMaps/<detector>/gains.h5``.
+    `/sf/jungfrau/config/gainMaps/<detector>/gains.h5``.
 
     Args:
         file_path (str or Path): File path of a jungfrau data file.
@@ -23,11 +23,11 @@ def locate_gain_file(file_path, verbose=True):
 
     detector_name = _read_detector_name(file_path)
 
-    gain_path = Path(*file_path.parts[:3]).joinpath("config", "jungfrau", "gainMaps")
+    gain_path = Path("/sf/jungfrau/config/gainMaps/")
     gain_file = gain_path.joinpath(detector_name, "gains.h5")
 
     if not gain_file.is_file():
-        raise Exception(f"No gain file in default location: {gain_path}")
+        raise Exception(f"No gain file in the default location: {gain_path}")
 
     if verbose:
         print(f"Auto-located gain file: {gain_file}")
