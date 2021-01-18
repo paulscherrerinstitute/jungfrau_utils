@@ -1,6 +1,6 @@
 import re
 
-from setuptools import setup
+from setuptools import find_packages, setup
 
 with open("jungfrau_utils/__init__.py") as f:
     version = re.search(r'__version__ = "(.*?)"', f.read()).group(1)
@@ -11,6 +11,6 @@ setup(
     description="",
     author="Paul Scherrer Institute",
     license="GNU GPLv3",
-    packages=["jungfrau_utils", "jungfrau_utils.scripts"],
+    packages=find_packages(),
     zip_safe=False,
 )
