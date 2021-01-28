@@ -547,11 +547,6 @@ class JFDataHandler:
         return (self.gain is not None) and (self.pedestal is not None)
 
     def _process(self, res, images, conversion, mask, gap_pixels, geometry, parallel):
-        if self.is_stripsel() and geometry:
-            module_conv_shape = (images.shape[0], *self._get_shape_n_modules(1))
-            module_conv = np.empty(shape=module_conv_shape, dtype=np.float32)
-            reshape_stripsel = self._reshape_stripsel(parallel=parallel)
-
         proc_func = self._proc_func(parallel=parallel)
         factor = self.factor
 
@@ -566,6 +561,9 @@ class JFDataHandler:
             module_p = self._get_module_slice(self._p, i, geometry) if conversion else None
 
             if self.is_stripsel() and geometry:
+                module_conv_shape = (images.shape[0], *self._get_shape_n_modules(1))
+                module_conv = np.zeros(shape=module_conv_shape, dtype=np.float32)
+                reshape_stripsel = self._reshape_stripsel(parallel=parallel)
                 proc_func(module_conv, module, module_g, module_p, module_mask, factor, gap_pixels)
                 module_res = res[:, oy:, ox:]
                 reshape_stripsel(module_res, module_conv)
@@ -703,18 +701,18 @@ def _correct(res, image, gain, pedestal, mask, factor, gap_pixels):
                 ri3 = i3 + i3 // CHIP_SIZE_X * CHIP_GAP_X * gap_pixels
 
                 if mask is not None and mask[i2, i3]:
-                    res[i1, ri2, ri3] = 0
+                    continue
+
+                if gain is None or pedestal is None:
+                    res[i1, ri2, ri3] = image[i1, i2, i3]
                 else:
-                    if gain is None or pedestal is None:
-                        res[i1, ri2, ri3] = image[i1, i2, i3]
+                    gm = image[i1, i2, i3] >> 14
+                    val = np.float32(image[i1, i2, i3] & 0x3FFF)
+                    tmp_res = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
+                    if factor is None:
+                        res[i1, ri2, ri3] = tmp_res
                     else:
-                        gm = image[i1, i2, i3] >> 14
-                        val = np.float32(image[i1, i2, i3] & 0x3FFF)
-                        tmp_res = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
-                        if factor is None:
-                            res[i1, ri2, ri3] = tmp_res
-                        else:
-                            res[i1, ri2, ri3] = round(tmp_res)
+                        res[i1, ri2, ri3] = round(tmp_res)
 
 
 @njit(cache=True)
@@ -727,17 +725,17 @@ def _correct_highgain(res, image, gain, pedestal, mask, factor, gap_pixels):
                 ri3 = i3 + i3 // CHIP_SIZE_X * CHIP_GAP_X * gap_pixels
 
                 if mask is not None and mask[i2, i3]:
-                    res[i1, ri2, ri3] = 0
+                    continue
+
+                if gain is None or pedestal is None:
+                    res[i1, ri2, ri3] = image[i1, i2, i3]
                 else:
-                    if gain is None or pedestal is None:
-                        res[i1, ri2, ri3] = image[i1, i2, i3]
+                    val = np.float32(image[i1, i2, i3] & 0x3FFF)
+                    tmp_res = (val - pedestal[0, i2, i3]) * gain[0, i2, i3]
+                    if factor is None:
+                        res[i1, ri2, ri3] = tmp_res
                     else:
-                        val = np.float32(image[i1, i2, i3] & 0x3FFF)
-                        tmp_res = (val - pedestal[0, i2, i3]) * gain[0, i2, i3]
-                        if factor is None:
-                            res[i1, ri2, ri3] = tmp_res
-                        else:
-                            res[i1, ri2, ri3] = round(tmp_res)
+                        res[i1, ri2, ri3] = round(tmp_res)
 
 
 @njit(cache=True, parallel=True)
@@ -751,18 +749,18 @@ def _correct_parallel(res, image, gain, pedestal, mask, factor, gap_pixels):
                 ri3 = i3 + i3 // CHIP_SIZE_X * CHIP_GAP_X * gap_pixels
 
                 if mask is not None and mask[i2, i3]:
-                    res[i1, ri2, ri3] = 0
+                    continue
+
+                if gain is None or pedestal is None:
+                    res[i1, ri2, ri3] = image[i1, i2, i3]
                 else:
-                    if gain is None or pedestal is None:
-                        res[i1, ri2, ri3] = image[i1, i2, i3]
+                    gm = image[i1, i2, i3] >> 14
+                    val = np.float32(image[i1, i2, i3] & 0x3FFF)
+                    tmp_res = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
+                    if factor is None:
+                        res[i1, ri2, ri3] = tmp_res
                     else:
-                        gm = image[i1, i2, i3] >> 14
-                        val = np.float32(image[i1, i2, i3] & 0x3FFF)
-                        tmp_res = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
-                        if factor is None:
-                            res[i1, ri2, ri3] = tmp_res
-                        else:
-                            res[i1, ri2, ri3] = round(tmp_res)
+                        res[i1, ri2, ri3] = round(tmp_res)
 
 
 @njit(cache=True, parallel=True)
@@ -776,17 +774,17 @@ def _correct_highgain_parallel(res, image, gain, pedestal, mask, factor, gap_pix
                 ri3 = i3 + i3 // CHIP_SIZE_X * CHIP_GAP_X * gap_pixels
 
                 if mask is not None and mask[i2, i3]:
-                    res[i1, ri2, ri3] = 0
+                    continue
+
+                if gain is None or pedestal is None:
+                    res[i1, ri2, ri3] = image[i1, i2, i3]
                 else:
-                    if gain is None or pedestal is None:
-                        res[i1, ri2, ri3] = image[i1, i2, i3]
+                    val = np.float32(image[i1, i2, i3] & 0x3FFF)
+                    tmp_res = (val - pedestal[0, i2, i3]) * gain[0, i2, i3]
+                    if factor is None:
+                        res[i1, ri2, ri3] = tmp_res
                     else:
-                        val = np.float32(image[i1, i2, i3] & 0x3FFF)
-                        tmp_res = (val - pedestal[0, i2, i3]) * gain[0, i2, i3]
-                        if factor is None:
-                            res[i1, ri2, ri3] = tmp_res
-                        else:
-                            res[i1, ri2, ri3] = round(tmp_res)
+                        res[i1, ri2, ri3] = round(tmp_res)
 
 
 @njit(cache=True)
