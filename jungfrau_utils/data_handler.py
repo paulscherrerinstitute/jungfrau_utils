@@ -715,7 +715,7 @@ def _correct(res, image, gain, pedestal, mask, factor, gap_pixels):
                         res[i1, ri2, ri3] = image[i1, i2, i3]
                     else:
                         gm = image[i1, i2, i3] >> 14
-                        val = image[i1, i2, i3] & 0x3FFF
+                        val = np.float32(image[i1, i2, i3] & 0x3FFF)
                         tmp_res = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
                         if factor is None:
                             res[i1, ri2, ri3] = tmp_res
@@ -738,7 +738,7 @@ def _correct_highgain(res, image, gain, pedestal, mask, factor, gap_pixels):
                     if gain is None or pedestal is None:
                         res[i1, ri2, ri3] = image[i1, i2, i3]
                     else:
-                        val = image[i1, i2, i3] & 0x3FFF
+                        val = np.float32(image[i1, i2, i3] & 0x3FFF)
                         tmp_res = (val - pedestal[0, i2, i3]) * gain[0, i2, i3]
                         if factor is None:
                             res[i1, ri2, ri3] = tmp_res
@@ -763,7 +763,7 @@ def _correct_parallel(res, image, gain, pedestal, mask, factor, gap_pixels):
                         res[i1, ri2, ri3] = image[i1, i2, i3]
                     else:
                         gm = image[i1, i2, i3] >> 14
-                        val = image[i1, i2, i3] & 0x3FFF
+                        val = np.float32(image[i1, i2, i3] & 0x3FFF)
                         tmp_res = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
                         if factor is None:
                             res[i1, ri2, ri3] = tmp_res
@@ -787,7 +787,7 @@ def _correct_highgain_parallel(res, image, gain, pedestal, mask, factor, gap_pix
                     if gain is None or pedestal is None:
                         res[i1, ri2, ri3] = image[i1, i2, i3]
                     else:
-                        val = image[i1, i2, i3] & 0x3FFF
+                        val = np.float32(image[i1, i2, i3] & 0x3FFF)
                         tmp_res = (val - pedestal[0, i2, i3]) * gain[0, i2, i3]
                         if factor is None:
                             res[i1, ri2, ri3] = tmp_res
