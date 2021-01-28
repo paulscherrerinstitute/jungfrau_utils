@@ -153,7 +153,7 @@ class JFDataHandler:
                 shape_x += (CHIP_NUM_X - 1) * CHIP_GAP_X
                 shape_y += (CHIP_NUM_Y - 1) * CHIP_GAP_Y * self._number_active_modules
 
-        elif not geometry and not gap_pixels:
+        else:  # not geometry and not gap_pixels:
             shape_y, shape_x = self._shape_in
 
         return shape_y, shape_x
@@ -374,8 +374,9 @@ class JFDataHandler:
 
         self._pixel_mask = value
 
+        # self._mask_all[False] -> original mask
+        # self._mask_all[True] -> original + double pixels mask
         mask = value.astype(np.bool, copy=True)
-
         self._mask_all[False] = mask.copy()
 
         if self.is_stripsel():
@@ -407,18 +408,17 @@ class JFDataHandler:
         if self._mask is None:
             return None
 
-        res = np.empty(self._shape_in, dtype=np.bool)
+        input_mask = np.empty(self._shape_in, dtype=np.bool)
         for i, m in enumerate(self.module_map):
             if m == -1:
                 continue
 
-            module = self._get_module_slice(self._mask, i)
-            module_res = self._get_module_slice(res, m)
-            module_res[:] = module
+            input_mask_slice = self._get_module_slice(input_mask, m)
+            input_mask_slice[:] = self._get_module_slice(self._mask, i)
 
         res = np.invert(
             self.process(
-                np.invert(res),
+                np.invert(input_mask),
                 conversion=False,
                 mask=False,
                 gap_pixels=gap_pixels,
@@ -561,12 +561,11 @@ class JFDataHandler:
             module_p = self._get_module_slice(self._p, i, geometry) if conversion else None
 
             if self.is_stripsel() and geometry:
-                module_conv_shape = (images.shape[0], *self._get_shape_n_modules(1))
-                module_conv = np.zeros(shape=module_conv_shape, dtype=np.float32)
-                reshape_stripsel = self._reshape_stripsel(parallel=parallel)
-                proc_func(module_conv, module, module_g, module_p, module_mask, factor, gap_pixels)
+                module_tmp_shape = (images.shape[0], *self._get_shape_n_modules(1))
+                module_tmp = np.zeros(shape=module_tmp_shape, dtype=np.float32)
+                proc_func(module_tmp, module, module_g, module_p, module_mask, factor, gap_pixels)
                 module_res = res[:, oy:, ox:]
-                reshape_stripsel(module_res, module_conv)
+                self._reshape_stripsel(parallel=parallel)(module_res, module_tmp)
             else:
                 module_res = res[:, oy:, ox:]
                 proc_func(module_res, module, module_g, module_p, module_mask, factor, gap_pixels)
@@ -677,7 +676,7 @@ class JFDataHandler:
         elif self.highgain and not parallel:
             proc_func = _correct_highgain
 
-        elif self.highgain and parallel:
+        else:  # self.highgain and parallel:
             proc_func = _correct_highgain_parallel
 
         return proc_func

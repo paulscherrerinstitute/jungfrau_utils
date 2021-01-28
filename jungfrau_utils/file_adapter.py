@@ -416,6 +416,8 @@ class File:
             is_index_consecutive = ind.step is None or ind.step == 1
         elif isinstance(ind, (list, tuple, np.ndarray)):
             is_index_consecutive = np.sum(np.diff(ind)) == len(ind) - 1
+        else:
+            raise TypeError("Unknown index type")
 
         dset = self.file[self._data_dataset]
         if is_index_consecutive:
