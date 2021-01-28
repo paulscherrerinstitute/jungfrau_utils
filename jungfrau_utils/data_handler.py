@@ -562,7 +562,9 @@ class JFDataHandler:
 
             if self.is_stripsel() and geometry:
                 module_tmp_shape = (images.shape[0], *self._get_shape_n_modules(1))
-                module_tmp = np.zeros(shape=module_tmp_shape, dtype=np.float32)
+                module_tmp_dtype = self.get_dtype_out(images.dtype, conversion=conversion)
+                module_tmp = np.zeros(shape=module_tmp_shape, dtype=module_tmp_dtype)
+
                 proc_func(module_tmp, module, module_g, module_p, module_mask, factor, gap_pixels)
                 module_res = res[:, oy:, ox:]
                 self._reshape_stripsel(parallel=parallel)(module_res, module_tmp)
