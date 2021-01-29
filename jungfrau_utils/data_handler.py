@@ -549,6 +549,8 @@ class JFDataHandler:
     def _process(self, res, images, conversion, mask, gap_pixels, geometry, parallel):
         proc_func = self._proc_func(parallel=parallel)
         factor = self.factor
+        # weirdly, numba works faster with None than True/False
+        highgain = self.highgain if self.highgain else None
 
         for i, m in enumerate(self.module_map):
             if m == -1:
@@ -565,12 +567,12 @@ class JFDataHandler:
                 module_tmp_dtype = self.get_dtype_out(images.dtype, conversion=conversion)
                 module_tmp = np.zeros(shape=module_tmp_shape, dtype=module_tmp_dtype)
 
-                proc_func(module_tmp, module, module_g, module_p, module_mask, factor, gap_pixels)
+                proc_func(module_tmp, module, module_g, module_p, module_mask, factor, gap_pixels, highgain)
                 module_res = res[:, oy:, ox:]
                 self._reshape_stripsel(parallel=parallel)(module_res, module_tmp)
             else:
                 module_res = res[:, oy:, ox:]
-                proc_func(module_res, module, module_g, module_p, module_mask, factor, gap_pixels)
+                proc_func(module_res, module, module_g, module_p, module_mask, factor, gap_pixels, highgain)
 
     def _get_final_module_coordinates(self, m, i, geometry, gap_pixels):
         if geometry:
@@ -669,17 +671,10 @@ class JFDataHandler:
         return saturated_value
 
     def _proc_func(self, parallel):
-        if not self.highgain and not parallel:
+        if not parallel:
             proc_func = _correct
-
-        elif not self.highgain and parallel:
+        else:
             proc_func = _correct_parallel
-
-        elif self.highgain and not parallel:
-            proc_func = _correct_highgain
-
-        else:  # self.highgain and parallel:
-            proc_func = _correct_highgain_parallel
 
         return proc_func
 
@@ -693,7 +688,7 @@ class JFDataHandler:
 
 
 @njit(cache=True)
-def _correct(res, image, gain, pedestal, mask, factor, gap_pixels):
+def _correct(res, image, gain, pedestal, mask, factor, gap_pixels, highgain):
     num, size_y, size_x = image.shape
     for i1 in range(num):
         for i2 in range(size_y):
@@ -707,7 +702,7 @@ def _correct(res, image, gain, pedestal, mask, factor, gap_pixels):
                 if gain is None or pedestal is None:
                     res[i1, ri2, ri3] = image[i1, i2, i3]
                 else:
-                    gm = image[i1, i2, i3] >> 14
+                    gm = np.right_shift(image[i1, i2, i3], 14) if highgain is None else 0
                     val = np.float32(image[i1, i2, i3] & 0x3FFF)
                     tmp_res = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
                     if factor is None:
@@ -716,31 +711,8 @@ def _correct(res, image, gain, pedestal, mask, factor, gap_pixels):
                         res[i1, ri2, ri3] = round(tmp_res)
 
 
-@njit(cache=True)
-def _correct_highgain(res, image, gain, pedestal, mask, factor, gap_pixels):
-    num, size_y, size_x = image.shape
-    for i1 in range(num):
-        for i2 in range(size_y):
-            for i3 in range(size_x):
-                ri2 = i2 + i2 // CHIP_SIZE_Y * CHIP_GAP_Y * gap_pixels
-                ri3 = i3 + i3 // CHIP_SIZE_X * CHIP_GAP_X * gap_pixels
-
-                if mask is not None and mask[i2, i3]:
-                    continue
-
-                if gain is None or pedestal is None:
-                    res[i1, ri2, ri3] = image[i1, i2, i3]
-                else:
-                    val = np.float32(image[i1, i2, i3] & 0x3FFF)
-                    tmp_res = (val - pedestal[0, i2, i3]) * gain[0, i2, i3]
-                    if factor is None:
-                        res[i1, ri2, ri3] = tmp_res
-                    else:
-                        res[i1, ri2, ri3] = round(tmp_res)
-
-
 @njit(cache=True, parallel=True)
-def _correct_parallel(res, image, gain, pedestal, mask, factor, gap_pixels):
+def _correct_parallel(res, image, gain, pedestal, mask, factor, gap_pixels, highgain):
     num, size_y, size_x = image.shape
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
     for i1 in prange(num):  # pylint: disable=not-an-iterable
@@ -755,33 +727,9 @@ def _correct_parallel(res, image, gain, pedestal, mask, factor, gap_pixels):
                 if gain is None or pedestal is None:
                     res[i1, ri2, ri3] = image[i1, i2, i3]
                 else:
-                    gm = image[i1, i2, i3] >> 14
+                    gm = np.right_shift(image[i1, i2, i3], 14) if highgain is None else 0
                     val = np.float32(image[i1, i2, i3] & 0x3FFF)
                     tmp_res = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
-                    if factor is None:
-                        res[i1, ri2, ri3] = tmp_res
-                    else:
-                        res[i1, ri2, ri3] = round(tmp_res)
-
-
-@njit(cache=True, parallel=True)
-def _correct_highgain_parallel(res, image, gain, pedestal, mask, factor, gap_pixels):
-    num, size_y, size_x = image.shape
-    # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
-    for i1 in prange(num):  # pylint: disable=not-an-iterable
-        for i2 in range(size_y):
-            for i3 in range(size_x):
-                ri2 = i2 + i2 // CHIP_SIZE_Y * CHIP_GAP_Y * gap_pixels
-                ri3 = i3 + i3 // CHIP_SIZE_X * CHIP_GAP_X * gap_pixels
-
-                if mask is not None and mask[i2, i3]:
-                    continue
-
-                if gain is None or pedestal is None:
-                    res[i1, ri2, ri3] = image[i1, i2, i3]
-                else:
-                    val = np.float32(image[i1, i2, i3] & 0x3FFF)
-                    tmp_res = (val - pedestal[0, i2, i3]) * gain[0, i2, i3]
                     if factor is None:
                         res[i1, ri2, ri3] = tmp_res
                     else:
