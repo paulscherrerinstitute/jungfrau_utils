@@ -241,6 +241,8 @@ class JFDataHandler:
         if self.factor is None:
             _g = 1 / self.gain
         else:
+            # self.factor is one number and self.gain is a large array, so this order of division
+            # will avoid double broadcasting
             _g = 1 / self.factor / self.gain
 
         self._g_all[True] = _g[3:].copy()
@@ -550,29 +552,41 @@ class JFDataHandler:
         proc_func = self._proc_func(parallel=parallel)
         factor = self.factor
         # weirdly, numba works faster with None than True/False
-        highgain = self.highgain if self.highgain else None
+        if self.highgain:
+            highgain = self.highgain
+        else:
+            highgain = None
 
         for i, m in enumerate(self.module_map):
             if m == -1:
                 continue
 
             oy, ox = self._get_final_module_coordinates(m, i, geometry, gap_pixels)
-            module = self._get_module_slice(images, m, geometry)
-            module_mask = self._get_module_slice(self._mask, i, geometry) if mask else None
-            module_g = self._get_module_slice(self._g, i, geometry) if conversion else None
-            module_p = self._get_module_slice(self._p, i, geometry) if conversion else None
+            mod = self._get_module_slice(images, m, geometry)
+
+            if mask:
+                mod_mask = self._get_module_slice(self._mask, i, geometry)
+            else:
+                mod_mask = None
+
+            if conversion:
+                mod_g = self._get_module_slice(self._g, i, geometry)
+                mod_p = self._get_module_slice(self._p, i, geometry)
+            else:
+                mod_g = None
+                mod_p = None
 
             if self.is_stripsel() and geometry:
-                module_tmp_shape = (images.shape[0], *self._get_shape_n_modules(1))
-                module_tmp_dtype = self.get_dtype_out(images.dtype, conversion=conversion)
-                module_tmp = np.zeros(shape=module_tmp_shape, dtype=module_tmp_dtype)
+                mod_tmp_shape = (images.shape[0], *self._get_shape_n_modules(1))
+                mod_tmp_dtype = self.get_dtype_out(images.dtype, conversion=conversion)
+                mod_tmp = np.zeros(shape=mod_tmp_shape, dtype=mod_tmp_dtype)
 
-                proc_func(module_tmp, module, module_g, module_p, module_mask, factor, gap_pixels, highgain)
-                module_res = res[:, oy:, ox:]
-                self._reshape_stripsel(parallel=parallel)(module_res, module_tmp)
+                proc_func(mod_tmp, mod, mod_g, mod_p, mod_mask, factor, gap_pixels, highgain)
+                mod_res = res[:, oy:, ox:]
+                self._reshape_stripsel_func(parallel=parallel)(mod_res, mod_tmp)
             else:
-                module_res = res[:, oy:, ox:]
-                proc_func(module_res, module, module_g, module_p, module_mask, factor, gap_pixels, highgain)
+                mod_res = res[:, oy:, ox:]
+                proc_func(mod_res, mod, mod_g, mod_p, mod_mask, factor, gap_pixels, highgain)
 
     def _get_final_module_coordinates(self, m, i, geometry, gap_pixels):
         if geometry:
@@ -671,18 +685,18 @@ class JFDataHandler:
         return saturated_value
 
     def _proc_func(self, parallel):
-        if not parallel:
-            proc_func = _correct
-        else:
+        if parallel:
             proc_func = _correct_parallel
+        else:
+            proc_func = _correct
 
         return proc_func
 
-    def _reshape_stripsel(self, parallel):
-        if not parallel:
-            reshape_stripsel = _reshape_stripsel
-        else:
+    def _reshape_stripsel_func(self, parallel):
+        if parallel:
             reshape_stripsel = _reshape_stripsel_parallel
+        else:
+            reshape_stripsel = _reshape_stripsel
 
         return reshape_stripsel
 
@@ -693,18 +707,23 @@ def _correct(res, image, gain, pedestal, mask, factor, gap_pixels, highgain):
     for i1 in range(num):
         for i2 in range(size_y):
             for i3 in range(size_x):
-                ri2 = i2 + i2 // CHIP_SIZE_Y * CHIP_GAP_Y * gap_pixels
-                ri3 = i3 + i3 // CHIP_SIZE_X * CHIP_GAP_X * gap_pixels
-
                 if mask is not None and mask[i2, i3]:
                     continue
+
+                ri2 = i2 + i2 // CHIP_SIZE_Y * CHIP_GAP_Y * gap_pixels
+                ri3 = i3 + i3 // CHIP_SIZE_X * CHIP_GAP_X * gap_pixels
 
                 if gain is None or pedestal is None:
                     res[i1, ri2, ri3] = image[i1, i2, i3]
                 else:
-                    gm = np.right_shift(image[i1, i2, i3], 14) if highgain is None else 0
+                    if highgain is None:
+                        gm = np.right_shift(image[i1, i2, i3], 14)
+                    else:
+                        gm = 0
+
                     val = np.float32(image[i1, i2, i3] & 0x3FFF)
                     tmp_res = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
+
                     if factor is None:
                         res[i1, ri2, ri3] = tmp_res
                     else:
@@ -718,18 +737,23 @@ def _correct_parallel(res, image, gain, pedestal, mask, factor, gap_pixels, high
     for i1 in prange(num):  # pylint: disable=not-an-iterable
         for i2 in range(size_y):
             for i3 in range(size_x):
-                ri2 = i2 + i2 // CHIP_SIZE_Y * CHIP_GAP_Y * gap_pixels
-                ri3 = i3 + i3 // CHIP_SIZE_X * CHIP_GAP_X * gap_pixels
-
                 if mask is not None and mask[i2, i3]:
                     continue
+
+                ri2 = i2 + i2 // CHIP_SIZE_Y * CHIP_GAP_Y * gap_pixels
+                ri3 = i3 + i3 // CHIP_SIZE_X * CHIP_GAP_X * gap_pixels
 
                 if gain is None or pedestal is None:
                     res[i1, ri2, ri3] = image[i1, i2, i3]
                 else:
-                    gm = np.right_shift(image[i1, i2, i3], 14) if highgain is None else 0
+                    if highgain is None:
+                        gm = np.right_shift(image[i1, i2, i3], 14)
+                    else:
+                        gm = 0
+
                     val = np.float32(image[i1, i2, i3] & 0x3FFF)
                     tmp_res = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
+
                     if factor is None:
                         res[i1, ri2, ri3] = tmp_res
                     else:
