@@ -272,7 +272,7 @@ class File:
 
         if roi is None:
             # save a pixel mask
-            h5_dest[f"data/{self.detector_name}/pixel_mask"] = np.invert(pixel_mask)
+            h5_dest[f"data/{self.detector_name}/pixel_mask"] = pixel_mask
 
             image_shape = self.handler.get_shape_out(self.gap_pixels, self.geometry)
             # TODO: this is not ideal, find a way to avoid the 2 next lines
@@ -309,7 +309,7 @@ class File:
                 # save a pixel mask for ROI
                 h5_dest.create_dataset(
                     f"data/{self.detector_name}/pixel_mask_roi_{i}",
-                    data=np.invert(pixel_mask[slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)]),
+                    data=pixel_mask[slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)],
                 )
 
                 # prepare ROI datasets

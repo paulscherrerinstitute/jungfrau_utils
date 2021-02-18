@@ -257,7 +257,7 @@ def test_handler_process(handler, conversion, gap_pixels, geometry):
 @pytest.mark.parametrize("gap_pixels", [True, False])
 @pytest.mark.parametrize("geometry", [True, False])
 def test_handler_shaped_pixel_mask(handler, gap_pixels, geometry):
-    res = handler.get_pixel_mask(gap_pixels=gap_pixels, geometry=geometry)
+    res = np.invert(handler.get_pixel_mask(gap_pixels=gap_pixels, geometry=geometry))
 
     assert res.ndim == 2
     assert res.dtype == np.bool

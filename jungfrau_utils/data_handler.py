@@ -377,10 +377,10 @@ class JFDataHandler:
         self._pixel_mask = value
 
         # self._mask_all[False] -> original mask
-        # self._mask_all[True] -> original + double pixels mask
-        mask = value.astype(np.bool, copy=True)
+        mask = np.invert(value.astype(np.bool, copy=True))
         self._mask_all[False] = mask.copy()
 
+        # self._mask_all[True] -> original + double pixels mask
         if self.is_stripsel():
             # TODO: implement stripsel double pixel masking
             ...
@@ -388,12 +388,12 @@ class JFDataHandler:
             for m in range(self.detector.n_modules):
                 module_mask = self._get_module_slice(mask, m)
                 for n in range(CHIP_NUM_X):
-                    module_mask[:, CHIP_SIZE_X * n] = True
-                    module_mask[:, CHIP_SIZE_X * (n + 1) - 1] = True
+                    module_mask[:, CHIP_SIZE_X * n] = False
+                    module_mask[:, CHIP_SIZE_X * (n + 1) - 1] = False
 
                 for n in range(CHIP_NUM_Y):
-                    module_mask[CHIP_SIZE_Y * n, :] = True
-                    module_mask[CHIP_SIZE_Y * (n + 1) - 1, :] = True
+                    module_mask[CHIP_SIZE_Y * n, :] = False
+                    module_mask[CHIP_SIZE_Y * (n + 1) - 1, :] = False
 
         self._mask_all[True] = mask
 
@@ -405,7 +405,7 @@ class JFDataHandler:
             geometry (bool, optional): Apply detector geometry corrections. Defaults to True.
 
         Returns:
-            ndarray: Resulting pixel mask.
+            ndarray: Resulting pixel mask, where True values correspond to valid pixels.
         """
         if self._mask is None:
             return None
@@ -418,14 +418,8 @@ class JFDataHandler:
             input_mask_slice = self._get_module_slice(input_mask, m)
             input_mask_slice[:] = self._get_module_slice(self._mask, i)
 
-        res = np.invert(
-            self.process(
-                np.invert(input_mask),
-                conversion=False,
-                mask=False,
-                gap_pixels=gap_pixels,
-                geometry=geometry,
-            )
+        res = self.process(
+            input_mask, conversion=False, mask=False, gap_pixels=gap_pixels, geometry=geometry,
         )
 
         return res
@@ -707,7 +701,7 @@ def _correct(res, image, gain, pedestal, mask, factor, gap_pixels, highgain):
     for i1 in range(num):
         for i2 in range(size_y):
             for i3 in range(size_x):
-                if mask is not None and mask[i2, i3]:
+                if mask is not None and not mask[i2, i3]:
                     continue
 
                 ri2 = i2 + i2 // CHIP_SIZE_Y * CHIP_GAP_Y * gap_pixels
@@ -737,7 +731,7 @@ def _correct_parallel(res, image, gain, pedestal, mask, factor, gap_pixels, high
     for i1 in prange(num):  # pylint: disable=not-an-iterable
         for i2 in range(size_y):
             for i3 in range(size_x):
-                if mask is not None and mask[i2, i3]:
+                if mask is not None and not mask[i2, i3]:
                     continue
 
                 ri2 = i2 + i2 // CHIP_SIZE_Y * CHIP_GAP_Y * gap_pixels

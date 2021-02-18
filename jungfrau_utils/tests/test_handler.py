@@ -369,7 +369,7 @@ def test_handler_process_mm_missing(handler, gap_pixels, geometry):
 def test_handler_shaped_pixel_mask(handler, gap_pixels, geometry, module_map):
     handler.module_map = module_map
 
-    res = handler.get_pixel_mask(gap_pixels=gap_pixels, geometry=geometry)
+    res = np.invert(handler.get_pixel_mask(gap_pixels=gap_pixels, geometry=geometry))
 
     assert res.ndim == 2
     assert res.dtype == np.bool
@@ -395,7 +395,7 @@ def test_handler_shaped_pixel_mask(handler, gap_pixels, geometry, module_map):
 def test_handler_shaped_pixel_mask_mm_missing(handler, gap_pixels, geometry):
     handler.module_map = np.array([0, 1, -1])
 
-    res = handler.get_pixel_mask(gap_pixels=gap_pixels, geometry=geometry)
+    res = np.invert(handler.get_pixel_mask(gap_pixels=gap_pixels, geometry=geometry))
 
     assert res.ndim == 2
     assert res.dtype == np.bool
