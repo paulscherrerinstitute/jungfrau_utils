@@ -410,7 +410,7 @@ class JFDataHandler:
         if self._mask is None:
             return None
 
-        input_mask = np.empty(self._shape_in, dtype=np.bool)
+        input_mask = np.zeros(self._shape_in, dtype=np.bool)
         for i, m in enumerate(self.module_map):
             if m == -1:
                 continue
