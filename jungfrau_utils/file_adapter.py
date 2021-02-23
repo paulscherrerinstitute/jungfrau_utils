@@ -372,9 +372,10 @@ class File:
             )
 
             if roi is None:
-                bytes_number_of_elements = struct.pack(">q", image_shape[0] * image_shape[1] * 4)
-                bytes_block_size = struct.pack(">i", BLOCK_SIZE * 4)
-                header = bytes_number_of_elements + bytes_block_size
+                dtype_size = out_dtype.itemsize
+                bytes_num_elem = struct.pack(">q", image_shape[0] * image_shape[1] * dtype_size)
+                bytes_block_size = struct.pack(">i", BLOCK_SIZE * dtype_size)
+                header = bytes_num_elem + bytes_block_size
 
                 for pos, im in zip(batch_range, out_buffer_view):
                     if compression:
