@@ -503,6 +503,8 @@ class JFDataHandler:
 
         if not (conversion or mask or gap_pixels or geometry):
             # no need to continue, return unchanged images
+            if out is not None:
+                out[:] = images
             return images
 
         if conversion and not self.can_convert():
