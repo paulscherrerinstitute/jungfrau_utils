@@ -181,12 +181,12 @@ class JFDataHandler:
         """
         if conversion:
             if dtype_in != np.uint16:
-                raise TypeError(f"Only images of type {np.uint16} can be converted.")
+                raise TypeError(f"Only images of dtype {np.dtype(np.uint16)} can be converted.")
 
             if self.factor is None:
-                dtype_out = np.float32
+                dtype_out = np.dtype(np.float32)
             else:
-                dtype_out = np.int32
+                dtype_out = np.dtype(np.int32)
         else:
             dtype_out = dtype_in
 
