@@ -40,7 +40,7 @@ def _pedestal_file(tmpdir_factory):
 
     with h5py.File(pedestal_filename, "w") as h5f:
         h5f["/gains"] = np.ones((4, *DATA_SHAPE))
-        h5f["/pixel_mask"] = np.random.randint(2, size=DATA_SHAPE, dtype=np.bool)
+        h5f["/pixel_mask"] = np.random.randint(2, size=DATA_SHAPE, dtype=bool)
 
     return pedestal_filename
 
@@ -51,7 +51,7 @@ def _bad_pedestal_file(tmpdir_factory):
 
     with h5py.File(pedestal_filename, "w") as h5f:
         h5f["/gains"] = np.ones((4, 2 * 512, 1024))
-        h5f["/pixel_mask"] = np.random.randint(2, size=DATA_SHAPE, dtype=np.bool)
+        h5f["/pixel_mask"] = np.random.randint(2, size=DATA_SHAPE, dtype=bool)
 
     return pedestal_filename
 

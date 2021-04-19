@@ -398,7 +398,7 @@ class JFDataHandler:
         self._pixel_mask = value
 
         # self._mask_all[False] -> original mask
-        mask = np.invert(value.astype(np.bool, copy=True))
+        mask = np.invert(value.astype(bool, copy=True))
         self._mask_all[False] = mask.copy()
 
         # self._mask_all[True] -> original + double pixels mask
@@ -431,7 +431,7 @@ class JFDataHandler:
         if self._mask is None:
             return None
 
-        input_mask = np.zeros(self._shape_in, dtype=np.bool)
+        input_mask = np.zeros(self._shape_in, dtype=bool)
         for i, m in enumerate(self.module_map):
             if m == -1:
                 continue

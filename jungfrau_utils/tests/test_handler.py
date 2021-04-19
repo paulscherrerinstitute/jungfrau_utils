@@ -13,7 +13,7 @@ DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY = (1040 + 512 + 2, 0 + 1024 + 6)
 pedestal = np.ones((4, *DATA_SHAPE)).astype(np.float32)
 gain = 10 * np.ones((4, *DATA_SHAPE)).astype(np.float32)
 pixel_mask_orig = np.random.randint(2, size=DATA_SHAPE, dtype=np.uint32)
-pixel_mask = pixel_mask_orig.astype(np.bool, copy=True)
+pixel_mask = pixel_mask_orig.astype(bool, copy=True)
 
 image_stack = np.arange(np.prod(STACK_SHAPE), dtype=np.uint16).reshape(STACK_SHAPE[::-1])
 image_stack = np.ascontiguousarray(image_stack.transpose(2, 1, 0))
@@ -372,7 +372,7 @@ def test_handler_shaped_pixel_mask(handler, gap_pixels, geometry, module_map):
     res = np.invert(handler.get_pixel_mask(gap_pixels=gap_pixels, geometry=geometry))
 
     assert res.ndim == 2
-    assert res.dtype == np.bool
+    assert res.dtype == bool
 
     if gap_pixels and geometry:
         assert res.shape == DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY
@@ -398,7 +398,7 @@ def test_handler_shaped_pixel_mask_mm_missing(handler, gap_pixels, geometry):
     res = np.invert(handler.get_pixel_mask(gap_pixels=gap_pixels, geometry=geometry))
 
     assert res.ndim == 2
-    assert res.dtype == np.bool
+    assert res.dtype == bool
 
     if gap_pixels and geometry:
         assert res.shape == DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY
