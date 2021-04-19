@@ -1,47 +1,44 @@
-# Module geometry parameters
-modules_orig = {
-    "JF01T03V01": (
-        [0, 520, 1040],
-        [0, 0, 0],
+from dataclasses import dataclass
+from typing import Tuple
+
+@dataclass
+class DetectorGeometry:
+    origin_y: Tuple[int] = (0, )
+    origin_x: Tuple[int] = (0, )
+    is_stripsel: bool = False
+    rotate90: int = 0
+
+
+detector_geometry = {
+    "JF01T03V01": DetectorGeometry(
+        origin_y=(0, 520, 1040),
+        origin_x=(0, 0, 0),
     ),
 
-    "JF02T09V01": (
-        [0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 1036, 2072, 3108, 4144, 5180, 6216, 7252, 8288],
+    "JF02T09V01": DetectorGeometry(
+        origin_y=(0, 0, 0, 0, 0, 0, 0, 0, 0),
+        origin_x=(0, 1036, 2072, 3108, 4144, 5180, 6216, 7252, 8288),
     ),
 
-    "JF02T09V02": (
-        [0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 1036, 2072, 3108, 4144, 5180, 6216, 7252, 8288],
+    "JF02T09V02": DetectorGeometry(
+        origin_y=(0, 0, 0, 0, 0, 0, 0, 0, 0),
+        origin_x=(0, 1036, 2072, 3108, 4144, 5180, 6216, 7252, 8288),
     ),
 
-    "JF02T01V02": (
-        [0],
-        [0],
+    "JF02T01V02": DetectorGeometry(),
+
+    "JF03T01V01": DetectorGeometry(),
+
+    "JF03T01V02": DetectorGeometry(),
+
+    "JF04T01V01": DetectorGeometry(),
+
+    "JF05T01V01": DetectorGeometry(
+        is_stripsel=True
     ),
 
-    "JF03T01V01": (
-        [0],
-        [0],
-    ),
-
-    "JF03T01V02": (
-        [0],
-        [0],
-    ),
-
-    "JF04T01V01": (
-        [0],
-        [0],
-    ),
-
-    "JF05T01V01": (
-        [0],
-        [0],
-    ),
-
-    "JF06T32V01": (
-        [
+    "JF06T32V01": DetectorGeometry(
+        origin_y=(
             68, 0, 618, 618,
             550, 550, 1168, 1168,
             1100, 1100, 1718, 1718,
@@ -50,8 +47,8 @@ modules_orig = {
             2750, 2750, 3368, 3368,
             3300, 3300, 3918, 3918,
             3850, 3850, 4468, 4400,
-        ],
-        [
+        ),
+        origin_x=(
             972, 2011, 0, 1039,
             2078, 3117, 0, 1039,
             2078, 3117, 0, 1039,
@@ -60,11 +57,12 @@ modules_orig = {
             2145, 3184, 66, 1106,
             2145, 3184, 66, 1106,
             2145, 3184, 1106, 2145,
-        ],
+        ),
+        rotate90=1,
     ),
 
-    "JF06T32V02": (
-        [
+    "JF06T32V02": DetectorGeometry(
+        origin_y=(
             68, 0, 618, 618,
             550, 550, 1168, 1168,
             1100, 1100, 1718, 1718,
@@ -73,8 +71,8 @@ modules_orig = {
             2750, 2750, 3368, 3368,
             3300, 3300, 3918, 3918,
             3850, 3850, 4468, 4400,
-        ],
-        [
+        ),
+        origin_x=(
             972, 2011, 0, 1039,
             2078, 3117, 0, 1039,
             2078, 3117, 0, 1039,
@@ -83,38 +81,42 @@ modules_orig = {
             2145, 3184, 66, 1106,
             2145, 3184, 66, 1106,
             2145, 3184, 1106, 2145,
-        ],
+        ),
+        rotate90=1,
     ),
 
-    "JF06T08V01": (
-        [
+    "JF06T08V01": DetectorGeometry(
+        origin_y=(
             68, 0, 618, 550,
             1168, 1100, 1718, 1650,
-        ],
-        [
+        ),
+        origin_x=(
             0, 1039, 0, 1039,
             67, 1106, 67, 1106,
-        ],
+        ),
+        rotate90=1,
     ),
 
-    "JF06T08V02": (
-        [
+    "JF06T08V02": DetectorGeometry(
+        origin_y=(
             68, 0, 618, 550,
             1168, 1100, 1718, 1650,
-        ],
-        [
+        ),
+        origin_x=(
             0, 1039, 0, 1039,
             67, 1106, 67, 1106,
-        ],
+        ),
+        rotate90=1,
     ),
 
-    "JF06T04V01": (
-        [68, 0, 618, 550],
-        [0, 1039, 67, 1106],
+    "JF06T04V01": DetectorGeometry(
+        origin_y=(68, 0, 618, 550),
+        origin_x=(0, 1039, 67, 1106),
+        rotate90=1,
     ),
 
-    "JF07T32V01": (
-        [
+    "JF07T32V01": DetectorGeometry(
+        origin_y=(
             0, 0, 68, 68,
             550, 550, 618, 618,
             1100, 1100, 1168, 1168,
@@ -123,8 +125,8 @@ modules_orig = {
             2750, 2750, 2818, 2818,
             3300, 3300, 3368, 3368,
             3850, 3850, 3918, 3918,
-        ],
-        [
+        ),
+        origin_x=(
             68, 1107, 2146, 3185,
             68, 1107, 2146, 3185,
             68, 1107, 2146, 3185,
@@ -133,42 +135,31 @@ modules_orig = {
             0, 1039, 2078, 3117,
             0, 1039, 2078, 3117,
             0, 1039, 2078, 3117,
-        ],
+        ),
     ),
 
-    "JF08T01V01": (
-        [0],
-        [0],
+    "JF08T01V01": DetectorGeometry(),
+
+    "JF09T01V01": DetectorGeometry(),
+
+    "JF10T01V01": DetectorGeometry(
+        is_stripsel=True,
     ),
 
-    "JF09T01V01": (
-        [0],
-        [0],
+    "JF11T04V01": DetectorGeometry(
+        origin_y=(0, 0, 0, 0),
+        origin_x=(9306, 6198, 3108, 0),
+        is_stripsel=True,
     ),
 
-    "JF10T01V01": (
-        [0],
-        [0],
-    ),
-
-    "JF11T04V01": (
-        [0, 0, 0, 0],
-        [9306, 6198, 3108, 0],
-    ),
-
-    "JF12T04V01": (
+    "JF12T04V01": DetectorGeometry(
         # a vertical gap of 4 pix is artificial, because they are physically separated 2 detectors
-        [0, 0, 90, 90],
-        [0, 3117, 0, 3117],
+        origin_y=(0, 0, 90, 90),
+        origin_x=(0, 3117, 0, 3117),
+        is_stripsel=True,
     ),
 
-    "JF13T01V01": (
-        [0],
-        [0],
-    ),
+    "JF13T01V01": DetectorGeometry(),
 
-    "JF14T01V01": (
-        [0],
-        [0],
-    ),
+    "JF14T01V01": DetectorGeometry(),
 }

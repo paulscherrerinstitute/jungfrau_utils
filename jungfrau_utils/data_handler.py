@@ -7,7 +7,7 @@ import h5py
 import numpy as np
 from numba import njit, prange
 
-from jungfrau_utils.geometry import modules_orig
+from jungfrau_utils.geometry import detector_geometry
 
 CHIP_SIZE_X = 256
 CHIP_SIZE_Y = 256
@@ -58,8 +58,9 @@ class JFDataHandler:
 
     def __init__(self, detector_name):
         # detector_name needs to be a valid name
-        if detector_name in modules_orig:
+        if detector_name in detector_geometry:
             self._detector_name = detector_name
+            self._detector_geometry = detector_geometry[detector_name]
         else:
             raise KeyError(f"Geometry for '{detector_name}' detector is not present.")
 
@@ -100,10 +101,16 @@ class JFDataHandler:
         """
         return self._detector_name
 
+    @property
+    def detector_geometry(self):
+        """Detector geometry configuration (readonly).
+        """
+        return self._detector_geometry
+
     def is_stripsel(self):
         """Return true if detector is a stripsel.
         """
-        return self.detector_name.startswith(("JF05", "JF10", "JF11", "JF12"))
+        return self.detector_geometry.is_stripsel
 
     @property
     def detector(self):
@@ -146,12 +153,14 @@ class JFDataHandler:
             return self._get_stripsel_shape_out(geometry=geometry)
 
         if geometry and gap_pixels:
-            modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
+            modules_orig_y = self.detector_geometry.origin_y
+            modules_orig_x = self.detector_geometry.origin_x
             shape_x = max(modules_orig_x) + MODULE_SIZE_X + (CHIP_NUM_X - 1) * CHIP_GAP_X
             shape_y = max(modules_orig_y) + MODULE_SIZE_Y + (CHIP_NUM_Y - 1) * CHIP_GAP_Y
 
         elif geometry and not gap_pixels:
-            modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
+            modules_orig_y = self.detector_geometry.origin_y
+            modules_orig_x = self.detector_geometry.origin_x
             shape_x = max(modules_orig_x) + MODULE_SIZE_X
             shape_y = max(modules_orig_y) + MODULE_SIZE_Y
 
@@ -171,7 +180,8 @@ class JFDataHandler:
 
     def _get_stripsel_shape_out(self, geometry):
         if geometry:
-            modules_orig_y, modules_orig_x = modules_orig[self.detector_name]
+            modules_orig_y = self.detector_geometry.origin_y
+            modules_orig_x = self.detector_geometry.origin_x
             shape_x = max(modules_orig_x) + STRIPSEL_SIZE_X
             shape_y = max(modules_orig_y) + STRIPSEL_SIZE_Y
         else:
@@ -541,9 +551,9 @@ class JFDataHandler:
 
         self._process(out, images, conversion, mask, gap_pixels, geometry, parallel)
 
-        # rotate image stack in case of alvra JF06 detector
-        if geometry and self.detector_name.startswith("JF06"):
-            out = np.rot90(out, axes=(1, 2))
+        # rotate image stack according to a geometry configuration (e.g. for alvra JF06 detectors)
+        if geometry and self.detector_geometry.rotate90:
+            out = np.rot90(out, k=self.detector_geometry.rotate90, axes=(1, 2))
 
         return out
 
@@ -597,8 +607,8 @@ class JFDataHandler:
 
     def _get_final_module_coordinates(self, m, i, geometry, gap_pixels):
         if geometry:
-            oy = modules_orig[self.detector_name][0][i]
-            ox = modules_orig[self.detector_name][1][i]
+            oy = self.detector_geometry.origin_y[i]
+            ox = self.detector_geometry.origin_x[i]
 
         elif gap_pixels:
             if self.detector_name == "JF02T09V01":
