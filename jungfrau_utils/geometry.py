@@ -164,7 +164,7 @@ detector_geometry = {
     "JF14T01V01": DetectorGeometry(),
 
     "JF15T08V01": DetectorGeometry(
-        origin_y=(1798, 1649, 1249, 1100, 699, 550, 149, 0),
+        origin_y=(0, 149, 550, 699, 1100, 1249, 1649, 1798),
         origin_x=(149, 1185, 149, 1185, 0, 1037, 0, 1037),
     ),
 }
