@@ -43,6 +43,7 @@ class File:
     def __init__(
         self,
         file_path,
+        *,
         gain_file="",
         pedestal_file="",
         conversion=True,
@@ -209,7 +210,15 @@ class File:
         return f"data/{self.detector_name}/data"
 
     def export(
-        self, dest, index=None, roi=None, compression=False, factor=None, dtype=None, batch_size=100
+        self,
+        dest,
+        *,
+        index=None,
+        roi=None,
+        compression=False,
+        factor=None,
+        dtype=None,
+        batch_size=100,
     ):
         """Export processed data into a separate hdf5 file.
 
@@ -294,7 +303,9 @@ class File:
             # save a pixel mask
             h5_dest[f"data/{self.detector_name}/pixel_mask"] = pixel_mask
 
-            image_shape = self.handler.get_shape_out(self.gap_pixels, self.geometry)
+            image_shape = self.handler.get_shape_out(
+                gap_pixels=self.gap_pixels, geometry=self.geometry
+            )
             # TODO: this is not ideal, find a way to avoid the 2 next lines
             if self.geometry and self.handler.detector_geometry.rotate90 % 2:
                 image_shape = image_shape[1], image_shape[0]

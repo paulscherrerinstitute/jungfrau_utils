@@ -138,7 +138,7 @@ class JFDataHandler:
     def _shape_in(self):
         return self._get_shape_n_modules(self._number_active_modules)
 
-    def get_shape_out(self, gap_pixels=True, geometry=True):
+    def get_shape_out(self, *, gap_pixels=True, geometry=True):
         """Return final image shape of a detector, based on gap_pixel and geometry flags
 
         Args:
@@ -188,7 +188,7 @@ class JFDataHandler:
 
         return shape_y, shape_x
 
-    def get_dtype_out(self, dtype_in, conversion=True):
+    def get_dtype_out(self, dtype_in, *, conversion=True):
         """Resulting image dtype of a detector, based on input dtype and a conversion flag.
 
         Args:
@@ -417,7 +417,7 @@ class JFDataHandler:
 
         self._mask_all[True] = mask
 
-    def get_pixel_mask(self, gap_pixels=True, double_pixels="keep", geometry=True):
+    def get_pixel_mask(self, *, gap_pixels=True, double_pixels="keep", geometry=True):
         """Return pixel mask, shaped according to gap_pixel and geometry flags.
 
         Args:
@@ -484,6 +484,7 @@ class JFDataHandler:
     def process(
         self,
         images,
+        *,
         conversion=True,
         mask=True,
         gap_pixels=True,
@@ -655,7 +656,7 @@ class JFDataHandler:
 
         return out
 
-    def get_gains(self, images, mask=True, gap_pixels=True, geometry=True):
+    def get_gains(self, images, *, mask=True, gap_pixels=True, geometry=True):
         """Return gain values of images, based on mask, gap_pixel and geometry flags.
 
         Args:
@@ -678,7 +679,7 @@ class JFDataHandler:
 
         return gains
 
-    def get_saturated_pixels(self, images, mask=True, gap_pixels=True, geometry=True):
+    def get_saturated_pixels(self, images, *, mask=True, gap_pixels=True, geometry=True):
         """Return coordinates of saturated pixels, based on mask, gap_pixel and geometry flags.
 
         Args:
