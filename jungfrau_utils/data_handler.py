@@ -695,7 +695,12 @@ class JFDataHandler:
         if images.dtype != np.uint16:
             raise TypeError(f"Expected image type {np.uint16}, provided data type {images.dtype}.")
 
-        saturated_pixels = images == self.get_saturated_value()
+        if self.highgain:
+            saturated_value = 0b0011111111111111  # = 16383
+        else:
+            saturated_value = 0b1100000000000000  # = 49152
+
+        saturated_pixels = images == saturated_value
         saturated_pixels = self.process(
             saturated_pixels, conversion=False, mask=mask, gap_pixels=gap_pixels, geometry=geometry
         )
@@ -703,19 +708,6 @@ class JFDataHandler:
         saturated_pixels_coordinates = np.nonzero(saturated_pixels)
 
         return saturated_pixels_coordinates
-
-    def get_saturated_value(self):
-        """Get a value for saturated pixels.
-
-        Returns:
-            int: A saturated pixel value.
-        """
-        if self.highgain:
-            saturated_value = 0b0011111111111111  # = 16383
-        else:
-            saturated_value = 0b1100000000000000  # = 49152
-
-        return saturated_value
 
 
 def _correct(res, image, gain, pedestal, mask, factor, gap_pixels, highgain):
