@@ -34,6 +34,8 @@ class File:
             Defaults to True.
         mask (bool, optional): Perform masking of bad pixels (assign them to 0). Defaults to True.
         gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
+        double_pixels (str, optional): A method to handle double pixels in-between ASICs. Can be
+            "keep", "mask", or "interp". Defaults to "keep".
         geometry (bool, optional): Apply geometry correction. Defaults to True.
         parallel (bool, optional): Use parallelized processing. Defaults to True.
     """
@@ -46,6 +48,7 @@ class File:
         conversion=True,
         mask=True,
         gap_pixels=True,
+        double_pixels="keep",
         geometry=True,
         parallel=True,
     ):
@@ -57,6 +60,7 @@ class File:
         self._conversion = conversion
         self._mask = mask
         self._gap_pixels = gap_pixels
+        self._double_pixels = double_pixels
         self._geometry = geometry
         self._parallel = parallel
 
@@ -153,6 +157,20 @@ class File:
             return
 
         self._gap_pixels = value
+
+    @property
+    def double_pixels(self):
+        """A parameter for making modifications to double pixels.
+        """
+        return self._double_pixels
+
+    @double_pixels.setter
+    def double_pixels(self, value):
+        if self._processed:
+            print("The file is already processed, setting 'double_pixels' has no effect.")
+            return
+
+        self._double_pixels = value
 
     @property
     def geometry(self):
@@ -268,7 +286,9 @@ class File:
 
         h5_dest[f"data/{self.detector_name}/conversion_factor"] = self.handler.factor or np.NaN
 
-        pixel_mask = self.handler.get_pixel_mask(gap_pixels=self.gap_pixels, geometry=self.geometry)
+        pixel_mask = self.handler.get_pixel_mask(
+            gap_pixels=self.gap_pixels, double_pixels=self.double_pixels, geometry=self.geometry
+        )
 
         if roi is None:
             # save a pixel mask
@@ -366,6 +386,7 @@ class File:
                 conversion=self.conversion,
                 mask=self.mask,
                 gap_pixels=self.gap_pixels,
+                double_pixels=self.double_pixels,
                 geometry=self.geometry,
                 parallel=self.parallel,
                 out=out_buffer_view,
@@ -442,6 +463,7 @@ class File:
                 conversion=self.conversion,
                 mask=self.mask,
                 gap_pixels=self.gap_pixels,
+                double_pixels=self.double_pixels,
                 geometry=self.geometry,
                 parallel=self.parallel,
             )

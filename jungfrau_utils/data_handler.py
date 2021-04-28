@@ -82,7 +82,6 @@ class JFDataHandler:
         self._module_map = np.arange(self.detector.n_modules)
 
         self._mask_all = {True: None, False: None}
-        self._mask_double_pixels = False
 
         # Precompile numba-jitted functions
         self._proc_func = {
@@ -418,18 +417,22 @@ class JFDataHandler:
 
         self._mask_all[True] = mask
 
-    def get_pixel_mask(self, gap_pixels=True, geometry=True):
+    def get_pixel_mask(self, gap_pixels=True, double_pixels="keep", geometry=True):
         """Return pixel mask, shaped according to gap_pixel and geometry flags.
 
         Args:
             gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
+            double_pixels (str, optional): A method to handle double pixels in-between ASICs. Can be
+                "keep", "mask", or "interp". Defaults to "keep".
             geometry (bool, optional): Apply detector geometry corrections. Defaults to True.
 
         Returns:
             ndarray: Resulting pixel mask, where True values correspond to valid pixels.
         """
-        if self._mask is None:
+        if self._pixel_mask is None:
             return None
+
+        _mask = self._mask(double_pixels)
 
         input_mask = np.zeros(self._shape_in, dtype=bool)
         for i, m in enumerate(self.module_map):
@@ -437,7 +440,7 @@ class JFDataHandler:
                 continue
 
             input_mask_slice = self._get_module_slice(input_mask, m)
-            input_mask_slice[:] = self._get_module_slice(self._mask, i)
+            input_mask_slice[:] = self._get_module_slice(_mask, i)
 
         res = self.process(
             input_mask, conversion=False, mask=False, gap_pixels=gap_pixels, geometry=geometry,
@@ -445,22 +448,13 @@ class JFDataHandler:
 
         return res
 
-    @property
-    def mask_double_pixels(self):
-        """Current flag for masking double pixels.
-        """
-        return self._mask_double_pixels
-
-    @mask_double_pixels.setter
-    def mask_double_pixels(self, value):
-        if not isinstance(value, bool):
-            value = bool(value)
-
-        self._mask_double_pixels = value
-
-    @property
-    def _mask(self):
-        return self._mask_all[self.mask_double_pixels]
+    def _mask(self, double_pixels):
+        if double_pixels in ("keep", "interp"):
+            return self._mask_all[False]
+        elif double_pixels == "mask":
+            return self._mask_all[True]
+        else:
+            raise ValueError("'double_pixels' can only be 'keep', 'mask', or 'interp'")
 
     @property
     def module_map(self):
@@ -493,6 +487,7 @@ class JFDataHandler:
         conversion=True,
         mask=True,
         gap_pixels=True,
+        double_pixels="keep",
         geometry=True,
         parallel=False,
         out=None,
@@ -507,6 +502,8 @@ class JFDataHandler:
             mask (bool, optional): Perform masking of bad pixels (set those values to 0).
                 Defaults to True.
             gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
+            double_pixels (str, optional): A method to handle double pixels in-between ASICs. Can be
+                "keep", "mask", or "interp". Defaults to "keep".
             geometry (bool, optional): Apply detector geometry corrections. Defaults to True.
             parallel (bool, optional): Parallelize image stack processing. Defaults to False.
             out (ndarray, optional): If provided, the destination to place the result. The shape
@@ -531,25 +528,39 @@ class JFDataHandler:
         if conversion and not self.can_convert():
             raise RuntimeError("Gain and/or pedestal values are not set.")
 
-        if mask and self._mask is None:
+        if mask and self._pixel_mask is None:
             raise RuntimeError("Pixel mask values are not set.")
+
+        if double_pixels not in ("keep", "mask", "interp"):
+            raise ValueError("'double_pixels' can only be 'keep', 'mask', or 'interp'")
+
+        if double_pixels == "interp":
+            raise RuntimeError("Not implemented.")
+
+        if not mask and double_pixels == "mask":
+            warnings.warn(
+                '\'double_pixels="mask"\' has no effect when "mask"=False', RuntimeWarning
+            )
+
+        if double_pixels == "interp" and not gap_pixels:
+            raise RuntimeError("Double pixel interpolation requires 'gap_pixels' to be True.")
 
         if self.is_stripsel() and gap_pixels:
             warnings.warn("'gap_pixels' flag has no effect on stripsel detectors", RuntimeWarning)
             gap_pixels = False
 
-        if self.is_stripsel() and self.mask_double_pixels:
+        if self.is_stripsel() and double_pixels == "mask":
             warnings.warn(
-                "'mask_double_pixels' flag has no effect on stripsel detectors", RuntimeWarning
+                "Masking double pixels has no effect on stripsel detectors", RuntimeWarning
             )
-            self.mask_double_pixels = False
+            double_pixels = "keep"
 
         if out is None:
             out_shape = self.get_shape_out(gap_pixels=gap_pixels, geometry=geometry)
             out_dtype = self.get_dtype_out(images.dtype, conversion=conversion)
             out = np.zeros((images.shape[0], *out_shape), dtype=out_dtype)
 
-        self._process(out, images, conversion, mask, gap_pixels, geometry, parallel)
+        self._process(out, images, conversion, mask, gap_pixels, double_pixels, geometry, parallel)
 
         # rotate image stack according to a geometry configuration (e.g. for alvra JF06 detectors)
         if geometry and self.detector_geometry.rotate90:
@@ -565,7 +576,9 @@ class JFDataHandler:
         """
         return (self.gain is not None) and (self.pedestal is not None)
 
-    def _process(self, res, images, conversion, mask, gap_pixels, geometry, parallel):
+    def _process(
+        self, res, images, conversion, mask, gap_pixels, double_pixels, geometry, parallel
+    ):
         proc_func = self._proc_func[parallel]
         factor = self.factor
         # weirdly, numba works faster with None than True/False
@@ -573,6 +586,8 @@ class JFDataHandler:
             highgain = self.highgain
         else:
             highgain = None
+
+        _mask = self._mask(double_pixels)
 
         for i, m in enumerate(self.module_map):
             if m == -1:
@@ -582,7 +597,7 @@ class JFDataHandler:
             mod = self._get_module_slice(images, m, geometry)
 
             if mask:
-                mod_mask = self._get_module_slice(self._mask, i, geometry)
+                mod_mask = self._get_module_slice(_mask, i, geometry)
             else:
                 mod_mask = None
 
