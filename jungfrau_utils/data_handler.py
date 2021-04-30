@@ -94,6 +94,11 @@ class JFDataHandler:
             False: njit(cache=True)(_reshape_stripsel),
         }
 
+        self._inplace_interp_dp = {
+            True: njit(cache=True, parallel=True)(_inplace_interp_dp),
+            False: njit(cache=True)(_inplace_interp_dp),
+        }
+
     @property
     def detector_name(self):
         """Detector name (readonly).
@@ -535,9 +540,6 @@ class JFDataHandler:
         if double_pixels not in ("keep", "mask", "interp"):
             raise ValueError("'double_pixels' can only be 'keep', 'mask', or 'interp'")
 
-        if double_pixels == "interp":
-            raise RuntimeError("Not implemented.")
-
         if not mask and double_pixels == "mask":
             warnings.warn(
                 '\'double_pixels="mask"\' has no effect when "mask"=False', RuntimeWarning
@@ -620,6 +622,8 @@ class JFDataHandler:
             else:
                 mod_res = res[:, oy:, ox:]
                 proc_func(mod_res, mod, mod_g, mod_p, mod_mask, factor, gap_pixels, highgain)
+                if double_pixels == "interp":
+                    self._inplace_interp_dp[parallel](mod_res)
 
     def _get_final_module_coordinates(self, m, i, geometry, gap_pixels):
         if geometry:
@@ -771,3 +775,68 @@ def _reshape_stripsel(res, image):
                 xout = igap * 774 + 765 + 11 - yin % 6
                 res[ind, yout, xout] = image[ind, yin, xin] / 2
                 res[ind, yout + 1, xout] = image[ind, yin, xin] / 2
+
+
+def _inplace_interp_dp(res):
+    for i1 in prange(res.shape[0]):
+        # corner quad pixels
+        for ri2 in (255, 257):
+            for ri3 in (255, 257, 513, 515, 771, 773):
+                shift_y = 0 if ri2 == 255 else 1
+                shift_x = 0 if ri3 == 255 or ri3 == 513 or ri3 == 771 else 1
+
+                shared_val = res[i1, ri2 + shift_y, ri3 + shift_x] / 4
+                res[i1, ri2, ri3] = shared_val
+                res[i1, ri2 + 1, ri3] = shared_val
+                res[i1, ri2, ri3 + 1] = shared_val
+                res[i1, ri2 + 1, ri3 + 1] = shared_val
+
+        # rows of double pixels
+        ri2 = 255
+        for x_start, x_end in ((0, 255), (259, 513), (517, 771), (775, 1030)):
+            for ri3 in range(x_start, x_end):
+                v1 = res[i1, ri2 - 1, ri3]
+                v2 = res[i1, ri2, ri3]
+                v3 = res[i1, ri2 + 3, ri3]
+                v4 = res[i1, ri2 + 4, ri3]
+
+                if v1 == 0 and v3 == 0:
+                    shared_val = v2 / 2
+                    res[i1, ri2, ri3] = shared_val
+                    res[i1, ri2 + 1, ri3] = shared_val
+                else:
+                    res[i1, ri2, ri3] *= (4 * v1 + v3) / (6 * v1 + 3 * v3)
+                    res[i1, ri2 + 1, ri3] = v2 - res[i1, ri2, ri3]
+
+                if v4 == 0 and v2 == 0:
+                    shared_val = v3 / 2
+                    res[i1, ri2 + 3, ri3] = shared_val
+                    res[i1, ri2 + 2, ri3] = shared_val
+                else:
+                    res[i1, ri2 + 3, ri3] *= (4 * v4 + v2) / (6 * v4 + 3 * v2)
+                    res[i1, ri2 + 2, ri3] = v3 - res[i1, ri2 + 3, ri3]
+
+        # columns of double pixels
+        for ri3 in (255, 513, 771):
+            for y_start, y_end in ((0, 255), (259, 514)):
+                for ri2 in range(y_start, y_end):
+                    v1 = res[i1, ri2, ri3 - 1]
+                    v2 = res[i1, ri2, ri3]
+                    v3 = res[i1, ri2, ri3 + 3]
+                    v4 = res[i1, ri2, ri3 + 4]
+
+                    if v1 == 0 and v3 == 0:
+                        shared_val = v2 / 2
+                        res[i1, ri2, ri3] = shared_val
+                        res[i1, ri2, ri3 + 1] = shared_val
+                    else:
+                        res[i1, ri2, ri3] *= (4 * v1 + v3) / (6 * v1 + 3 * v3)
+                        res[i1, ri2, ri3 + 1] = v2 - res[i1, ri2, ri3]
+
+                    if v4 == 0 and v2 == 0:
+                        shared_val = v3 / 2
+                        res[i1, ri2, ri3 + 3] = shared_val
+                        res[i1, ri2, ri3 + 2] = shared_val
+                    else:
+                        res[i1, ri2, ri3 + 3] *= (4 * v4 + v2) / (6 * v4 + 3 * v2)
+                        res[i1, ri2, ri3 + 2] = v3 - res[i1, ri2, ri3 + 3]
