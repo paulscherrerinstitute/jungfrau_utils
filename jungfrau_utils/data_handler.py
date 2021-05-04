@@ -83,22 +83,6 @@ class JFDataHandler:
 
         self._mask_all = {True: None, False: None}
 
-        # Precompile numba-jitted functions
-        self._proc_func = {
-            True: njit(cache=True, parallel=True)(_correct),
-            False: njit(cache=True)(_correct),
-        }
-
-        self._reshape_stripsel_func = {
-            True: njit(cache=True, parallel=True)(_reshape_stripsel),
-            False: njit(cache=True)(_reshape_stripsel),
-        }
-
-        self._inplace_interp_dp = {
-            True: njit(cache=True, parallel=True)(_inplace_interp_dp),
-            False: njit(cache=True)(_inplace_interp_dp),
-        }
-
     @property
     def detector_name(self):
         """Detector name (readonly).
@@ -582,7 +566,7 @@ class JFDataHandler:
     def _process(
         self, res, images, conversion, mask, gap_pixels, double_pixels, geometry, parallel
     ):
-        proc_func = self._proc_func[parallel]
+        proc_func = _adc_to_energy_jit[parallel]
         factor = self.factor
         # weirdly, numba works faster with None than True/False
         if self.highgain:
@@ -618,12 +602,12 @@ class JFDataHandler:
 
                 proc_func(mod_tmp, mod, mod_g, mod_p, mod_mask, factor, gap_pixels, highgain)
                 mod_res = res[:, oy:, ox:]
-                self._reshape_stripsel_func[parallel](mod_res, mod_tmp)
+                _reshape_stripsel_jit[parallel](mod_res, mod_tmp)
             else:
                 mod_res = res[:, oy:, ox:]
                 proc_func(mod_res, mod, mod_g, mod_p, mod_mask, factor, gap_pixels, highgain)
                 if double_pixels == "interp":
-                    self._inplace_interp_dp[parallel](mod_res)
+                    _inplace_interp_dp_jit[parallel](mod_res)
 
     def _get_final_module_coordinates(self, m, i, geometry, gap_pixels):
         if geometry:
@@ -714,7 +698,7 @@ class JFDataHandler:
         return saturated_pixels_coordinates
 
 
-def _correct(res, image, gain, pedestal, mask, factor, gap_pixels, highgain):
+def _adc_to_energy(res, image, gain, pedestal, mask, factor, gap_pixels, highgain):
     num, size_y, size_x = image.shape
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
     for i1 in prange(num):  # pylint: disable=not-an-iterable
@@ -840,3 +824,20 @@ def _inplace_interp_dp(res):
                     else:
                         res[i1, ri2, ri3 + 3] *= (4 * v4 + v2) / (6 * v4 + 3 * v2)
                         res[i1, ri2, ri3 + 2] = v3 - res[i1, ri2, ri3 + 3]
+
+
+# Compile numba functions
+_adc_to_energy_jit = {
+    True: njit(cache=True, parallel=True)(_adc_to_energy),
+    False: njit(cache=True)(_adc_to_energy),
+}
+
+_reshape_stripsel_jit = {
+    True: njit(cache=True, parallel=True)(_reshape_stripsel),
+    False: njit(cache=True)(_reshape_stripsel),
+}
+
+_inplace_interp_dp_jit = {
+    True: njit(cache=True, parallel=True)(_inplace_interp_dp),
+    False: njit(cache=True)(_inplace_interp_dp),
+}
