@@ -209,6 +209,16 @@ class File:
     def _data_dataset(self):
         return f"data/{self.detector_name}/data"
 
+    def get_pixel_mask(self):
+        """Return pixel mask, shaped according to gap_pixel and geometry flags.
+
+        Returns:
+            ndarray: Resulting pixel mask, where True values correspond to valid pixels.
+        """
+        return self.handler.get_pixel_mask(
+            gap_pixels=self.gap_pixels, double_pixels=self.double_pixels, geometry=self.geometry
+        )
+
     def export(
         self,
         dest,
