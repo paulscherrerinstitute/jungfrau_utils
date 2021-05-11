@@ -254,7 +254,7 @@ class JFDataHandler:
             # will avoid double broadcasting
             _g = 1 / self.factor / self.gain
 
-        self._g_all[True] = _g[3:].copy()
+        self._g_all[True] = np.tile(_g[3], (4, 1, 1))
 
         _g[3] = _g[2]
         self._g_all[False] = _g
@@ -312,7 +312,7 @@ class JFDataHandler:
 
         _p = self._pedestal.copy()
 
-        self._p_all[True] = _p[3:].copy()
+        self._p_all[True] = np.tile(_p[3], (4, 1, 1))
 
         _p[3] = _p[2]
         self._p_all[False] = _p
@@ -566,14 +566,8 @@ class JFDataHandler:
     def _process(
         self, res, images, conversion, mask, gap_pixels, double_pixels, geometry, parallel
     ):
-        proc_func = _adc_to_energy_jit[parallel]
+        _adc_to_energy = _adc_to_energy_jit[parallel]
         factor = self.factor
-        # weirdly, numba works faster with None than True/False
-        if self.highgain:
-            highgain = self.highgain
-        else:
-            highgain = None
-
         _mask = self._mask(double_pixels)
 
         for i, m in enumerate(self.module_map):
@@ -600,12 +594,12 @@ class JFDataHandler:
                 mod_tmp_dtype = self.get_dtype_out(images.dtype, conversion=conversion)
                 mod_tmp = np.zeros(shape=mod_tmp_shape, dtype=mod_tmp_dtype)
 
-                proc_func(mod_tmp, mod, mod_g, mod_p, mod_mask, factor, gap_pixels, highgain)
+                _adc_to_energy(mod_tmp, mod, mod_g, mod_p, mod_mask, factor, gap_pixels)
                 mod_res = res[:, oy:, ox:]
                 _reshape_stripsel_jit[parallel](mod_res, mod_tmp)
             else:
                 mod_res = res[:, oy:, ox:]
-                proc_func(mod_res, mod, mod_g, mod_p, mod_mask, factor, gap_pixels, highgain)
+                _adc_to_energy(mod_res, mod, mod_g, mod_p, mod_mask, factor, gap_pixels)
                 if double_pixels == "interp":
                     _inplace_interp_dp_jit[parallel](mod_res)
 
@@ -698,7 +692,7 @@ class JFDataHandler:
         return saturated_pixels_coordinates
 
 
-def _adc_to_energy(res, image, gain, pedestal, mask, factor, gap_pixels, highgain):
+def _adc_to_energy(res, image, gain, pedestal, mask, factor, gap_pixels):
     num, size_y, size_x = image.shape
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
     for i1 in prange(num):  # pylint: disable=not-an-iterable
@@ -713,11 +707,7 @@ def _adc_to_energy(res, image, gain, pedestal, mask, factor, gap_pixels, highgai
                 if gain is None or pedestal is None:
                     res[i1, ri2, ri3] = image[i1, i2, i3]
                 else:
-                    if highgain is None:
-                        gm = np.right_shift(image[i1, i2, i3], 14)
-                    else:
-                        gm = 0
-
+                    gm = np.right_shift(image[i1, i2, i3], 14)
                     val = np.float32(image[i1, i2, i3] & 0x3FFF)
                     tmp_res = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
 
