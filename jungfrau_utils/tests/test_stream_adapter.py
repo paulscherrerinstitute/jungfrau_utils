@@ -159,36 +159,3 @@ def test_stream_module_map(stream_adapter, gain_file, pedestal_file):
 
     assert res.dtype == np.dtype(np.float32)
     assert res.shape == DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY
-
-
-@pytest.mark.parametrize("mask_double_pixels", [True, False])
-def test_stream_keep_mask_double_pixels_flag_1(stream_adapter, mask_double_pixels):
-    stream_adapter.mask_double_pixels = mask_double_pixels
-
-    metadata = {"detector_name": DETECTOR_NAME}
-    stream_adapter.process(image, metadata)
-
-    assert stream_adapter.handler.mask_double_pixels == mask_double_pixels
-
-    metadata = {"detector_name": "JF04T01V01"}
-    data = np.zeros((512, 1024), np.uint16)
-    stream_adapter.process(data, metadata)
-
-    assert stream_adapter.handler.mask_double_pixels == mask_double_pixels
-
-
-@pytest.mark.parametrize("mask_double_pixels", [True, False])
-def test_stream_keep_mask_double_pixels_flag_2(stream_adapter, mask_double_pixels):
-    metadata = {"detector_name": DETECTOR_NAME}
-    stream_adapter.process(image, metadata)
-
-    stream_adapter.mask_double_pixels = mask_double_pixels
-
-    assert stream_adapter.handler.mask_double_pixels == mask_double_pixels
-
-    metadata = {"detector_name": "JF04T01V01"}
-    data = np.zeros((512, 1024), np.uint16)
-
-    stream_adapter.process(data, metadata)
-
-    assert stream_adapter.handler.mask_double_pixels == mask_double_pixels

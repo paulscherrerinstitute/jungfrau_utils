@@ -4,7 +4,7 @@ from pathlib import Path
 import h5py
 
 
-def locate_gain_file(file_path, verbose=True):
+def locate_gain_file(file_path, *, verbose=True):
     """Locate gain file in default location at swissfel.
 
     The default gain file location is
@@ -35,7 +35,7 @@ def locate_gain_file(file_path, verbose=True):
     return gain_file.as_posix()
 
 
-def locate_pedestal_file(file_path, verbose=True):
+def locate_pedestal_file(file_path, *, verbose=True):
     """Locate pedestal file in default location at swissfel.
 
     The default pedestal file paths for a particula p-group are

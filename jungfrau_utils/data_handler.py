@@ -82,18 +82,6 @@ class JFDataHandler:
         self._module_map = np.arange(self.detector.n_modules)
 
         self._mask_all = {True: None, False: None}
-        self._mask_double_pixels = False
-
-        # Precompile numba-jitted functions
-        self._proc_func = {
-            True: njit(parallel=True)(_correct),
-            False: njit()(_correct),
-        }
-
-        self._reshape_stripsel_func = {
-            True: njit(parallel=True)(_reshape_stripsel),
-            False: njit()(_reshape_stripsel),
-        }
 
     @property
     def detector_name(self):
@@ -139,7 +127,7 @@ class JFDataHandler:
     def _shape_in(self):
         return self._get_shape_n_modules(self._number_active_modules)
 
-    def get_shape_out(self, gap_pixels=True, geometry=True):
+    def get_shape_out(self, *, gap_pixels=True, geometry=True):
         """Return final image shape of a detector, based on gap_pixel and geometry flags
 
         Args:
@@ -189,7 +177,7 @@ class JFDataHandler:
 
         return shape_y, shape_x
 
-    def get_dtype_out(self, dtype_in, conversion=True):
+    def get_dtype_out(self, dtype_in, *, conversion=True):
         """Resulting image dtype of a detector, based on input dtype and a conversion flag.
 
         Args:
@@ -266,7 +254,7 @@ class JFDataHandler:
             # will avoid double broadcasting
             _g = 1 / self.factor / self.gain
 
-        self._g_all[True] = _g[3:].copy()
+        self._g_all[True] = np.tile(_g[3], (4, 1, 1))
 
         _g[3] = _g[2]
         self._g_all[False] = _g
@@ -324,7 +312,7 @@ class JFDataHandler:
 
         _p = self._pedestal.copy()
 
-        self._p_all[True] = _p[3:].copy()
+        self._p_all[True] = np.tile(_p[3], (4, 1, 1))
 
         _p[3] = _p[2]
         self._p_all[False] = _p
@@ -402,34 +390,35 @@ class JFDataHandler:
         self._mask_all[False] = mask.copy()
 
         # self._mask_all[True] -> original + double pixels mask
-        if self.is_stripsel():
-            # TODO: implement stripsel double pixel masking
-            ...
-        else:
+        if not self.is_stripsel():
             for m in range(self.detector.n_modules):
                 module_mask = self._get_module_slice(mask, m)
-                for n in range(CHIP_NUM_X):
+                for n in range(1, CHIP_NUM_X):
+                    module_mask[:, CHIP_SIZE_X * n - 1] = False
                     module_mask[:, CHIP_SIZE_X * n] = False
-                    module_mask[:, CHIP_SIZE_X * (n + 1) - 1] = False
 
-                for n in range(CHIP_NUM_Y):
+                for n in range(1, CHIP_NUM_Y):
+                    module_mask[CHIP_SIZE_Y * n - 1, :] = False
                     module_mask[CHIP_SIZE_Y * n, :] = False
-                    module_mask[CHIP_SIZE_Y * (n + 1) - 1, :] = False
 
         self._mask_all[True] = mask
 
-    def get_pixel_mask(self, gap_pixels=True, geometry=True):
+    def get_pixel_mask(self, *, gap_pixels=True, double_pixels="keep", geometry=True):
         """Return pixel mask, shaped according to gap_pixel and geometry flags.
 
         Args:
             gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
+            double_pixels (str, optional): A method to handle double pixels in-between ASICs. Can be
+                "keep", "mask", or "interp". Defaults to "keep".
             geometry (bool, optional): Apply detector geometry corrections. Defaults to True.
 
         Returns:
             ndarray: Resulting pixel mask, where True values correspond to valid pixels.
         """
-        if self._mask is None:
+        if self._pixel_mask is None:
             return None
+
+        _mask = self._mask(double_pixels)
 
         input_mask = np.zeros(self._shape_in, dtype=bool)
         for i, m in enumerate(self.module_map):
@@ -437,7 +426,7 @@ class JFDataHandler:
                 continue
 
             input_mask_slice = self._get_module_slice(input_mask, m)
-            input_mask_slice[:] = self._get_module_slice(self._mask, i)
+            input_mask_slice[:] = self._get_module_slice(_mask, i)
 
         res = self.process(
             input_mask, conversion=False, mask=False, gap_pixels=gap_pixels, geometry=geometry,
@@ -445,22 +434,13 @@ class JFDataHandler:
 
         return res
 
-    @property
-    def mask_double_pixels(self):
-        """Current flag for masking double pixels.
-        """
-        return self._mask_double_pixels
-
-    @mask_double_pixels.setter
-    def mask_double_pixels(self, value):
-        if not isinstance(value, bool):
-            value = bool(value)
-
-        self._mask_double_pixels = value
-
-    @property
-    def _mask(self):
-        return self._mask_all[self.mask_double_pixels]
+    def _mask(self, double_pixels):
+        if double_pixels in ("keep", "interp"):
+            return self._mask_all[False]
+        elif double_pixels == "mask":
+            return self._mask_all[True]
+        else:
+            raise ValueError("'double_pixels' can only be 'keep', 'mask', or 'interp'")
 
     @property
     def module_map(self):
@@ -490,9 +470,11 @@ class JFDataHandler:
     def process(
         self,
         images,
+        *,
         conversion=True,
         mask=True,
         gap_pixels=True,
+        double_pixels="keep",
         geometry=True,
         parallel=False,
         out=None,
@@ -507,6 +489,8 @@ class JFDataHandler:
             mask (bool, optional): Perform masking of bad pixels (set those values to 0).
                 Defaults to True.
             gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
+            double_pixels (str, optional): A method to handle double pixels in-between ASICs. Can be
+                "keep", "mask", or "interp". Defaults to "keep".
             geometry (bool, optional): Apply detector geometry corrections. Defaults to True.
             parallel (bool, optional): Parallelize image stack processing. Defaults to False.
             out (ndarray, optional): If provided, the destination to place the result. The shape
@@ -531,25 +515,39 @@ class JFDataHandler:
         if conversion and not self.can_convert():
             raise RuntimeError("Gain and/or pedestal values are not set.")
 
-        if mask and self._mask is None:
+        if mask and self._pixel_mask is None:
             raise RuntimeError("Pixel mask values are not set.")
+
+        if double_pixels not in ("keep", "mask", "interp"):
+            raise ValueError("'double_pixels' can only be 'keep', 'mask', or 'interp'")
+
+        if not mask and double_pixels == "mask":
+            warnings.warn(
+                '\'double_pixels="mask"\' has no effect when "mask"=False', RuntimeWarning
+            )
+
+        if double_pixels == "interp" and not gap_pixels:
+            raise RuntimeError("Double pixel interpolation requires 'gap_pixels' to be True.")
+
+        if double_pixels == "interp" and self.factor is not None:
+            raise ValueError("Unsupported mode: double_pixels='mask' with a factor value.")
 
         if self.is_stripsel() and gap_pixels:
             warnings.warn("'gap_pixels' flag has no effect on stripsel detectors", RuntimeWarning)
             gap_pixels = False
 
-        if self.is_stripsel() and self.mask_double_pixels:
+        if self.is_stripsel() and double_pixels == "mask":
             warnings.warn(
-                "'mask_double_pixels' flag has no effect on stripsel detectors", RuntimeWarning
+                "Masking double pixels has no effect on stripsel detectors", RuntimeWarning
             )
-            self.mask_double_pixels = False
+            double_pixels = "keep"
 
         if out is None:
             out_shape = self.get_shape_out(gap_pixels=gap_pixels, geometry=geometry)
             out_dtype = self.get_dtype_out(images.dtype, conversion=conversion)
             out = np.zeros((images.shape[0], *out_shape), dtype=out_dtype)
 
-        self._process(out, images, conversion, mask, gap_pixels, geometry, parallel)
+        self._process(out, images, conversion, mask, gap_pixels, double_pixels, geometry, parallel)
 
         # rotate image stack according to a geometry configuration (e.g. for alvra JF06 detectors)
         if geometry and self.detector_geometry.rotate90:
@@ -565,14 +563,12 @@ class JFDataHandler:
         """
         return (self.gain is not None) and (self.pedestal is not None)
 
-    def _process(self, res, images, conversion, mask, gap_pixels, geometry, parallel):
-        proc_func = self._proc_func[parallel]
+    def _process(
+        self, res, images, conversion, mask, gap_pixels, double_pixels, geometry, parallel
+    ):
+        _adc_to_energy = _adc_to_energy_jit[parallel]
         factor = self.factor
-        # weirdly, numba works faster with None than True/False
-        if self.highgain:
-            highgain = self.highgain
-        else:
-            highgain = None
+        _mask = self._mask(double_pixels)
 
         for i, m in enumerate(self.module_map):
             if m == -1:
@@ -582,7 +578,7 @@ class JFDataHandler:
             mod = self._get_module_slice(images, m, geometry)
 
             if mask:
-                mod_mask = self._get_module_slice(self._mask, i, geometry)
+                mod_mask = self._get_module_slice(_mask, i, geometry)
             else:
                 mod_mask = None
 
@@ -598,12 +594,14 @@ class JFDataHandler:
                 mod_tmp_dtype = self.get_dtype_out(images.dtype, conversion=conversion)
                 mod_tmp = np.zeros(shape=mod_tmp_shape, dtype=mod_tmp_dtype)
 
-                proc_func(mod_tmp, mod, mod_g, mod_p, mod_mask, factor, gap_pixels, highgain)
+                _adc_to_energy(mod_tmp, mod, mod_g, mod_p, mod_mask, factor, gap_pixels)
                 mod_res = res[:, oy:, ox:]
-                self._reshape_stripsel_func[parallel](mod_res, mod_tmp)
+                _reshape_stripsel_jit[parallel](mod_res, mod_tmp)
             else:
                 mod_res = res[:, oy:, ox:]
-                proc_func(mod_res, mod, mod_g, mod_p, mod_mask, factor, gap_pixels, highgain)
+                _adc_to_energy(mod_res, mod, mod_g, mod_p, mod_mask, factor, gap_pixels)
+                if double_pixels == "interp":
+                    _inplace_interp_dp_jit[parallel](mod_res)
 
     def _get_final_module_coordinates(self, m, i, geometry, gap_pixels):
         if geometry:
@@ -640,7 +638,7 @@ class JFDataHandler:
 
         return out
 
-    def get_gains(self, images, mask=True, gap_pixels=True, geometry=True):
+    def get_gains(self, images, *, mask=True, gap_pixels=True, geometry=True):
         """Return gain values of images, based on mask, gap_pixel and geometry flags.
 
         Args:
@@ -663,7 +661,7 @@ class JFDataHandler:
 
         return gains
 
-    def get_saturated_pixels(self, images, mask=True, gap_pixels=True, geometry=True):
+    def get_saturated_pixels(self, images, *, mask=True, gap_pixels=True, geometry=True):
         """Return coordinates of saturated pixels, based on mask, gap_pixel and geometry flags.
 
         Args:
@@ -679,7 +677,12 @@ class JFDataHandler:
         if images.dtype != np.uint16:
             raise TypeError(f"Expected image type {np.uint16}, provided data type {images.dtype}.")
 
-        saturated_pixels = images == self.get_saturated_value()
+        if self.highgain:
+            saturated_value = 0b0011111111111111  # = 16383
+        else:
+            saturated_value = 0b1100000000000000  # = 49152
+
+        saturated_pixels = images == saturated_value
         saturated_pixels = self.process(
             saturated_pixels, conversion=False, mask=mask, gap_pixels=gap_pixels, geometry=geometry
         )
@@ -688,21 +691,8 @@ class JFDataHandler:
 
         return saturated_pixels_coordinates
 
-    def get_saturated_value(self):
-        """Get a value for saturated pixels.
 
-        Returns:
-            int: A saturated pixel value.
-        """
-        if self.highgain:
-            saturated_value = 0b0011111111111111  # = 16383
-        else:
-            saturated_value = 0b1100000000000000  # = 49152
-
-        return saturated_value
-
-
-def _correct(res, image, gain, pedestal, mask, factor, gap_pixels, highgain):
+def _adc_to_energy(res, image, gain, pedestal, mask, factor, gap_pixels):
     num, size_y, size_x = image.shape
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
     for i1 in prange(num):  # pylint: disable=not-an-iterable
@@ -717,11 +707,7 @@ def _correct(res, image, gain, pedestal, mask, factor, gap_pixels, highgain):
                 if gain is None or pedestal is None:
                     res[i1, ri2, ri3] = image[i1, i2, i3]
                 else:
-                    if highgain is None:
-                        gm = np.right_shift(image[i1, i2, i3], 14)
-                    else:
-                        gm = 0
-
+                    gm = np.right_shift(image[i1, i2, i3], 14)
                     val = np.float32(image[i1, i2, i3] & 0x3FFF)
                     tmp_res = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
 
@@ -763,3 +749,85 @@ def _reshape_stripsel(res, image):
                 xout = igap * 774 + 765 + 11 - yin % 6
                 res[ind, yout, xout] = image[ind, yin, xin] / 2
                 res[ind, yout + 1, xout] = image[ind, yin, xin] / 2
+
+
+def _inplace_interp_dp(res):
+    for i1 in prange(res.shape[0]):
+        # corner quad pixels
+        for ri2 in (255, 257):
+            for ri3 in (255, 257, 513, 515, 771, 773):
+                shift_y = 0 if ri2 == 255 else 1
+                shift_x = 0 if ri3 == 255 or ri3 == 513 or ri3 == 771 else 1
+
+                shared_val = res[i1, ri2 + shift_y, ri3 + shift_x] / 4
+                res[i1, ri2, ri3] = shared_val
+                res[i1, ri2 + 1, ri3] = shared_val
+                res[i1, ri2, ri3 + 1] = shared_val
+                res[i1, ri2 + 1, ri3 + 1] = shared_val
+
+        # rows of double pixels
+        ri2 = 255
+        for x_start, x_end in ((0, 255), (259, 513), (517, 771), (775, 1030)):
+            for ri3 in range(x_start, x_end):
+                v1 = res[i1, ri2 - 1, ri3]
+                v2 = res[i1, ri2, ri3]
+                v3 = res[i1, ri2 + 3, ri3]
+                v4 = res[i1, ri2 + 4, ri3]
+
+                if v1 == 0 and v3 == 0:
+                    shared_val = v2 / 2
+                    res[i1, ri2, ri3] = shared_val
+                    res[i1, ri2 + 1, ri3] = shared_val
+                else:
+                    res[i1, ri2, ri3] *= (4 * v1 + v3) / (6 * v1 + 3 * v3)
+                    res[i1, ri2 + 1, ri3] = v2 - res[i1, ri2, ri3]
+
+                if v4 == 0 and v2 == 0:
+                    shared_val = v3 / 2
+                    res[i1, ri2 + 3, ri3] = shared_val
+                    res[i1, ri2 + 2, ri3] = shared_val
+                else:
+                    res[i1, ri2 + 3, ri3] *= (4 * v4 + v2) / (6 * v4 + 3 * v2)
+                    res[i1, ri2 + 2, ri3] = v3 - res[i1, ri2 + 3, ri3]
+
+        # columns of double pixels
+        for ri3 in (255, 513, 771):
+            for y_start, y_end in ((0, 255), (259, 514)):
+                for ri2 in range(y_start, y_end):
+                    v1 = res[i1, ri2, ri3 - 1]
+                    v2 = res[i1, ri2, ri3]
+                    v3 = res[i1, ri2, ri3 + 3]
+                    v4 = res[i1, ri2, ri3 + 4]
+
+                    if v1 == 0 and v3 == 0:
+                        shared_val = v2 / 2
+                        res[i1, ri2, ri3] = shared_val
+                        res[i1, ri2, ri3 + 1] = shared_val
+                    else:
+                        res[i1, ri2, ri3] *= (4 * v1 + v3) / (6 * v1 + 3 * v3)
+                        res[i1, ri2, ri3 + 1] = v2 - res[i1, ri2, ri3]
+
+                    if v4 == 0 and v2 == 0:
+                        shared_val = v3 / 2
+                        res[i1, ri2, ri3 + 3] = shared_val
+                        res[i1, ri2, ri3 + 2] = shared_val
+                    else:
+                        res[i1, ri2, ri3 + 3] *= (4 * v4 + v2) / (6 * v4 + 3 * v2)
+                        res[i1, ri2, ri3 + 2] = v3 - res[i1, ri2, ri3 + 3]
+
+
+# Compile numba functions
+_adc_to_energy_jit = {
+    True: njit(parallel=True)(_adc_to_energy),
+    False: njit()(_adc_to_energy),
+}
+
+_reshape_stripsel_jit = {
+    True: njit(parallel=True)(_reshape_stripsel),
+    False: njit()(_reshape_stripsel),
+}
+
+_inplace_interp_dp_jit = {
+    True: njit(parallel=True)(_inplace_interp_dp),
+    False: njit()(_inplace_interp_dp),
+}
