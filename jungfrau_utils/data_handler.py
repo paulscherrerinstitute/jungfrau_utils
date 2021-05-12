@@ -86,13 +86,13 @@ class JFDataHandler:
 
         # Precompile numba-jitted functions
         self._proc_func = {
-            True: njit(cache=True, parallel=True)(_correct),
-            False: njit(cache=True)(_correct),
+            True: njit(parallel=True)(_correct),
+            False: njit()(_correct),
         }
 
         self._reshape_stripsel_func = {
-            True: njit(cache=True, parallel=True)(_reshape_stripsel),
-            False: njit(cache=True)(_reshape_stripsel),
+            True: njit(parallel=True)(_reshape_stripsel),
+            False: njit()(_reshape_stripsel),
         }
 
     @property
