@@ -84,16 +84,9 @@ class JFDataHandler:
         self._mask_all = {True: None, False: None}
         self._mask_double_pixels = False
 
-        # Precompile numba-jitted functions
-        self._proc_func = {
-            True: njit(parallel=True)(_correct),
-            False: njit()(_correct),
-        }
-
-        self._reshape_stripsel_func = {
-            True: njit(parallel=True)(_reshape_stripsel),
-            False: njit()(_reshape_stripsel),
-        }
+        # numba-jitted functions
+        self._proc_func = {True: _correct_parallel, False: _correct}
+        self._reshape_stripsel_func = {True: _reshape_stripsel_parallel, False: _reshape_stripsel}
 
     @property
     def detector_name(self):
@@ -702,7 +695,38 @@ class JFDataHandler:
         return saturated_value
 
 
+@njit(cache=True)
 def _correct(res, image, gain, pedestal, mask, factor, gap_pixels, highgain):
+    num, size_y, size_x = image.shape
+    # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
+    for i1 in range(num):  # pylint: disable=not-an-iterable
+        for i2 in range(size_y):
+            for i3 in range(size_x):
+                if mask is not None and not mask[i2, i3]:
+                    continue
+
+                ri2 = i2 + i2 // CHIP_SIZE_Y * CHIP_GAP_Y * gap_pixels
+                ri3 = i3 + i3 // CHIP_SIZE_X * CHIP_GAP_X * gap_pixels
+
+                if gain is None or pedestal is None:
+                    res[i1, ri2, ri3] = image[i1, i2, i3]
+                else:
+                    if highgain is None:
+                        gm = np.right_shift(image[i1, i2, i3], 14)
+                    else:
+                        gm = 0
+
+                    val = np.float32(image[i1, i2, i3] & 0x3FFF)
+                    tmp_res = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
+
+                    if factor is None:
+                        res[i1, ri2, ri3] = tmp_res
+                    else:
+                        res[i1, ri2, ri3] = round(tmp_res)
+
+
+@njit(cache=True, parallel=True)
+def _correct_parallel(res, image, gain, pedestal, mask, factor, gap_pixels, highgain):
     num, size_y, size_x = image.shape
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
     for i1 in prange(num):  # pylint: disable=not-an-iterable
@@ -731,7 +755,43 @@ def _correct(res, image, gain, pedestal, mask, factor, gap_pixels, highgain):
                         res[i1, ri2, ri3] = round(tmp_res)
 
 
+@njit(cache=True)
 def _reshape_stripsel(res, image):
+    num = image.shape[0]
+    # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
+    for ind in range(num):  # pylint: disable=not-an-iterable
+        # first we fill the normal pixels, the gap ones will be overwritten later
+        for yin in range(252):
+            for xin in range(1024):
+                ichip = xin // 256
+                xout = (ichip * 774) + (xin % 256) * 3 + yin % 3
+                # 774 is the chip period, 256*3+6
+                yout = yin // 3
+                res[ind, yout, xout] = image[ind, yin, xin]
+
+        # now the gap pixels
+        for igap in range(3):
+            for yin in range(252):
+                yout = (yin // 6) * 2
+
+                # if we want a proper normalization (the area of those pixels is double,
+                # so they see 2x the signal)
+
+                # first the left side of gap
+                xin = igap * 256 + 255
+                xout = igap * 774 + 765 + yin % 6
+                res[ind, yout, xout] = image[ind, yin, xin] / 2
+                res[ind, yout + 1, xout] = image[ind, yin, xin] / 2
+
+                # then the right side is mirrored
+                xin = igap * 256 + 255 + 1
+                xout = igap * 774 + 765 + 11 - yin % 6
+                res[ind, yout, xout] = image[ind, yin, xin] / 2
+                res[ind, yout + 1, xout] = image[ind, yin, xin] / 2
+
+
+@njit(cache=True, parallel=True)
+def _reshape_stripsel_parallel(res, image):
     num = image.shape[0]
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
     for ind in prange(num):  # pylint: disable=not-an-iterable
