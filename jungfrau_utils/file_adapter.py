@@ -34,6 +34,8 @@ class File:
             Defaults to True.
         mask (bool, optional): Perform masking of bad pixels (assign them to 0). Defaults to True.
         gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
+        double_pixels (str, optional): A method to handle double pixels in-between ASICs. Can be
+            "keep", "mask", or "interp". Defaults to "keep".
         geometry (bool, optional): Apply geometry correction. Defaults to True.
         parallel (bool, optional): Use parallelized processing. Defaults to True.
     """
@@ -41,11 +43,13 @@ class File:
     def __init__(
         self,
         file_path,
+        *,
         gain_file="",
         pedestal_file="",
         conversion=True,
         mask=True,
         gap_pixels=True,
+        double_pixels="keep",
         geometry=True,
         parallel=True,
     ):
@@ -57,6 +61,7 @@ class File:
         self._conversion = conversion
         self._mask = mask
         self._gap_pixels = gap_pixels
+        self._double_pixels = double_pixels
         self._geometry = geometry
         self._parallel = parallel
 
@@ -155,6 +160,20 @@ class File:
         self._gap_pixels = value
 
     @property
+    def double_pixels(self):
+        """A parameter for making modifications to double pixels.
+        """
+        return self._double_pixels
+
+    @double_pixels.setter
+    def double_pixels(self, value):
+        if self._processed:
+            print("The file is already processed, setting 'double_pixels' has no effect.")
+            return
+
+        self._double_pixels = value
+
+    @property
     def geometry(self):
         """A flag for applying geometry.
         """
@@ -190,8 +209,26 @@ class File:
     def _data_dataset(self):
         return f"data/{self.detector_name}/data"
 
+    def get_pixel_mask(self):
+        """Return pixel mask, shaped according to gap_pixel and geometry flags.
+
+        Returns:
+            ndarray: Resulting pixel mask, where True values correspond to valid pixels.
+        """
+        return self.handler.get_pixel_mask(
+            gap_pixels=self.gap_pixels, double_pixels=self.double_pixels, geometry=self.geometry
+        )
+
     def export(
-        self, dest, index=None, roi=None, compression=False, factor=None, dtype=None, batch_size=100
+        self,
+        dest,
+        *,
+        index=None,
+        roi=None,
+        compression=False,
+        factor=None,
+        dtype=None,
+        batch_size=100,
     ):
         """Export processed data into a separate hdf5 file.
 
@@ -268,13 +305,17 @@ class File:
 
         h5_dest[f"data/{self.detector_name}/conversion_factor"] = self.handler.factor or np.NaN
 
-        pixel_mask = self.handler.get_pixel_mask(gap_pixels=self.gap_pixels, geometry=self.geometry)
+        pixel_mask = self.handler.get_pixel_mask(
+            gap_pixels=self.gap_pixels, double_pixels=self.double_pixels, geometry=self.geometry
+        )
 
         if roi is None:
             # save a pixel mask
             h5_dest[f"data/{self.detector_name}/pixel_mask"] = pixel_mask
 
-            image_shape = self.handler.get_shape_out(self.gap_pixels, self.geometry)
+            image_shape = self.handler.get_shape_out(
+                gap_pixels=self.gap_pixels, geometry=self.geometry
+            )
             # TODO: this is not ideal, find a way to avoid the 2 next lines
             if self.geometry and self.handler.detector_geometry.rotate90 % 2:
                 image_shape = image_shape[1], image_shape[0]
@@ -366,6 +407,7 @@ class File:
                 conversion=self.conversion,
                 mask=self.mask,
                 gap_pixels=self.gap_pixels,
+                double_pixels=self.double_pixels,
                 geometry=self.geometry,
                 parallel=self.parallel,
                 out=out_buffer_view,
@@ -442,6 +484,7 @@ class File:
                 conversion=self.conversion,
                 mask=self.mask,
                 gap_pixels=self.gap_pixels,
+                double_pixels=self.double_pixels,
                 geometry=self.geometry,
                 parallel=self.parallel,
             )

@@ -14,7 +14,7 @@ class EscapeAdapter:
         pedestal_file (str, optional): Path to pedestal file. Auto-locate if empty. Defaults to "".
     """
 
-    def __init__(self, file_path, gain_file="", pedestal_file=""):
+    def __init__(self, file_path, *, gain_file="", pedestal_file=""):
         with h5py.File(file_path, "r") as h5f:
             detector_name = h5f["/general/detector_name"][()].decode()
             self.handler = JFDataHandler(detector_name)
