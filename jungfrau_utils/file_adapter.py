@@ -402,7 +402,7 @@ class File:
                     dset.read_direct(read_buffer_view, source_sel=np.s_[j], dest_sel=np.s_[i])
 
             # Process data
-            self.handler.process(
+            out_buffer_view = self.handler.process(
                 read_buffer_view,
                 conversion=self.conversion,
                 mask=self.mask,
@@ -412,6 +412,8 @@ class File:
                 parallel=self.parallel,
                 out=out_buffer_view,
             )
+
+            out_buffer_view = np.ascontiguousarray(out_buffer_view)
 
             if roi is None:
                 dtype_size = out_dtype.itemsize
