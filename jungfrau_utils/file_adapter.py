@@ -316,9 +316,6 @@ class File:
             image_shape = self.handler.get_shape_out(
                 gap_pixels=self.gap_pixels, geometry=self.geometry
             )
-            # TODO: this is not ideal, find a way to avoid the 2 next lines
-            if self.geometry and self.handler.detector_geometry.rotate90 % 2:
-                image_shape = image_shape[1], image_shape[0]
 
             args["shape"] = (n_images, *image_shape)
             args["maxshape"] = (n_images, *image_shape)

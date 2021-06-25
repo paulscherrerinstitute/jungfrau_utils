@@ -127,8 +127,9 @@ class JFDataHandler:
     def _shape_in(self):
         return self._get_shape_n_modules(self._number_active_modules)
 
-    def get_shape_out(self, *, gap_pixels=True, geometry=True):
-        """Return final image shape of a detector, based on gap_pixel and geometry flags
+    def _get_shape_out(self, gap_pixels, geometry):
+        """Return the image shape of a detector without an optional post-processing rotation step,
+        based on gap_pixel and geometry flags
 
         Args:
             gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
@@ -163,6 +164,22 @@ class JFDataHandler:
 
         else:  # not geometry and not gap_pixels:
             shape_y, shape_x = self._shape_in
+
+        return shape_y, shape_x
+
+    def get_shape_out(self, *, gap_pixels=True, geometry=True):
+        """Return the final image shape of a detector, based on gap_pixel and geometry flags
+
+        Args:
+            gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
+            geometry (bool, optional): Apply detector geometry corrections. Defaults to True.
+
+        Returns:
+            tuple: Height and width of a resulting image.
+        """
+        shape_y, shape_x = self._get_shape_out(gap_pixels, geometry)
+        if geometry and self.detector_geometry.rotate90 % 2:
+            shape_y, shape_x = shape_x, shape_y
 
         return shape_y, shape_x
 
@@ -543,9 +560,19 @@ class JFDataHandler:
             double_pixels = "keep"
 
         if out is None:
-            out_shape = self.get_shape_out(gap_pixels=gap_pixels, geometry=geometry)
+            # get the shape without an optional rotation
+            out_shape = self._get_shape_out(gap_pixels, geometry)
             out_dtype = self.get_dtype_out(images.dtype, conversion=conversion)
             out = np.zeros((images.shape[0], *out_shape), dtype=out_dtype)
+        else:
+            out_shape = self.get_shape_out(gap_pixels=gap_pixels, geometry=geometry)
+            if out.shape[-2:] != out_shape:
+                raise ValueError(f"Expected 'out' shape is {out_shape}, provided is {out.shape}")
+
+            # reshape inplace in case of a detector with an odd detector_geometry.rotate90 value
+            # it will be rotated to the original shape at the end of this function
+            if geometry and self.detector_geometry.rotate90 % 2:
+                out.shape = out_shape[1], out_shape[0]
 
         self._process(out, images, conversion, mask, gap_pixels, double_pixels, geometry, parallel)
 
