@@ -250,6 +250,9 @@ class File:
         if self._processed:
             raise RuntimeError("Can not run export, the file is already processed.")
 
+        if index is not None:
+            index = np.array(index)  # convert iterable into numpy array
+
         self.handler.factor = factor
 
         with h5py.File(dest, "w") as h5_dest:
@@ -275,13 +278,13 @@ class File:
 
             if name == self._data_dataset:
                 self._process_data(h5_dest, index, roi, compression, dtype, batch_size)
-
             else:
                 if name.startswith("data"):
                     # datasets with data per image, so indexing should be applied
                     if index is None:
-                        index = slice(None)
-                    data = dset_source[index, :]
+                        data = dset_source[:, :]
+                    else:
+                        data = dset_source[index, :]
                     args = {"shape": data.shape, "maxshape": data.shape}
                     h5_dest.create_dataset_like(name, dset_source, data=data, **args)
                 else:
@@ -300,7 +303,6 @@ class File:
         if index is None:
             n_images = self["data"].shape[0]
         else:
-            index = np.array(index)
             n_images = len(index)
 
         h5_dest[f"data/{self.detector_name}/conversion_factor"] = self.handler.factor or np.NaN
@@ -380,7 +382,7 @@ class File:
 
         # process and write data in batches
         for batch_start_ind in range(0, n_images, batch_size):
-            batch_range = range(batch_start_ind, min(batch_start_ind + batch_size, n_images))
+            batch_range = np.arange(batch_start_ind, min(batch_start_ind + batch_size, n_images))
 
             if index is None:
                 batch_ind = batch_range
