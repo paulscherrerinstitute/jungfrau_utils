@@ -547,7 +547,7 @@ class JFDataHandler:
             raise RuntimeError("Double pixel interpolation requires 'gap_pixels' to be True.")
 
         if double_pixels == "interp" and self.factor is not None:
-            raise ValueError("Unsupported mode: double_pixels='mask' with a factor value.")
+            raise ValueError("Unsupported mode: double_pixels='interp' with a factor value.")
 
         if self.is_stripsel() and gap_pixels:
             warnings.warn("'gap_pixels' flag has no effect on stripsel detectors", RuntimeWarning)
