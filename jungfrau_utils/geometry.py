@@ -138,6 +138,11 @@ detector_geometry = {
         ),
     ),
 
+    "JF07T03V01": DetectorGeometry(
+        origin_y=(0, 550, 1100),
+        origin_x=(0, 0, 0),
+    ),
+
     "JF08T01V01": DetectorGeometry(),
 
     "JF09T01V01": DetectorGeometry(),
