@@ -209,6 +209,14 @@ class File:
     def _data_dataset(self):
         return f"data/{self.detector_name}/data"
 
+    def get_shape_out(self):
+        """Return the final image shape of a detector, based on gap_pixel and geometry flags.
+
+        Returns:
+            tuple: Height and width of a resulting image.
+        """
+        return self.handler.get_shape_out(gap_pixels=self.gap_pixels, geometry=self.geometry)
+
     def get_pixel_mask(self):
         """Return pixel mask, shaped according to gap_pixel and geometry flags.
 
