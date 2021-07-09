@@ -432,6 +432,9 @@ class JFDataHandler:
         Returns:
             ndarray: Resulting pixel mask, where True values correspond to valid pixels.
         """
+        if double_pixels == "interp" and not gap_pixels:
+            raise RuntimeError("Double pixel interpolation requires 'gap_pixels' to be True.")
+
         if self._pixel_mask is None:
             return None
 
@@ -448,6 +451,12 @@ class JFDataHandler:
         res = self.process(
             input_mask, conversion=False, mask=False, gap_pixels=gap_pixels, geometry=geometry,
         )
+
+        if double_pixels == "interp":
+            for row in (256, 257):
+                res[row, :] = True
+            for col in (256, 257, 514, 515, 772, 773):
+                res[:, col] = True
 
         return res
 
