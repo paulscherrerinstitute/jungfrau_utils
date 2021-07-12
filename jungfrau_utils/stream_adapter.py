@@ -12,12 +12,13 @@ class StreamAdapter:
         # a placeholder for jf data handler to be initiated with detector name
         self.handler = None
 
-    def process(self, image, metadata):
+    def process(self, image, metadata, **kwargs):
         """Perform jungfrau detector data processing on an image received via stream.
 
         Args:
             image (ndarray): An image to be processed.
             metadata (dict): A corresponding image metadata.
+            **kwargs: Extra arguments for JFDataHandler.process() call.
 
         Returns:
             ndarray: Resulting image.
@@ -44,13 +45,16 @@ class StreamAdapter:
         # parse metadata
         self._update_handler(metadata)
 
-        # skip conversion step if jungfrau data handler cannot do it, thus avoiding Exception raise
-        conversion = self.handler.can_convert()
+        if "conversion" not in kwargs:
+            # skip conversion step if jungfrau data handler cannot do it, thus avoiding Exception
+            # raise
+            kwargs["conversion"] = self.handler.can_convert()
 
-        # skip masking step if pixel_mask is None
-        mask = self.handler.pixel_mask is not None
+        if "mask" not in kwargs:
+            # skip masking step if pixel_mask is None
+            kwargs["mask"] = self.handler.pixel_mask is not None
 
-        return self.handler.process(image, conversion=conversion, mask=mask)
+        return self.handler.process(image, **kwargs)
 
     def _update_handler(self, md_dict):
         # gain file
