@@ -435,28 +435,40 @@ class JFDataHandler:
         if double_pixels == "interp" and not gap_pixels:
             raise RuntimeError("Double pixel interpolation requires 'gap_pixels' to be True.")
 
+        if self.is_stripsel() and gap_pixels:
+            warnings.warn("'gap_pixels' flag has no effect on stripsel detectors", RuntimeWarning)
+            gap_pixels = False
+
         if self._pixel_mask is None:
             return None
 
-        _mask = self._mask(double_pixels)
+        _mask = self._mask(double_pixels)[np.newaxis]
 
-        input_mask = np.zeros(self._shape_in, dtype=bool)
+        res_shape = self._get_shape_out(gap_pixels, geometry)
+        res = np.zeros((1, *res_shape), dtype=bool)
+
         for i, m in enumerate(self.module_map):
             if m == -1:
                 continue
 
-            input_mask_slice = self._get_module_slice(input_mask, m)
-            input_mask_slice[:] = self._get_module_slice(_mask, i)
+            oy, ox = self._get_final_module_coordinates(m, i, geometry, gap_pixels)
 
-        res = self.process(
-            input_mask, conversion=False, mask=False, gap_pixels=gap_pixels, geometry=geometry,
-        )
+            mod = self._get_module_slice(_mask, i, geometry)
+            mod_res = res[:, oy:, ox:]
 
-        if double_pixels == "interp":
-            for row in (256, 257):
-                res[row, :] = True
-            for col in (256, 257, 514, 515, 772, 773):
-                res[:, col] = True
+            if self.is_stripsel() and geometry:
+                _reshape_stripsel(mod_res, mod)
+            else:
+                # this will just copy data to the correct place
+                _adc_to_energy(mod_res, mod, None, None, None, None, gap_pixels)
+                if double_pixels == "interp":
+                    _inplace_mask_dp(mod_res)
+
+        # rotate mask according to a geometry configuration (e.g. for alvra JF06 detectors)
+        if geometry and self.detector_geometry.rotate90:
+            res = np.rot90(res, k=self.detector_geometry.rotate90, axes=(1, 2))
+
+        res = res[0]
 
         return res
 
@@ -625,16 +637,15 @@ class JFDataHandler:
                 mod_g = None
                 mod_p = None
 
+            mod_res = res[:, oy:, ox:]
             if self.is_stripsel() and geometry:
                 mod_tmp_shape = (images.shape[0], *self._get_shape_n_modules(1))
                 mod_tmp_dtype = self.get_dtype_out(images.dtype, conversion=conversion)
                 mod_tmp = np.zeros(shape=mod_tmp_shape, dtype=mod_tmp_dtype)
 
                 _adc_to_energy(mod_tmp, mod, mod_g, mod_p, mod_mask, factor, gap_pixels)
-                mod_res = res[:, oy:, ox:]
                 _reshape_stripsel_jit[parallel](mod_res, mod_tmp)
             else:
-                mod_res = res[:, oy:, ox:]
                 _adc_to_energy(mod_res, mod, mod_g, mod_p, mod_mask, factor, gap_pixels)
                 if double_pixels == "interp":
                     _inplace_interp_dp_jit[parallel](mod_res)
@@ -980,6 +991,14 @@ def _inplace_interp_dp_parallel(res):
                     else:
                         res[i1, ri2, ri3 + 3] *= (4 * v4 + v2) / (6 * v4 + 3 * v2)
                         res[i1, ri2, ri3 + 2] = v3 - res[i1, ri2, ri3 + 3]
+
+
+@njit(cache=True)
+def _inplace_mask_dp(res):
+    for row in (256, 257):
+        res[:, row, :1030] = True
+    for col in (256, 257, 514, 515, 772, 773):
+        res[:, :514, col] = True
 
 
 # Numba functions
