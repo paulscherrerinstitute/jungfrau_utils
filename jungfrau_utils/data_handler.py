@@ -432,12 +432,21 @@ class JFDataHandler:
         Returns:
             ndarray: Resulting pixel mask, where True values correspond to valid pixels.
         """
+        if double_pixels not in ("keep", "mask", "interp"):
+            raise ValueError("'double_pixels' can only be 'keep', 'mask', or 'interp'")
+
         if double_pixels == "interp" and not gap_pixels:
             raise RuntimeError("Double pixel interpolation requires 'gap_pixels' to be True.")
 
         if self.is_stripsel() and gap_pixels:
             warnings.warn("'gap_pixels' flag has no effect on stripsel detectors", RuntimeWarning)
             gap_pixels = False
+
+        if self.is_stripsel() and double_pixels != "keep":
+            warnings.warn(
+                "Handling double pixels has no effect on stripsel detectors", RuntimeWarning
+            )
+            double_pixels = "keep"
 
         if self._pixel_mask is None:
             return None
@@ -574,9 +583,9 @@ class JFDataHandler:
             warnings.warn("'gap_pixels' flag has no effect on stripsel detectors", RuntimeWarning)
             gap_pixels = False
 
-        if self.is_stripsel() and double_pixels == "mask":
+        if self.is_stripsel() and double_pixels != "keep":
             warnings.warn(
-                "Masking double pixels has no effect on stripsel detectors", RuntimeWarning
+                "Handling double pixels has no effect on stripsel detectors", RuntimeWarning
             )
             double_pixels = "keep"
 
