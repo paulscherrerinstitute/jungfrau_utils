@@ -128,8 +128,7 @@ class JFDataHandler:
         return self._get_shape_n_modules(self._number_active_modules)
 
     def _get_shape_out(self, gap_pixels, geometry):
-        """Return the image shape of a detector without an optional post-processing rotation step,
-        based on gap_pixel and geometry flags
+        """Return the image shape of a detector without an optional post-processing rotation step.
 
         Args:
             gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
@@ -168,7 +167,7 @@ class JFDataHandler:
         return shape_y, shape_x
 
     def get_shape_out(self, *, gap_pixels=True, geometry=True):
-        """Return the final image shape of a detector, based on gap_pixel and geometry flags
+        """Return the final image shape of a detector.
 
         Args:
             gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
@@ -195,7 +194,7 @@ class JFDataHandler:
         return shape_y, shape_x
 
     def get_dtype_out(self, dtype_in, *, conversion=True):
-        """Resulting image dtype of a detector, based on input dtype and a conversion flag.
+        """Return resulting image dtype of a detector.
 
         Args:
             dtype_in (dtype): dtype of an input data.
@@ -421,7 +420,7 @@ class JFDataHandler:
         self._mask_all[True] = mask
 
     def get_pixel_mask(self, *, gap_pixels=True, double_pixels="keep", geometry=True):
-        """Return pixel mask, shaped according to gap_pixel and geometry flags.
+        """Return pixel mask.
 
         Args:
             gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
@@ -695,7 +694,7 @@ class JFDataHandler:
         return out
 
     def get_gains(self, images, *, mask=True, gap_pixels=True, geometry=True):
-        """Return gain values of images, based on mask, gap_pixel and geometry flags.
+        """Return gain values of images.
 
         Args:
             images (ndarray): Images to be processed.
@@ -718,7 +717,7 @@ class JFDataHandler:
         return gains
 
     def get_saturated_pixels(self, images, *, mask=True, gap_pixels=True, geometry=True):
-        """Return coordinates of saturated pixels, based on mask, gap_pixel and geometry flags.
+        """Return coordinates of saturated pixels.
 
         Args:
             images (ndarray): Images to be processed.
@@ -1004,6 +1003,7 @@ def _inplace_interp_dp_parallel(res):
 
 @njit(cache=True)
 def _inplace_mask_dp(res):
+    # gap_pixels is always True
     for row in (256, 257):
         res[:, row, :1030] = True
     for col in (256, 257, 514, 515, 772, 773):
