@@ -693,7 +693,7 @@ class JFDataHandler:
 
         return out
 
-    def get_gains(self, images, *, mask=True, gap_pixels=True, geometry=True):
+    def get_gains(self, images, *, mask=True, gap_pixels=True, double_pixels="keep", geometry=True):
         """Return gain values of images.
 
         Args:
@@ -701,6 +701,8 @@ class JFDataHandler:
             mask (bool, optional): Perform masking of bad pixels (set those values to 0).
                 Defaults to True.
             gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
+            double_pixels (str, optional): A method to handle double pixels in-between ASICs. Can be
+                "keep", "mask", or "interp" (resolves into "keep"). Defaults to "keep".
             geometry (bool, optional): Apply detector geometry corrections. Defaults to True.
 
         Returns:
@@ -709,14 +711,25 @@ class JFDataHandler:
         if images.dtype != np.uint16:
             raise TypeError(f"Expected image type {np.uint16}, provided data type {images.dtype}.")
 
+        if double_pixels == "interp":
+            # interpolation makes sense only for final keV values
+            double_pixels = "keep"
+
         gains = images >> 14
         gains = self.process(
-            gains, conversion=False, mask=mask, gap_pixels=gap_pixels, geometry=geometry
+            gains,
+            conversion=False,
+            mask=mask,
+            gap_pixels=gap_pixels,
+            double_pixels=double_pixels,
+            geometry=geometry,
         )
 
         return gains
 
-    def get_saturated_pixels(self, images, *, mask=True, gap_pixels=True, geometry=True):
+    def get_saturated_pixels(
+        self, images, *, mask=True, gap_pixels=True, double_pixels="keep", geometry=True
+    ):
         """Return coordinates of saturated pixels.
 
         Args:
@@ -724,6 +737,8 @@ class JFDataHandler:
             mask (bool, optional): Perform masking of bad pixels (set those values to 0).
                 Defaults to True.
             gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
+            double_pixels (str, optional): A method to handle double pixels in-between ASICs. Can be
+                "keep", "mask", or "interp" (resolves into "keep"). Defaults to "keep".
             geometry (bool, optional): Apply detector geometry corrections. Defaults to True.
 
         Returns:
@@ -732,6 +747,10 @@ class JFDataHandler:
         if images.dtype != np.uint16:
             raise TypeError(f"Expected image type {np.uint16}, provided data type {images.dtype}.")
 
+        if double_pixels == "interp":
+            # interpolation makes sense only for final keV values
+            double_pixels = "keep"
+
         if self.highgain:
             saturated_value = 0b0011111111111111  # = 16383
         else:
@@ -739,7 +758,12 @@ class JFDataHandler:
 
         saturated_pixels = images == saturated_value
         saturated_pixels = self.process(
-            saturated_pixels, conversion=False, mask=mask, gap_pixels=gap_pixels, geometry=geometry
+            saturated_pixels,
+            conversion=False,
+            mask=mask,
+            gap_pixels=gap_pixels,
+            double_pixels=double_pixels,
+            geometry=geometry,
         )
 
         saturated_pixels_coordinates = np.nonzero(saturated_pixels)
