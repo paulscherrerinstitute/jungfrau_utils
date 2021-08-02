@@ -1,7 +1,7 @@
 import re
 import warnings
 from collections import namedtuple
-from functools import wraps
+from functools import lru_cache, wraps
 
 import h5py
 import numpy as np
@@ -386,6 +386,7 @@ class JFDataHandler:
     def pixel_mask(self, value):
         if value is None:
             self._pixel_mask = None
+            self.get_pixel_mask.cache_clear()
             return
 
         if value.ndim != 2:
@@ -400,6 +401,7 @@ class JFDataHandler:
             )
 
         self._pixel_mask = value
+        self.get_pixel_mask.cache_clear()
 
         # self._mask_all[False] -> original mask
         mask = np.invert(value.astype(bool, copy=True))
@@ -419,6 +421,7 @@ class JFDataHandler:
 
         self._mask_all[True] = mask
 
+    @lru_cache(maxsize=8)
     def get_pixel_mask(self, *, gap_pixels=True, double_pixels="keep", geometry=True):
         """Return pixel mask.
 
