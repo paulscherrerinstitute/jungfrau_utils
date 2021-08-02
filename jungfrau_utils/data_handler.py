@@ -920,20 +920,22 @@ def _inplace_interp_dp(res):
                 v3 = res[i1, ri2 + 3, ri3]
                 v4 = res[i1, ri2 + 4, ri3]
 
-                if v1 == 0 and v3 == 0:
+                div = 6 * v1 + 3 * v3
+                if div == 0:
                     shared_val = v2 / 2
                     res[i1, ri2, ri3] = shared_val
                     res[i1, ri2 + 1, ri3] = shared_val
                 else:
-                    res[i1, ri2, ri3] *= (4 * v1 + v3) / (6 * v1 + 3 * v3)
+                    res[i1, ri2, ri3] *= (4 * v1 + v3) / div
                     res[i1, ri2 + 1, ri3] = v2 - res[i1, ri2, ri3]
 
-                if v4 == 0 and v2 == 0:
+                div = 6 * v4 + 3 * v2
+                if div == 0:
                     shared_val = v3 / 2
                     res[i1, ri2 + 3, ri3] = shared_val
                     res[i1, ri2 + 2, ri3] = shared_val
                 else:
-                    res[i1, ri2 + 3, ri3] *= (4 * v4 + v2) / (6 * v4 + 3 * v2)
+                    res[i1, ri2 + 3, ri3] *= (4 * v4 + v2) / div
                     res[i1, ri2 + 2, ri3] = v3 - res[i1, ri2 + 3, ri3]
 
         # columns of double pixels
@@ -945,20 +947,22 @@ def _inplace_interp_dp(res):
                     v3 = res[i1, ri2, ri3 + 3]
                     v4 = res[i1, ri2, ri3 + 4]
 
-                    if v1 == 0 and v3 == 0:
+                    div = 6 * v1 + 3 * v3
+                    if div == 0:
                         shared_val = v2 / 2
                         res[i1, ri2, ri3] = shared_val
                         res[i1, ri2, ri3 + 1] = shared_val
                     else:
-                        res[i1, ri2, ri3] *= (4 * v1 + v3) / (6 * v1 + 3 * v3)
+                        res[i1, ri2, ri3] *= (4 * v1 + v3) / div
                         res[i1, ri2, ri3 + 1] = v2 - res[i1, ri2, ri3]
 
-                    if v4 == 0 and v2 == 0:
+                    div = 6 * v4 + 3 * v2
+                    if div == 0:
                         shared_val = v3 / 2
                         res[i1, ri2, ri3 + 3] = shared_val
                         res[i1, ri2, ri3 + 2] = shared_val
                     else:
-                        res[i1, ri2, ri3 + 3] *= (4 * v4 + v2) / (6 * v4 + 3 * v2)
+                        res[i1, ri2, ri3 + 3] *= (4 * v4 + v2) / div
                         res[i1, ri2, ri3 + 2] = v3 - res[i1, ri2, ri3 + 3]
 
 
@@ -986,20 +990,22 @@ def _inplace_interp_dp_parallel(res):
                 v3 = res[i1, ri2 + 3, ri3]
                 v4 = res[i1, ri2 + 4, ri3]
 
-                if v1 == 0 and v3 == 0:
+                div = 6 * v1 + 3 * v3
+                if div == 0:
                     shared_val = v2 / 2
                     res[i1, ri2, ri3] = shared_val
                     res[i1, ri2 + 1, ri3] = shared_val
                 else:
-                    res[i1, ri2, ri3] *= (4 * v1 + v3) / (6 * v1 + 3 * v3)
+                    res[i1, ri2, ri3] *= (4 * v1 + v3) / div
                     res[i1, ri2 + 1, ri3] = v2 - res[i1, ri2, ri3]
 
-                if v4 == 0 and v2 == 0:
+                div = 6 * v4 + 3 * v2
+                if div == 0:
                     shared_val = v3 / 2
                     res[i1, ri2 + 3, ri3] = shared_val
                     res[i1, ri2 + 2, ri3] = shared_val
                 else:
-                    res[i1, ri2 + 3, ri3] *= (4 * v4 + v2) / (6 * v4 + 3 * v2)
+                    res[i1, ri2 + 3, ri3] *= (4 * v4 + v2) / div
                     res[i1, ri2 + 2, ri3] = v3 - res[i1, ri2 + 3, ri3]
 
         # columns of double pixels
@@ -1011,20 +1017,22 @@ def _inplace_interp_dp_parallel(res):
                     v3 = res[i1, ri2, ri3 + 3]
                     v4 = res[i1, ri2, ri3 + 4]
 
-                    if v1 == 0 and v3 == 0:
+                    div = 6 * v1 + 3 * v3
+                    if div == 0:
                         shared_val = v2 / 2
                         res[i1, ri2, ri3] = shared_val
                         res[i1, ri2, ri3 + 1] = shared_val
                     else:
-                        res[i1, ri2, ri3] *= (4 * v1 + v3) / (6 * v1 + 3 * v3)
+                        res[i1, ri2, ri3] *= (4 * v1 + v3) / div
                         res[i1, ri2, ri3 + 1] = v2 - res[i1, ri2, ri3]
 
-                    if v4 == 0 and v2 == 0:
+                    div = 6 * v4 + 3 * v2
+                    if div == 0:
                         shared_val = v3 / 2
                         res[i1, ri2, ri3 + 3] = shared_val
                         res[i1, ri2, ri3 + 2] = shared_val
                     else:
-                        res[i1, ri2, ri3 + 3] *= (4 * v4 + v2) / (6 * v4 + 3 * v2)
+                        res[i1, ri2, ri3 + 3] *= (4 * v4 + v2) / div
                         res[i1, ri2, ri3 + 2] = v3 - res[i1, ri2, ri3 + 3]
 
 
