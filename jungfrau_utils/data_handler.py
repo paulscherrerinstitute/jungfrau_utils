@@ -604,7 +604,7 @@ class JFDataHandler:
             # reshape inplace in case of a detector with an odd detector_geometry.rotate90 value
             # it will be rotated to the original shape at the end of this function
             if geometry and self.detector_geometry.rotate90 % 2:
-                out.shape = out_shape[1], out_shape[0]
+                out.shape = out.shape[0], out.shape[2], out.shape[1]
 
         self._process(out, images, conversion, mask, gap_pixels, double_pixels, geometry, parallel)
 
