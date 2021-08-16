@@ -16,7 +16,7 @@ requirements:
         - h5py >=2.9,<4
         - numpy
         - numba
-        - conda-forge::bitshuffle=0.3.5
+        - bitshuffle >=0.3.5
 
 test:
     source_files:
