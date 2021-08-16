@@ -318,9 +318,10 @@ class JFDataHandler:
             )
 
         p_shape = (4, *self._shape_full)
-        if value.shape != p_shape:
+        p_shape_v2 = (3, *self._shape_full)
+        if value.shape != p_shape and value.shape != p_shape_v2:
             raise ValueError(
-                f"Expected pedestal shape {p_shape}, provided pedestal shape {value.shape}."
+                f"Expected pedestal shapes {p_shape} or {p_shape_v2}, provided pedestal shape {value.shape}."
             )
 
         # convert _pedestal values to float32
@@ -328,10 +329,15 @@ class JFDataHandler:
 
         _p = self._pedestal.copy()
 
-        self._p_all[True] = np.tile(_p[3], (4, 1, 1))
+        if _p.shape == p_shape:
+            self._p_all[True] = np.tile(_p[3], (4, 1, 1))
 
-        _p[3] = _p[2]
-        self._p_all[False] = _p
+            _p[3] = _p[2]
+            self._p_all[False] = _p
+
+        else:  # _p.shape == p_shape_v2
+            _p_all = np.append(_p, _p[-1:], axis=0)
+            self._p_all[True] = self._p_all[False] = _p_all
 
     @property
     def factor(self):
