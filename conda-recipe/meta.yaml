@@ -7,12 +7,16 @@ package:
 source:
     path: ..
 
+build:
+    noarch: python
+    number: 0
+
 requirements:
     build:
-        - python {{ python }}
+        - python >=3.7
         - setuptools
     run:
-        - python {{ python }}
+        - python >=3.7
         - h5py >=2.9,<4
         - numpy
         - numba
@@ -24,9 +28,6 @@ test:
     requires:
         - pytest
 
-build:
-  number: 0
-
 about:
-   home: https://github.com/paulscherrerinstitute/jungfrau_utils
-   summary: {{ data['description'] }}
+    home: https://github.com/paulscherrerinstitute/jungfrau_utils
+    summary: {{ data['description'] }}

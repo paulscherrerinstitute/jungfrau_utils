@@ -1,2 +1,2 @@
-$PYTHON setup.py install # Python command to install the script
-echo $PREFIX
+#!/bin/bash
+$PYTHON setup.py install --single-version-externally-managed --record=record.txt
