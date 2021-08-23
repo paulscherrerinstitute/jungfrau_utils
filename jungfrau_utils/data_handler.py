@@ -1044,12 +1044,16 @@ def _inplace_interp_dp_parallel(res):
 
 @njit(cache=True)
 def _inplace_mask_dp(res):
-    # gap_pixels is always True
-    for row in (256, 257):
-        res[:, row, :1030] = True
-    for col in (256, 257, 514, 515, 772, 773):
-        res[:, :514, col] = True
+    # gap_pixels is always True here
+    for row in (256, ):
+        vals = res[:, row - 1, :1030] & res[:, row + 2, :1030]
+        res[:, row, :1030] = vals
+        res[:, row + 1, :1030] = vals
 
+    for col in (256, 514, 772):
+        vals = res[:, :514, col - 1] & res[:, :514, col + 2]
+        res[:, :514, col] = vals
+        res[:, :514, col + 1] = vals
 
 # Numba functions
 _adc_to_energy_jit = {
