@@ -505,11 +505,13 @@ class JFDataHandler:
 
     @module_map.setter
     def module_map(self, value):
+        if np.array_equal(self._module_map, value):
+            return
+
         n_modules = self.detector.n_modules
         if value is None:
             # support legacy data by emulating 'all modules are present'
-            self._module_map = np.arange(n_modules)
-            return
+            value = np.arange(n_modules)
 
         if len(value) != n_modules:
             raise ValueError(
@@ -520,6 +522,7 @@ class JFDataHandler:
             raise ValueError(f"Valid module_map values are integers between -1 and {n_modules-1}.")
 
         self._module_map = value
+        self.get_pixel_mask.cache_clear()
 
     @_allow_2darray
     def process(
