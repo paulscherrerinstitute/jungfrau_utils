@@ -489,6 +489,46 @@ class JFDataHandler:
 
         return res
 
+    def get_pixel_coordinates(self):
+        """Return arrays (x, y, z) of final coordinates for pixels in raw data.
+
+        The shape of the result is the same as the raw input data (equivalently, gap_pixels=False,
+        geometry=False), but the coordinates represent pixel positions after gap_pixel and geometry
+        corrections (gap_pixels=True, double_pixels="keep", geometry=True).
+        """
+        if self.detector_geometry.is_stripsel == True:
+            raise RuntimeError("Stripsel detectors are currently unsupported.")
+
+        if self.detector_geometry.rotate90:
+            raise RuntimeError("Detectors with post-rotation are currently unsupported.")
+
+        _y = np.arange(MODULE_SIZE_Y)
+        for n in range(1, CHIP_NUM_Y):
+            _y[n * CHIP_SIZE_Y :] += CHIP_GAP_Y
+
+        _x = np.arange(MODULE_SIZE_X)
+        for n in range(1, CHIP_NUM_X):
+            _x[n * CHIP_SIZE_X :] += CHIP_GAP_X
+
+        y_mod_grid, x_mod_grid = np.meshgrid(_y, _x, indexing="ij")
+
+        shape_out = self._get_shape_out(gap_pixels=False, geometry=False)
+        x_coord = np.zeros(shape=shape_out)
+        y_coord = np.zeros(shape=shape_out)
+        z_coord = np.zeros(shape=shape_out)
+
+        for i, m in enumerate(self.module_map):
+            if m == -1:
+                continue
+
+            oy, ox = self._get_final_module_coordinates(m, i, geometry=True, gap_pixels=True)
+            y_mod = self._get_module_slice(y_coord, i, geometry=False)
+            x_mod = self._get_module_slice(x_coord, i, geometry=False)
+            y_mod[:] = y_mod_grid + oy
+            x_mod[:] = x_mod_grid + ox
+
+        return x_coord, y_coord, z_coord
+
     def _mask(self, double_pixels):
         if double_pixels in ("keep", "interp"):
             return self._mask_all[False]
@@ -1048,7 +1088,7 @@ def _inplace_interp_dp_parallel(res):
 @njit(cache=True)
 def _inplace_mask_dp(res):
     # gap_pixels is always True here
-    for row in (256, ):
+    for row in (256,):
         vals = res[:, row - 1, :1030] & res[:, row + 2, :1030]
         res[:, row, :1030] = vals
         res[:, row + 1, :1030] = vals
@@ -1057,6 +1097,7 @@ def _inplace_mask_dp(res):
         vals = res[:, :514, col - 1] & res[:, :514, col + 2]
         res[:, :514, col] = vals
         res[:, :514, col + 1] = vals
+
 
 # Numba functions
 _adc_to_energy_jit = {
