@@ -409,11 +409,11 @@ class JFDataHandler:
         self._pixel_mask = value
         self.get_pixel_mask.cache_clear()
 
-        # self._mask_all[False] -> original mask
+        # original mask -> self._mask_all[False]
         mask = np.invert(value.astype(bool, copy=True))
         self._mask_all[False] = mask.copy()
 
-        # self._mask_all[True] -> original + double pixels mask
+        # original + double pixels mask -> self._mask_all[True]
         if not self.is_stripsel():
             for m in range(self.detector.n_modules):
                 module_mask = self._get_module_slice(mask, m)
@@ -470,7 +470,7 @@ class JFDataHandler:
 
             oy, ox = self._get_final_module_coordinates(m, i, geometry, gap_pixels)
 
-            mod = self._get_module_slice(_mask, i, geometry)
+            mod = self._get_module_slice(_mask, i)
             mod_res = res[:, oy:, ox:]
 
             if self.is_stripsel() and geometry:
@@ -522,8 +522,8 @@ class JFDataHandler:
                 continue
 
             oy, ox = self._get_final_module_coordinates(m, i, geometry=True, gap_pixels=True)
-            y_mod = self._get_module_slice(y_coord, i, geometry=False)
-            x_mod = self._get_module_slice(x_coord, i, geometry=False)
+            y_mod = self._get_module_slice(y_coord, i)
+            x_mod = self._get_module_slice(x_coord, i)
             y_mod[:] = y_mod_grid + oy
             x_mod[:] = x_mod_grid + ox
 
@@ -683,16 +683,16 @@ class JFDataHandler:
                 continue
 
             oy, ox = self._get_final_module_coordinates(m, i, geometry, gap_pixels)
-            mod = self._get_module_slice(images, m, geometry)
+            mod = self._get_module_slice(images, m)
 
             if mask:
-                mod_mask = self._get_module_slice(_mask, i, geometry)
+                mod_mask = self._get_module_slice(_mask, i)
             else:
                 mod_mask = None
 
             if conversion:
-                mod_g = self._get_module_slice(self._g, i, geometry)
-                mod_p = self._get_module_slice(self._p, i, geometry)
+                mod_g = self._get_module_slice(self._g, i)
+                mod_p = self._get_module_slice(self._p, i)
             else:
                 mod_g = None
                 mod_p = None
@@ -711,7 +711,7 @@ class JFDataHandler:
                     _inplace_interp_dp_jit[parallel](mod_res)
 
     def _get_final_module_coordinates(self, m, i, geometry, gap_pixels):
-        if geometry:
+        if geometry:  # gap pixels are already accounted for in module geometry coordinates
             oy = self.detector_geometry.origin_y[i]
             ox = self.detector_geometry.origin_x[i]
 
@@ -734,14 +734,11 @@ class JFDataHandler:
         return oy, ox
 
     @_allow_2darray
-    def _get_module_slice(self, data, m, geometry=False):
+    def _get_module_slice(self, data, m):
         if self.detector_name == "JF02T09V01":
             out = data[:, :, m * MODULE_SIZE_X : (m + 1) * MODULE_SIZE_X]
         else:
             out = data[:, m * MODULE_SIZE_Y : (m + 1) * MODULE_SIZE_Y, :]
-
-        if geometry and self.detector_name in ("JF02T09V02", "JF02T01V02"):
-            out = np.rot90(out, 2, axes=(1, 2))
 
         return out
 

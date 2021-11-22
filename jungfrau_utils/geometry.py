@@ -22,10 +22,11 @@ detector_geometry = {
 
     "JF02T09V02": DetectorGeometry(
         origin_y=(0, 0, 0, 0, 0, 0, 0, 0, 0),
-        origin_x=(0, 1036, 2072, 3108, 4144, 5180, 6216, 7252, 8288),
+        origin_x=(8288, 7252, 6216, 5180, 4144, 3108, 2072, 1036, 0),
+        rotate90=2,
     ),
 
-    "JF02T01V02": DetectorGeometry(),
+    "JF02T01V02": DetectorGeometry(rotate90=2),
 
     "JF03T01V01": DetectorGeometry(),
 
