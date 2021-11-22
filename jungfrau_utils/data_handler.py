@@ -107,7 +107,252 @@ class JFDataHandler:
         det = namedtuple("Detector", ["id", "n_modules", "version"])
         return det(*(int(d) for d in re.findall(r"\d+", self.detector_name)))
 
-    def _get_shape_n_modules(self, n):
+    @property
+    def gain_file(self):
+        """Return current gain filepath.
+        """
+        return self._gain_file
+
+    @gain_file.setter
+    def gain_file(self, filepath):
+        if not filepath:
+            self._gain_file = ""
+            self.gain = None
+            return
+
+        if filepath == self._gain_file:
+            return
+
+        with h5py.File(filepath, "r") as h5f:
+            gains = h5f["/gains"][:]
+
+        self._gain_file = filepath
+        self.gain = gains
+
+    @property
+    def gain(self):
+        """Current gain values.
+        """
+        return self._gain
+
+    @gain.setter
+    def gain(self, value):
+        if value is None:
+            self._gain = None
+            return
+
+        if value.ndim != 3:
+            raise ValueError(f"Expected gain dimensions 3, provided gain dimensions {value.ndim}.")
+
+        g_shape = (4, *self._shape_in_full)
+        if value.shape != g_shape:
+            raise ValueError(f"Expected gain shape {g_shape}, provided gain shape {value.shape}.")
+
+        # convert _gain values to float32
+        self._gain = value.astype(np.float32, copy=False)
+        self._update_g_all()
+
+    def _update_g_all(self):
+        if self.factor is None:
+            _g = 1 / self.gain
+        else:
+            # self.factor is one number and self.gain is a large array, so this order of division
+            # will avoid double broadcasting
+            _g = 1 / self.factor / self.gain
+
+        self._g_all[True] = np.tile(_g[3], (4, 1, 1))
+
+        _g[3] = _g[2]
+        self._g_all[False] = _g
+
+    @property
+    def _g(self):
+        return self._g_all[self.highgain]
+
+    @property
+    def pedestal_file(self):
+        """Return current pedestal filepath.
+        """
+        return self._pedestal_file
+
+    @pedestal_file.setter
+    def pedestal_file(self, filepath):
+        if not filepath:
+            self._pedestal_file = ""
+            self.pedestal = None
+            self.pixel_mask = None
+            return
+
+        if filepath == self._pedestal_file:
+            return
+
+        with h5py.File(filepath, "r") as h5f:
+            pedestal = h5f["/gains"][:]
+            pixel_mask = h5f["/pixel_mask"][:]
+
+        self._pedestal_file = filepath
+        self.pedestal = pedestal
+        self.pixel_mask = pixel_mask
+
+    @property
+    def pedestal(self):
+        """Current pedestal values.
+        """
+        return self._pedestal
+
+    @pedestal.setter
+    def pedestal(self, value):
+        if value is None:
+            self._pedestal = None
+            return
+
+        if value.ndim != 3:
+            raise ValueError(
+                f"Expected pedestal dimensions 3, provided pedestal dimensions {value.ndim}."
+            )
+
+        p_shape = (4, *self._shape_in_full)
+        p_shape_v2 = (3, *self._shape_in_full)
+        if value.shape != p_shape and value.shape != p_shape_v2:
+            raise ValueError(
+                f"Expected pedestal shapes {p_shape} or {p_shape_v2}, provided pedestal shape {value.shape}."
+            )
+
+        # convert _pedestal values to float32
+        self._pedestal = value.astype(np.float32, copy=False)
+
+        _p = self._pedestal.copy()
+
+        if _p.shape == p_shape:
+            self._p_all[True] = np.tile(_p[3], (4, 1, 1))
+
+            _p[3] = _p[2]
+            self._p_all[False] = _p
+
+        else:  # _p.shape == p_shape_v2
+            _p_all = np.append(_p, _p[-1:], axis=0)
+            self._p_all[True] = self._p_all[False] = _p_all
+
+    @property
+    def _p(self):
+        return self._p_all[self.highgain]
+
+    @property
+    def pixel_mask(self):
+        """Current raw pixel mask values.
+        """
+        return self._pixel_mask
+
+    @pixel_mask.setter
+    def pixel_mask(self, value):
+        if value is None:
+            self._pixel_mask = None
+            self.get_pixel_mask.cache_clear()
+            return
+
+        if value.ndim != 2:
+            raise ValueError(
+                f"Expected pixel_mask dimensions 2, provided pixel_mask dimensions {value.ndim}."
+            )
+
+        pm_shape = self._shape_in_full
+        if value.shape != pm_shape:
+            raise ValueError(
+                f"Expected pixel_mask shape {pm_shape}, provided pixel_mask shape {value.shape}."
+            )
+
+        self._pixel_mask = value
+        self.get_pixel_mask.cache_clear()
+
+        # original mask -> self._mask_all[False]
+        mask = np.invert(value.astype(bool, copy=True))
+        self._mask_all[False] = mask.copy()
+
+        # original + double pixels mask -> self._mask_all[True]
+        if not self.is_stripsel():
+            for m in range(self.detector.n_modules):
+                module_mask = self._get_module_slice(mask, m)
+                for n in range(1, CHIP_NUM_X):
+                    module_mask[:, CHIP_SIZE_X * n - 1] = False
+                    module_mask[:, CHIP_SIZE_X * n] = False
+
+                for n in range(1, CHIP_NUM_Y):
+                    module_mask[CHIP_SIZE_Y * n - 1, :] = False
+                    module_mask[CHIP_SIZE_Y * n, :] = False
+
+        self._mask_all[True] = mask
+
+    def _mask(self, double_pixels):
+        if double_pixels in ("keep", "interp"):
+            return self._mask_all[False]
+        elif double_pixels == "mask":
+            return self._mask_all[True]
+        else:
+            raise ValueError("'double_pixels' can only be 'keep', 'mask', or 'interp'")
+
+    @property
+    def factor(self):
+        """A factor value.
+
+        If conversion is True, use this factor to divide converted values. The output values are
+        also rounded and casted to np.int32 dtype. Keep the original values if None.
+        """
+        return self._factor
+
+    @factor.setter
+    def factor(self, value):
+        if value is not None:
+            value = float(value)
+
+        if self._factor == value:
+            return
+
+        self._factor = value
+
+        if self.gain is not None:
+            self._update_g_all()
+
+    @property
+    def highgain(self):
+        """Current flag for highgain.
+        """
+        return self._highgain
+
+    @highgain.setter
+    def highgain(self, value):
+        if not isinstance(value, bool):
+            value = bool(value)
+
+        self._highgain = value
+
+    @property
+    def module_map(self):
+        """Current module map.
+        """
+        return self._module_map
+
+    @module_map.setter
+    def module_map(self, value):
+        if np.array_equal(self._module_map, value):
+            return
+
+        n_modules = self.detector.n_modules
+        if value is None:
+            # support legacy data by emulating 'all modules are present'
+            value = np.arange(n_modules)
+
+        if len(value) != n_modules:
+            raise ValueError(
+                f"Expected module_map length {n_modules}, provided module_map length {len(value)}."
+            )
+
+        if min(value) < -1 or n_modules <= max(value):
+            raise ValueError(f"Valid module_map values are integers between -1 and {n_modules-1}.")
+
+        self._module_map = value
+        self.get_pixel_mask.cache_clear()
+
+    def _get_shape_in_n_modules(self, n):
         if self.detector_name == "JF02T09V01":  # a special case
             shape_y, shape_x = MODULE_SIZE_Y, MODULE_SIZE_X * n
         else:
@@ -116,16 +361,16 @@ class JFDataHandler:
         return shape_y, shape_x
 
     @property
-    def _number_active_modules(self):
-        return np.sum(self.module_map != -1)
-
-    @property
-    def _shape_full(self):
-        return self._get_shape_n_modules(self.detector.n_modules)
+    def _shape_in_full(self):
+        return self._get_shape_in_n_modules(self.detector.n_modules)
 
     @property
     def _shape_in(self):
-        return self._get_shape_n_modules(self._number_active_modules)
+        return self._get_shape_in_n_modules(self._n_active_modules)
+
+    @property
+    def _n_active_modules(self):
+        return np.sum(self.module_map != -1)
 
     def _get_shape_out(self, gap_pixels, geometry):
         """Return the image shape of a detector without an optional post-processing rotation step.
@@ -155,11 +400,11 @@ class JFDataHandler:
         elif not geometry and gap_pixels:
             shape_y, shape_x = self._shape_in
             if self.detector_name == "JF02T09V01":
-                shape_x += (CHIP_NUM_X - 1) * CHIP_GAP_X * self._number_active_modules
+                shape_x += (CHIP_NUM_X - 1) * CHIP_GAP_X * self._n_active_modules
                 shape_y += (CHIP_NUM_Y - 1) * CHIP_GAP_Y
             else:
                 shape_x += (CHIP_NUM_X - 1) * CHIP_GAP_X
-                shape_y += (CHIP_NUM_Y - 1) * CHIP_GAP_Y * self._number_active_modules
+                shape_y += (CHIP_NUM_Y - 1) * CHIP_GAP_Y * self._n_active_modules
 
         else:  # not geometry and not gap_pixels:
             shape_y, shape_x = self._shape_in
@@ -217,357 +462,37 @@ class JFDataHandler:
 
         return dtype_out
 
-    @property
-    def gain_file(self):
-        """Return current gain filepath.
-        """
-        return self._gain_file
+    def _get_final_module_coordinates(self, m, i, geometry, gap_pixels):
+        if geometry:  # gap pixels are already accounted for in module geometry coordinates
+            oy = self.detector_geometry.origin_y[i]
+            ox = self.detector_geometry.origin_x[i]
 
-    @gain_file.setter
-    def gain_file(self, filepath):
-        if not filepath:
-            self._gain_file = ""
-            self.gain = None
-            return
-
-        if filepath == self._gain_file:
-            return
-
-        with h5py.File(filepath, "r") as h5f:
-            gains = h5f["/gains"][:]
-
-        self._gain_file = filepath
-        self.gain = gains
-
-    @property
-    def gain(self):
-        """Current gain values.
-        """
-        return self._gain
-
-    @gain.setter
-    def gain(self, value):
-        if value is None:
-            self._gain = None
-            return
-
-        if value.ndim != 3:
-            raise ValueError(f"Expected gain dimensions 3, provided gain dimensions {value.ndim}.")
-
-        g_shape = (4, *self._shape_full)
-        if value.shape != g_shape:
-            raise ValueError(f"Expected gain shape {g_shape}, provided gain shape {value.shape}.")
-
-        # convert _gain values to float32
-        self._gain = value.astype(np.float32, copy=False)
-        self._update_g_all()
-
-    def _update_g_all(self):
-        if self.factor is None:
-            _g = 1 / self.gain
-        else:
-            # self.factor is one number and self.gain is a large array, so this order of division
-            # will avoid double broadcasting
-            _g = 1 / self.factor / self.gain
-
-        self._g_all[True] = np.tile(_g[3], (4, 1, 1))
-
-        _g[3] = _g[2]
-        self._g_all[False] = _g
-
-    @property
-    def pedestal_file(self):
-        """Return current pedestal filepath.
-        """
-        return self._pedestal_file
-
-    @pedestal_file.setter
-    def pedestal_file(self, filepath):
-        if not filepath:
-            self._pedestal_file = ""
-            self.pedestal = None
-            self.pixel_mask = None
-            return
-
-        if filepath == self._pedestal_file:
-            return
-
-        with h5py.File(filepath, "r") as h5f:
-            pedestal = h5f["/gains"][:]
-            pixel_mask = h5f["/pixel_mask"][:]
-
-        self._pedestal_file = filepath
-        self.pedestal = pedestal
-        self.pixel_mask = pixel_mask
-
-    @property
-    def pedestal(self):
-        """Current pedestal values.
-        """
-        return self._pedestal
-
-    @pedestal.setter
-    def pedestal(self, value):
-        if value is None:
-            self._pedestal = None
-            return
-
-        if value.ndim != 3:
-            raise ValueError(
-                f"Expected pedestal dimensions 3, provided pedestal dimensions {value.ndim}."
-            )
-
-        p_shape = (4, *self._shape_full)
-        p_shape_v2 = (3, *self._shape_full)
-        if value.shape != p_shape and value.shape != p_shape_v2:
-            raise ValueError(
-                f"Expected pedestal shapes {p_shape} or {p_shape_v2}, provided pedestal shape {value.shape}."
-            )
-
-        # convert _pedestal values to float32
-        self._pedestal = value.astype(np.float32, copy=False)
-
-        _p = self._pedestal.copy()
-
-        if _p.shape == p_shape:
-            self._p_all[True] = np.tile(_p[3], (4, 1, 1))
-
-            _p[3] = _p[2]
-            self._p_all[False] = _p
-
-        else:  # _p.shape == p_shape_v2
-            _p_all = np.append(_p, _p[-1:], axis=0)
-            self._p_all[True] = self._p_all[False] = _p_all
-
-    @property
-    def factor(self):
-        """A factor value.
-
-        If conversion is True, use this factor to divide converted values. The output values are
-        also rounded and casted to np.int32 dtype. Keep the original values if None.
-        """
-        return self._factor
-
-    @factor.setter
-    def factor(self, value):
-        if value is not None:
-            value = float(value)
-
-        if self._factor == value:
-            return
-
-        self._factor = value
-
-        if self.gain is not None:
-            self._update_g_all()
-
-    @property
-    def highgain(self):
-        """Current flag for highgain.
-        """
-        return self._highgain
-
-    @highgain.setter
-    def highgain(self, value):
-        if not isinstance(value, bool):
-            value = bool(value)
-
-        self._highgain = value
-
-    @property
-    def _g(self):
-        return self._g_all[self.highgain]
-
-    @property
-    def _p(self):
-        return self._p_all[self.highgain]
-
-    @property
-    def pixel_mask(self):
-        """Current raw pixel mask values.
-        """
-        return self._pixel_mask
-
-    @pixel_mask.setter
-    def pixel_mask(self, value):
-        if value is None:
-            self._pixel_mask = None
-            self.get_pixel_mask.cache_clear()
-            return
-
-        if value.ndim != 2:
-            raise ValueError(
-                f"Expected pixel_mask dimensions 2, provided pixel_mask dimensions {value.ndim}."
-            )
-
-        pm_shape = self._shape_full
-        if value.shape != pm_shape:
-            raise ValueError(
-                f"Expected pixel_mask shape {pm_shape}, provided pixel_mask shape {value.shape}."
-            )
-
-        self._pixel_mask = value
-        self.get_pixel_mask.cache_clear()
-
-        # original mask -> self._mask_all[False]
-        mask = np.invert(value.astype(bool, copy=True))
-        self._mask_all[False] = mask.copy()
-
-        # original + double pixels mask -> self._mask_all[True]
-        if not self.is_stripsel():
-            for m in range(self.detector.n_modules):
-                module_mask = self._get_module_slice(mask, m)
-                for n in range(1, CHIP_NUM_X):
-                    module_mask[:, CHIP_SIZE_X * n - 1] = False
-                    module_mask[:, CHIP_SIZE_X * n] = False
-
-                for n in range(1, CHIP_NUM_Y):
-                    module_mask[CHIP_SIZE_Y * n - 1, :] = False
-                    module_mask[CHIP_SIZE_Y * n, :] = False
-
-        self._mask_all[True] = mask
-
-    @lru_cache(maxsize=8)
-    def get_pixel_mask(self, *, gap_pixels=True, double_pixels="keep", geometry=True):
-        """Return pixel mask.
-
-        Args:
-            gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
-            double_pixels (str, optional): A method to handle double pixels in-between ASICs. Can be
-                "keep", "mask", or "interp". Defaults to "keep".
-            geometry (bool, optional): Apply detector geometry corrections. Defaults to True.
-
-        Returns:
-            ndarray: Resulting pixel mask, where True values correspond to valid pixels.
-        """
-        if double_pixels not in ("keep", "mask", "interp"):
-            raise ValueError("'double_pixels' can only be 'keep', 'mask', or 'interp'")
-
-        if double_pixels == "interp" and not gap_pixels:
-            raise RuntimeError("Double pixel interpolation requires 'gap_pixels' to be True.")
-
-        if self.is_stripsel() and gap_pixels:
-            warnings.warn("'gap_pixels' flag has no effect on stripsel detectors", RuntimeWarning)
-            gap_pixels = False
-
-        if self.is_stripsel() and double_pixels != "keep":
-            warnings.warn(
-                "Handling double pixels has no effect on stripsel detectors", RuntimeWarning
-            )
-            double_pixels = "keep"
-
-        if self._pixel_mask is None:
-            return None
-
-        _mask = self._mask(double_pixels)[np.newaxis]
-
-        res_shape = self._get_shape_out(gap_pixels, geometry)
-        res = np.zeros((1, *res_shape), dtype=bool)
-
-        for i, m in enumerate(self.module_map):
-            if m == -1:
-                continue
-
-            oy, ox = self._get_final_module_coordinates(m, i, geometry, gap_pixels)
-
-            mod = self._get_module_slice(_mask, i)
-            mod_res = res[:, oy:, ox:]
-
-            if self.is_stripsel() and geometry:
-                _reshape_stripsel(mod_res, mod)
+        elif gap_pixels:
+            if self.detector_name == "JF02T09V01":
+                oy = 0
+                ox = m * (MODULE_SIZE_X + (CHIP_NUM_X - 1) * CHIP_GAP_X)
             else:
-                # this will just copy data to the correct place
-                _adc_to_energy(mod_res, mod, None, None, None, None, gap_pixels)
-                if double_pixels == "interp":
-                    _inplace_mask_dp(mod_res)
+                oy = m * (MODULE_SIZE_Y + (CHIP_NUM_Y - 1) * CHIP_GAP_Y)
+                ox = 0
 
-        # rotate mask according to a geometry configuration (e.g. for alvra JF06 detectors)
-        if geometry and self.detector_geometry.rotate90:
-            res = np.rot90(res, k=self.detector_geometry.rotate90, axes=(1, 2))
-
-        res = res[0]
-
-        return res
-
-    def get_pixel_coordinates(self):
-        """Return arrays (x, y, z) of final coordinates for pixels in raw data.
-
-        The shape of the result is the same as the raw input data (equivalently, gap_pixels=False,
-        geometry=False), but the coordinates represent pixel positions after gap_pixel and geometry
-        corrections (gap_pixels=True, double_pixels="keep", geometry=True).
-        """
-        if self.detector_geometry.is_stripsel == True:
-            raise RuntimeError("Stripsel detectors are currently unsupported.")
-
-        _y = np.arange(MODULE_SIZE_Y)
-        for n in range(1, CHIP_NUM_Y):
-            _y[n * CHIP_SIZE_Y :] += CHIP_GAP_Y
-
-        _x = np.arange(MODULE_SIZE_X)
-        for n in range(1, CHIP_NUM_X):
-            _x[n * CHIP_SIZE_X :] += CHIP_GAP_X
-
-        y_mod_grid, x_mod_grid = np.meshgrid(_y, _x, indexing="ij")
-
-        shape_out = self._get_shape_out(gap_pixels=False, geometry=False)
-        x_coord = np.zeros(shape=shape_out)
-        y_coord = np.zeros(shape=shape_out)
-        z_coord = np.zeros(shape=shape_out)
-
-        for i, m in enumerate(self.module_map):
-            if m == -1:
-                continue
-
-            oy, ox = self._get_final_module_coordinates(m, i, geometry=True, gap_pixels=True)
-            y_mod = self._get_module_slice(y_coord, i)
-            x_mod = self._get_module_slice(x_coord, i)
-            y_mod[:] = y_mod_grid + oy
-            x_mod[:] = x_mod_grid + ox
-
-        # apply final detector rotation
-        if self.detector_geometry.rotate90 == 1:  # (x, y) -> (y, -x)
-            x_coord, y_coord = y_coord, np.max(x_coord) - x_coord
-        elif self.detector_geometry.rotate90 == 2:  # (x, y) -> (-x, -y)
-            x_coord, y_coord = np.max(x_coord) - x_coord, np.max(y_coord) - y_coord
-        elif self.detector_geometry.rotate90 == 3:  # (x, y) -> (-y, x)
-            x_coord, y_coord = np.max(y_coord) - y_coord, x_coord
-
-        return x_coord, y_coord, z_coord
-
-    def _mask(self, double_pixels):
-        if double_pixels in ("keep", "interp"):
-            return self._mask_all[False]
-        elif double_pixels == "mask":
-            return self._mask_all[True]
         else:
-            raise ValueError("'double_pixels' can only be 'keep', 'mask', or 'interp'")
+            if self.detector_name == "JF02T09V01":
+                oy = 0
+                ox = m * MODULE_SIZE_X
+            else:
+                oy = m * MODULE_SIZE_Y
+                ox = 0
 
-    @property
-    def module_map(self):
-        """Current module map.
-        """
-        return self._module_map
+        return oy, ox
 
-    @module_map.setter
-    def module_map(self, value):
-        if np.array_equal(self._module_map, value):
-            return
+    @_allow_2darray
+    def _get_module_slice(self, data, m):
+        if self.detector_name == "JF02T09V01":
+            out = data[:, :, m * MODULE_SIZE_X : (m + 1) * MODULE_SIZE_X]
+        else:
+            out = data[:, m * MODULE_SIZE_Y : (m + 1) * MODULE_SIZE_Y, :]
 
-        n_modules = self.detector.n_modules
-        if value is None:
-            # support legacy data by emulating 'all modules are present'
-            value = np.arange(n_modules)
-
-        if len(value) != n_modules:
-            raise ValueError(
-                f"Expected module_map length {n_modules}, provided module_map length {len(value)}."
-            )
-
-        if min(value) < -1 or n_modules <= max(value):
-            raise ValueError(f"Valid module_map values are integers between -1 and {n_modules-1}.")
-
-        self._module_map = value
-        self.get_pixel_mask.cache_clear()
+        return out
 
     @_allow_2darray
     def process(
@@ -704,7 +629,7 @@ class JFDataHandler:
 
             mod_res = res[:, oy:, ox:]
             if self.is_stripsel() and geometry:
-                mod_tmp_shape = (images.shape[0], *self._get_shape_n_modules(1))
+                mod_tmp_shape = (images.shape[0], MODULE_SIZE_Y, MODULE_SIZE_X)
                 mod_tmp_dtype = self.get_dtype_out(images.dtype, conversion=conversion)
                 mod_tmp = np.zeros(shape=mod_tmp_shape, dtype=mod_tmp_dtype)
 
@@ -713,39 +638,114 @@ class JFDataHandler:
             else:
                 _adc_to_energy(mod_res, mod, mod_g, mod_p, mod_mask, factor, gap_pixels)
                 if double_pixels == "interp":
-                    _inplace_interp_dp_jit[parallel](mod_res)
+                    _inplace_interp_double_pixels_jit[parallel](mod_res)
 
-    def _get_final_module_coordinates(self, m, i, geometry, gap_pixels):
-        if geometry:  # gap pixels are already accounted for in module geometry coordinates
-            oy = self.detector_geometry.origin_y[i]
-            ox = self.detector_geometry.origin_x[i]
+    @lru_cache(maxsize=8)
+    def get_pixel_mask(self, *, gap_pixels=True, double_pixels="keep", geometry=True):
+        """Return pixel mask.
 
-        elif gap_pixels:
-            if self.detector_name == "JF02T09V01":
-                oy = 0
-                ox = m * (MODULE_SIZE_X + (CHIP_NUM_X - 1) * CHIP_GAP_X)
+        Args:
+            gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
+            double_pixels (str, optional): A method to handle double pixels in-between ASICs. Can be
+                "keep", "mask", or "interp". Defaults to "keep".
+            geometry (bool, optional): Apply detector geometry corrections. Defaults to True.
+
+        Returns:
+            ndarray: Resulting pixel mask, where True values correspond to valid pixels.
+        """
+        if double_pixels not in ("keep", "mask", "interp"):
+            raise ValueError("'double_pixels' can only be 'keep', 'mask', or 'interp'")
+
+        if double_pixels == "interp" and not gap_pixels:
+            raise RuntimeError("Double pixel interpolation requires 'gap_pixels' to be True.")
+
+        if self.is_stripsel() and gap_pixels:
+            warnings.warn("'gap_pixels' flag has no effect on stripsel detectors", RuntimeWarning)
+            gap_pixels = False
+
+        if self.is_stripsel() and double_pixels != "keep":
+            warnings.warn(
+                "Handling double pixels has no effect on stripsel detectors", RuntimeWarning
+            )
+            double_pixels = "keep"
+
+        if self._pixel_mask is None:
+            return None
+
+        _mask = self._mask(double_pixels)[np.newaxis]
+
+        res_shape = self._get_shape_out(gap_pixels, geometry)
+        res = np.zeros((1, *res_shape), dtype=bool)
+
+        for i, m in enumerate(self.module_map):
+            if m == -1:
+                continue
+
+            oy, ox = self._get_final_module_coordinates(m, i, geometry, gap_pixels)
+
+            mod = self._get_module_slice(_mask, i)
+            mod_res = res[:, oy:, ox:]
+
+            if self.is_stripsel() and geometry:
+                _reshape_stripsel(mod_res, mod)
             else:
-                oy = m * (MODULE_SIZE_Y + (CHIP_NUM_Y - 1) * CHIP_GAP_Y)
-                ox = 0
+                # this will just copy data to the correct place
+                _adc_to_energy(mod_res, mod, None, None, None, None, gap_pixels)
+                if double_pixels == "interp":
+                    _inplace_mask_double_pixels_jit(mod_res)
 
-        else:
-            if self.detector_name == "JF02T09V01":
-                oy = 0
-                ox = m * MODULE_SIZE_X
-            else:
-                oy = m * MODULE_SIZE_Y
-                ox = 0
+        # rotate mask according to a geometry configuration (e.g. for alvra JF06 detectors)
+        if geometry and self.detector_geometry.rotate90:
+            res = np.rot90(res, k=self.detector_geometry.rotate90, axes=(1, 2))
 
-        return oy, ox
+        res = res[0]
 
-    @_allow_2darray
-    def _get_module_slice(self, data, m):
-        if self.detector_name == "JF02T09V01":
-            out = data[:, :, m * MODULE_SIZE_X : (m + 1) * MODULE_SIZE_X]
-        else:
-            out = data[:, m * MODULE_SIZE_Y : (m + 1) * MODULE_SIZE_Y, :]
+        return res
 
-        return out
+    def get_pixel_coordinates(self):
+        """Return arrays (x, y, z) of final coordinates for pixels in raw data.
+
+        The shape of the result is the same as the raw input data (equivalently, gap_pixels=False,
+        geometry=False), but the coordinates represent pixel positions after gap_pixel and geometry
+        corrections (gap_pixels=True, double_pixels="keep", geometry=True).
+        """
+        if self.detector_geometry.is_stripsel == True:
+            raise RuntimeError("Stripsel detectors are currently unsupported.")
+
+        _y = np.arange(MODULE_SIZE_Y)
+        for n in range(1, CHIP_NUM_Y):
+            _y[n * CHIP_SIZE_Y :] += CHIP_GAP_Y
+
+        _x = np.arange(MODULE_SIZE_X)
+        for n in range(1, CHIP_NUM_X):
+            _x[n * CHIP_SIZE_X :] += CHIP_GAP_X
+
+        y_mod_grid, x_mod_grid = np.meshgrid(_y, _x, indexing="ij")
+
+        shape_out = self._get_shape_out(gap_pixels=False, geometry=False)
+        x_coord = np.zeros(shape=shape_out)
+        y_coord = np.zeros(shape=shape_out)
+        z_coord = np.zeros(shape=shape_out)
+
+        for i, m in enumerate(self.module_map):
+            if m == -1:
+                continue
+
+            oy, ox = self._get_final_module_coordinates(m, i, geometry=True, gap_pixels=True)
+            y_mod = self._get_module_slice(y_coord, i)
+            x_mod = self._get_module_slice(x_coord, i)
+            y_mod[:] = y_mod_grid + oy
+            x_mod[:] = x_mod_grid + ox
+
+        # apply final detector rotation
+        if self.detector_geometry.rotate90 == 1:  # (x, y) -> (y, -x)
+            x_coord, y_coord = y_coord, np.max(x_coord) - x_coord
+        elif self.detector_geometry.rotate90 == 2:  # (x, y) -> (-x, -y)
+            x_coord, y_coord = np.max(x_coord) - x_coord, np.max(y_coord) - y_coord
+        elif self.detector_geometry.rotate90 == 3:  # (x, y) -> (-y, x)
+            x_coord, y_coord = np.max(y_coord) - y_coord, x_coord
+
+        return x_coord, y_coord, z_coord
 
     def get_gains(self, images, *, mask=True, gap_pixels=True, double_pixels="keep", geometry=True):
         """Return gain values of images.
@@ -948,7 +948,7 @@ def _reshape_stripsel_parallel(res, image):
 
 
 @njit(cache=True)
-def _inplace_interp_dp(res):
+def _inplace_interp_double_pixels(res):
     for i1 in prange(res.shape[0]):
         # corner quad pixels
         for ri2 in (255, 257):
@@ -1018,7 +1018,7 @@ def _inplace_interp_dp(res):
 
 
 @njit(cache=True, parallel=True)
-def _inplace_interp_dp_parallel(res):
+def _inplace_interp_double_pixels_parallel(res):
     for i1 in prange(res.shape[0]):
         # corner quad pixels
         for ri2 in (255, 257):
@@ -1088,7 +1088,7 @@ def _inplace_interp_dp_parallel(res):
 
 
 @njit(cache=True)
-def _inplace_mask_dp(res):
+def _inplace_mask_double_pixels_jit(res):
     # gap_pixels is always True here
     for row in (256,):
         vals = res[:, row - 1, :1030] & res[:, row + 2, :1030]
@@ -1112,7 +1112,7 @@ _reshape_stripsel_jit = {
     False: _reshape_stripsel,
 }
 
-_inplace_interp_dp_jit = {
-    True: _inplace_interp_dp_parallel,
-    False: _inplace_interp_dp,
+_inplace_interp_double_pixels_jit = {
+    True: _inplace_interp_double_pixels_parallel,
+    False: _inplace_interp_double_pixels,
 }
