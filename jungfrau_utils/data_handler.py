@@ -499,9 +499,6 @@ class JFDataHandler:
         if self.detector_geometry.is_stripsel == True:
             raise RuntimeError("Stripsel detectors are currently unsupported.")
 
-        if self.detector_geometry.rotate90:
-            raise RuntimeError("Detectors with post-rotation are currently unsupported.")
-
         _y = np.arange(MODULE_SIZE_Y)
         for n in range(1, CHIP_NUM_Y):
             _y[n * CHIP_SIZE_Y :] += CHIP_GAP_Y
@@ -526,6 +523,14 @@ class JFDataHandler:
             x_mod = self._get_module_slice(x_coord, i)
             y_mod[:] = y_mod_grid + oy
             x_mod[:] = x_mod_grid + ox
+
+        # apply final detector rotation
+        if self.detector_geometry.rotate90 == 1:  # (x, y) -> (y, -x)
+            x_coord, y_coord = y_coord, np.max(x_coord) - x_coord
+        elif self.detector_geometry.rotate90 == 2:  # (x, y) -> (-x, -y)
+            x_coord, y_coord = np.max(x_coord) - x_coord, np.max(y_coord) - y_coord
+        elif self.detector_geometry.rotate90 == 3:  # (x, y) -> (-y, x)
+            x_coord, y_coord = np.max(y_coord) - y_coord, x_coord
 
         return x_coord, y_coord, z_coord
 
