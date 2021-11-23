@@ -712,13 +712,19 @@ class JFDataHandler:
         if self.detector_geometry.is_stripsel == True:
             raise RuntimeError("Stripsel detectors are currently unsupported.")
 
-        _y = np.arange(MODULE_SIZE_Y)
+        _y = np.arange(MODULE_SIZE_Y, dtype=np.float64)
         for n in range(1, CHIP_NUM_Y):
             _y[n * CHIP_SIZE_Y :] += CHIP_GAP_Y
+            # shift for double pixels
+            _y[n * CHIP_SIZE_Y - 1] += 0.5
+            _y[n * CHIP_SIZE_Y] -= 0.5
 
-        _x = np.arange(MODULE_SIZE_X)
+        _x = np.arange(MODULE_SIZE_X, dtype=np.float64)
         for n in range(1, CHIP_NUM_X):
             _x[n * CHIP_SIZE_X :] += CHIP_GAP_X
+            # shift for double pixels
+            _x[n * CHIP_SIZE_X - 1] += 0.5
+            _x[n * CHIP_SIZE_X] -= 0.5
 
         y_mod_grid, x_mod_grid = np.meshgrid(_y, _x, indexing="ij")
 
