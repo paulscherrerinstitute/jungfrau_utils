@@ -206,7 +206,7 @@ class File:
         return f"data/{self.detector_name}/conversion_factor" in self.file
 
     @property
-    def _data_dataset(self):
+    def _data_dset_name(self):
         return f"data/{self.detector_name}/data"
 
     def get_shape_out(self):
@@ -216,6 +216,16 @@ class File:
             tuple: Height and width of a resulting image.
         """
         return self.handler.get_shape_out(gap_pixels=self.gap_pixels, geometry=self.geometry)
+
+    def get_dtype_out(self):
+        """Return resulting image dtype of a detector.
+
+        Returns:
+            dtype: dtype of a resulting image.
+        """
+        return self.handler.get_dtype_out(
+            self.file[self._data_dset_name].dtype, conversion=self.conversion
+        )
 
     def get_pixel_mask(self):
         """Return pixel mask, shaped according to gap_pixel and geometry flags.
@@ -284,7 +294,7 @@ class File:
         elif isinstance(obj, h5py.Dataset):
             dset_source = self.file[name]
 
-            if name == self._data_dataset:
+            if name == self._data_dset_name:
                 self._process_data(h5_dest, index, roi, compression, dtype, batch_size)
             else:
                 if name.startswith("data"):
@@ -302,46 +312,42 @@ class File:
             raise TypeError(f"Unknown h5py object type {obj}")
 
         # copy attributes if it's not a dataset with the actual data
-        if name != self._data_dataset:
+        if name != self._data_dset_name:
             for key, value in self.file[name].attrs.items():
                 h5_dest[name].attrs[key] = value
 
     def _process_data(self, h5_dest, index, roi, compression, dtype, batch_size):
         args = dict()
+
+        data_dset = self.file[self._data_dset_name]
         if index is None:
-            n_images = self["data"].shape[0]
+            n_images = data_dset.shape[0]
         else:
             n_images = len(index)
 
         h5_dest[f"data/{self.detector_name}/conversion_factor"] = self.handler.factor or np.NaN
 
-        pixel_mask = self.handler.get_pixel_mask(
-            gap_pixels=self.gap_pixels, double_pixels=self.double_pixels, geometry=self.geometry
-        )
+        pixel_mask = self.get_pixel_mask()
 
         if roi is None:
             # save a pixel mask
             h5_dest[f"data/{self.detector_name}/pixel_mask"] = pixel_mask
 
-            image_shape = self.handler.get_shape_out(
-                gap_pixels=self.gap_pixels, geometry=self.geometry
-            )
+            image_shape = self.get_shape_out()
 
             args["shape"] = (n_images, *image_shape)
             args["maxshape"] = (n_images, *image_shape)
             args["chunks"] = (1, *image_shape)
 
             if dtype is None:
-                args["dtype"] = self.handler.get_dtype_out(
-                    self["data"].dtype, conversion=self.conversion
-                )
+                args["dtype"] = self.get_dtype_out()
             else:
                 args["dtype"] = dtype
 
             if compression:
                 args.update(compargs)
 
-            h5_dest.create_dataset_like(self._data_dataset, self.file[self._data_dataset], **args)
+            h5_dest.create_dataset_like(data_dset.name, data_dset, **args)
 
         else:
             if len(roi) == 4 and all(isinstance(v, int) for v in roi):
@@ -368,24 +374,20 @@ class File:
                 args["chunks"] = (1, *roi_shape)
 
                 if dtype is None:
-                    args["dtype"] = self.handler.get_dtype_out(
-                        self["data"].dtype, conversion=self.conversion
-                    )
+                    args["dtype"] = self.get_dtype_out()
                 else:
                     args["dtype"] = dtype
 
                 if compression:
                     args.update(compargs)
 
-                h5_dest.create_dataset(f"{self._data_dataset}_roi_{i}", **args)
-
-        dset = self.file[self._data_dataset]
+                h5_dest.create_dataset(f"{data_dset.name}_roi_{i}", **args)
 
         # prepare buffers to be reused for every batch
-        read_buffer = np.empty((batch_size, *dset.shape[1:]), dtype=dset.dtype)
+        read_buffer = np.empty((batch_size, *data_dset.shape[1:]), dtype=data_dset.dtype)
 
-        out_shape = self.handler.get_shape_out(gap_pixels=self.gap_pixels, geometry=self.geometry)
-        out_dtype = self.handler.get_dtype_out(dset.dtype, conversion=self.conversion)
+        out_shape = self.get_shape_out()
+        out_dtype = self.get_dtype_out()
         out_buffer = np.zeros((batch_size, *out_shape), dtype=out_dtype)
 
         # process and write data in batches
@@ -403,10 +405,10 @@ class File:
             # Avoid a stride-bottleneck, see https://github.com/h5py/h5py/issues/977
             if np.sum(np.diff(batch_ind)) == len(batch_ind) - 1:
                 # consecutive index values
-                dset.read_direct(read_buffer_view, source_sel=np.s_[batch_ind])
+                data_dset.read_direct(read_buffer_view, source_sel=np.s_[batch_ind])
             else:
                 for i, j in enumerate(batch_ind):
-                    dset.read_direct(read_buffer_view, source_sel=np.s_[j], dest_sel=np.s_[i])
+                    data_dset.read_direct(read_buffer_view, source_sel=np.s_[j], dest_sel=np.s_[i])
 
             # Process data
             out_buffer_view = self.handler.process(
@@ -434,12 +436,12 @@ class File:
                     else:
                         byte_array = im.tobytes()
 
-                    h5_dest[self._data_dataset].id.write_direct_chunk((pos, 0, 0), byte_array)
+                    h5_dest[data_dset.name].id.write_direct_chunk((pos, 0, 0), byte_array)
 
             else:
                 for i, (roi_y1, roi_y2, roi_x1, roi_x2) in enumerate(roi):
                     roi_data = out_buffer_view[:, slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)]
-                    h5_dest[f"{self._data_dataset}_roi_{i}"][batch_range] = roi_data
+                    h5_dest[f"{data_dset.name}_roi_{i}"][batch_range] = roi_data
 
     def __enter__(self):
         return self
@@ -471,7 +473,7 @@ class File:
         else:
             raise TypeError("Unknown index type")
 
-        dset = self.file[self._data_dataset]
+        dset = self.file[self._data_dset_name]
         if is_index_consecutive:
             data = dset[ind]
         else:
