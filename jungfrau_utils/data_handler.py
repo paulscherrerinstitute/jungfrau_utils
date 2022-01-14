@@ -155,21 +155,18 @@ class JFDataHandler:
 
     def _update_g_all(self):
         if self.factor is None:
-            _g = 1 / self.gain
+            _g = 1 / self._gain
         else:
             # self.factor is one number and self.gain is a large array, so this order of division
             # will avoid double broadcasting
-            _g = 1 / self.factor / self.gain
+            _g = 1 / self.factor / self._gain
+
+        self._g_all[False] = np.stack((_g[0], _g[1], _g[2], _g[2]))
 
         g_shape = (4, *self._shape_in_full)  # g_shape_v2 = (6, *self._shape_in_full)
         if _g.shape == g_shape:
-            self._g_all[True] = np.tile(_g[3], (4, 1, 1))
-
-            _g[3] = _g[2]
-            self._g_all[False] = _g
-
+            self._g_all[True] = np.stack((_g[3], _g[3], _g[3], _g[3]))
         else:  # _g.shape == g_shape_v2
-            self._g_all[False] = np.stack((_g[0], _g[1], _g[2], _g[2]))
             self._g_all[True] = np.stack((_g[3], _g[4], _g[5], _g[5]))
 
     @property
@@ -228,17 +225,14 @@ class JFDataHandler:
         # convert _pedestal values to float32
         self._pedestal = value.astype(np.float32, copy=False)
 
-        _p = self._pedestal.copy()
+        _p = self._pedestal
+
+        self._p_all[False] = np.stack((_p[0], _p[1], _p[2], _p[2]))
 
         if _p.shape == p_shape:
-            self._p_all[True] = np.tile(_p[3], (4, 1, 1))
-
-            _p[3] = _p[2]
-            self._p_all[False] = _p
-
+            self._p_all[True] = np.stack((_p[3], _p[3], _p[3], _p[3]))
         else:  # _p.shape == p_shape_v2
-            _p_all = np.append(_p, _p[-1:], axis=0)
-            self._p_all[True] = self._p_all[False] = _p_all
+            self._p_all[True] = np.stack((_p[0], _p[1], _p[2], _p[2]))
 
     @property
     def _p(self):
