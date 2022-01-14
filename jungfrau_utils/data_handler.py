@@ -145,8 +145,9 @@ class JFDataHandler:
             raise ValueError(f"Expected gain dimensions 3, provided gain dimensions {value.ndim}.")
 
         g_shape = (4, *self._shape_in_full)
-        if value.shape != g_shape:
-            raise ValueError(f"Expected gain shape {g_shape}, provided gain shape {value.shape}.")
+        g_shape_v2 = (6, *self._shape_in_full)
+        if value.shape != g_shape and value.shape != g_shape_v2:
+            raise ValueError(f"Expected gain shape {g_shape} or {g_shape_v2}, provided gain shape {value.shape}.")
 
         # convert _gain values to float32
         self._gain = value.astype(np.float32, copy=False)
@@ -160,10 +161,16 @@ class JFDataHandler:
             # will avoid double broadcasting
             _g = 1 / self.factor / self.gain
 
-        self._g_all[True] = np.tile(_g[3], (4, 1, 1))
+        g_shape = (4, *self._shape_in_full)  # g_shape_v2 = (6, *self._shape_in_full)
+        if _g.shape == g_shape:
+            self._g_all[True] = np.tile(_g[3], (4, 1, 1))
 
-        _g[3] = _g[2]
-        self._g_all[False] = _g
+            _g[3] = _g[2]
+            self._g_all[False] = _g
+
+        else:  # _g.shape == g_shape_v2
+            self._g_all[False] = np.stack((_g[0], _g[1], _g[2], _g[2]))
+            self._g_all[True] = np.stack((_g[3], _g[4], _g[5], _g[5]))
 
     @property
     def _g(self):
