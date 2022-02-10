@@ -1,6 +1,7 @@
 import os
 import struct
 import warnings
+import numbers
 from functools import partial
 from itertools import islice
 from pathlib import Path
@@ -464,7 +465,7 @@ class File:
             raise TypeError("Unknown selection type.")
 
         # Avoid a stride-bottleneck, see https://github.com/h5py/h5py/issues/977
-        if isinstance(ind, int):
+        if isinstance(ind, numbers.Integral):
             is_index_consecutive = True
         elif isinstance(ind, (slice, range)):
             is_index_consecutive = ind.step is None or ind.step == 1
