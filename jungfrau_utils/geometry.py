@@ -6,7 +6,7 @@ class DetectorGeometry:
     origin_y: Tuple[int] = (0, )
     origin_x: Tuple[int] = (0, )
     is_stripsel: bool = False
-    rotate90: int = 0
+    det_rot90: int = 0
 
 
 detector_geometry = {
@@ -23,16 +23,16 @@ detector_geometry = {
     "JF02T09V02": DetectorGeometry(
         origin_y=(0, 0, 0, 0, 0, 0, 0, 0, 0),
         origin_x=(8288, 7252, 6216, 5180, 4144, 3108, 2072, 1036, 0),
-        rotate90=2,
+        det_rot90=2,
     ),
 
     "JF02T09V03": DetectorGeometry(
         origin_y=(0, 0, 0, 0, 0, 0, 0, 0, 0),
         origin_x=(8288, 7252, 6216, 5180, 4144, 3108, 2072, 1036, 0),
-        rotate90=2,
+        det_rot90=2,
     ),
 
-    "JF02T01V02": DetectorGeometry(rotate90=2),
+    "JF02T01V02": DetectorGeometry(det_rot90=2),
 
     "JF03T01V01": DetectorGeometry(),
 
@@ -65,7 +65,7 @@ detector_geometry = {
             2145, 3184, 66, 1106,
             2145, 3184, 1106, 2145,
         ),
-        rotate90=1,
+        det_rot90=1,
     ),
 
     "JF06T32V02": DetectorGeometry(
@@ -89,7 +89,7 @@ detector_geometry = {
             2145, 3184, 66, 1106,
             2145, 3184, 1106, 2145,
         ),
-        rotate90=1,
+        det_rot90=1,
     ),
 
     "JF06T08V01": DetectorGeometry(
@@ -101,7 +101,7 @@ detector_geometry = {
             0, 1039, 0, 1039,
             67, 1106, 67, 1106,
         ),
-        rotate90=1,
+        det_rot90=1,
     ),
 
     "JF06T08V02": DetectorGeometry(
@@ -113,13 +113,13 @@ detector_geometry = {
             0, 1039, 0, 1039,
             67, 1106, 67, 1106,
         ),
-        rotate90=1,
+        det_rot90=1,
     ),
 
     "JF06T04V01": DetectorGeometry(
         origin_y=(68, 0, 618, 550),
         origin_x=(0, 1039, 67, 1106),
-        rotate90=1,
+        det_rot90=1,
     ),
 
     "JF07T32V01": DetectorGeometry(

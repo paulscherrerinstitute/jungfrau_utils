@@ -147,7 +147,9 @@ class JFDataHandler:
         g_shape = (4, *self._shape_in_full)
         g_shape_v2 = (6, *self._shape_in_full)
         if value.shape != g_shape and value.shape != g_shape_v2:
-            raise ValueError(f"Expected gain shape {g_shape} or {g_shape_v2}, provided gain shape {value.shape}.")
+            raise ValueError(
+                f"Expected gain shape {g_shape} or {g_shape_v2}, provided gain shape {value.shape}."
+            )
 
         # convert _gain values to float32
         self._gain = value.astype(np.float32, copy=False)
@@ -423,7 +425,7 @@ class JFDataHandler:
             tuple: Height and width of a resulting image.
         """
         shape_y, shape_x = self._get_shape_out(gap_pixels, geometry)
-        if geometry and self.detector_geometry.rotate90 % 2:
+        if geometry and self.detector_geometry.det_rot90 % 2:
             shape_y, shape_x = shape_x, shape_y
 
         return shape_y, shape_x
@@ -581,16 +583,16 @@ class JFDataHandler:
             if out.shape[-2:] != out_shape:
                 raise ValueError(f"Expected 'out' shape is {out_shape}, provided is {out.shape}")
 
-            # reshape inplace in case of a detector with an odd detector_geometry.rotate90 value
+            # reshape inplace in case of a detector with an odd detector_geometry.det_rot90 value
             # it will be rotated to the original shape at the end of this function
-            if geometry and self.detector_geometry.rotate90 % 2:
+            if geometry and self.detector_geometry.det_rot90 % 2:
                 out.shape = out.shape[0], out.shape[2], out.shape[1]
 
         self._process(out, images, conversion, mask, gap_pixels, double_pixels, geometry, parallel)
 
         # rotate image stack according to a geometry configuration (e.g. for alvra JF06 detectors)
-        if geometry and self.detector_geometry.rotate90:
-            out = np.rot90(out, k=self.detector_geometry.rotate90, axes=(1, 2))
+        if geometry and self.detector_geometry.det_rot90:
+            out = np.rot90(out, k=self.detector_geometry.det_rot90, axes=(1, 2))
 
         return out
 
@@ -696,8 +698,8 @@ class JFDataHandler:
                     _inplace_mask_double_pixels_jit(mod_res)
 
         # rotate mask according to a geometry configuration (e.g. for alvra JF06 detectors)
-        if geometry and self.detector_geometry.rotate90:
-            res = np.rot90(res, k=self.detector_geometry.rotate90, axes=(1, 2))
+        if geometry and self.detector_geometry.det_rot90:
+            res = np.rot90(res, k=self.detector_geometry.det_rot90, axes=(1, 2))
 
         res = res[0]
 
@@ -745,11 +747,11 @@ class JFDataHandler:
             x_mod[:] = x_mod_grid + ox
 
         # apply final detector rotation
-        if self.detector_geometry.rotate90 == 1:  # (x, y) -> (y, -x)
+        if self.detector_geometry.det_rot90 == 1:  # (x, y) -> (y, -x)
             x_coord, y_coord = y_coord, np.max(x_coord) - x_coord
-        elif self.detector_geometry.rotate90 == 2:  # (x, y) -> (-x, -y)
+        elif self.detector_geometry.det_rot90 == 2:  # (x, y) -> (-x, -y)
             x_coord, y_coord = np.max(x_coord) - x_coord, np.max(y_coord) - y_coord
-        elif self.detector_geometry.rotate90 == 3:  # (x, y) -> (-y, x)
+        elif self.detector_geometry.det_rot90 == 3:  # (x, y) -> (-y, x)
             x_coord, y_coord = np.max(y_coord) - y_coord, x_coord
 
         return x_coord, y_coord, z_coord
