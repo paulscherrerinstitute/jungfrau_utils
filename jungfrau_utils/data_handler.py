@@ -21,6 +21,9 @@ MODULE_SIZE_Y = CHIP_NUM_Y * CHIP_SIZE_Y
 CHIP_GAP_X = 2
 CHIP_GAP_Y = 2
 
+MODULE_FULL_SIZE_X = MODULE_SIZE_X + (CHIP_NUM_X - 1) * CHIP_GAP_X
+MODULE_FULL_SIZE_Y = MODULE_SIZE_Y + (CHIP_NUM_Y - 1) * CHIP_GAP_Y
+
 # 256 not divisible by 3, so we round up to 86
 # the last 4 pixels can be omitted, so the final height is (256 - 4) / 3 = 84
 
@@ -388,29 +391,21 @@ class JFDataHandler:
         if self.is_stripsel():
             return self._get_stripsel_shape_out(geometry=geometry)
 
-        if geometry and gap_pixels:
-            modules_orig_y = self.detector_geometry.origin_y
-            modules_orig_x = self.detector_geometry.origin_x
-            shape_x = max(modules_orig_x) + MODULE_SIZE_X + (CHIP_NUM_X - 1) * CHIP_GAP_X
-            shape_y = max(modules_orig_y) + MODULE_SIZE_Y + (CHIP_NUM_Y - 1) * CHIP_GAP_Y
+        if geometry:
+            size_x = MODULE_FULL_SIZE_X if gap_pixels else MODULE_SIZE_X
+            size_y = MODULE_FULL_SIZE_Y if gap_pixels else MODULE_SIZE_Y
+            shape_y = max(self.detector_geometry.origin_y) + size_y
+            shape_x = max(self.detector_geometry.origin_x) + size_x
 
-        elif geometry and not gap_pixels:
-            modules_orig_y = self.detector_geometry.origin_y
-            modules_orig_x = self.detector_geometry.origin_x
-            shape_x = max(modules_orig_x) + MODULE_SIZE_X
-            shape_y = max(modules_orig_y) + MODULE_SIZE_Y
-
-        elif not geometry and gap_pixels:
+        else:
             shape_y, shape_x = self._shape_in
-            if self.detector_name == "JF02T09V01":
-                shape_x += (CHIP_NUM_X - 1) * CHIP_GAP_X * self._n_active_modules
-                shape_y += (CHIP_NUM_Y - 1) * CHIP_GAP_Y
-            else:
-                shape_x += (CHIP_NUM_X - 1) * CHIP_GAP_X
-                shape_y += (CHIP_NUM_Y - 1) * CHIP_GAP_Y * self._n_active_modules
-
-        else:  # not geometry and not gap_pixels:
-            shape_y, shape_x = self._shape_in
+            if gap_pixels:
+                if self.detector_name == "JF02T09V01":
+                    shape_y += (CHIP_NUM_Y - 1) * CHIP_GAP_Y
+                    shape_x += (CHIP_NUM_X - 1) * CHIP_GAP_X * self._n_active_modules
+                else:
+                    shape_y += (CHIP_NUM_Y - 1) * CHIP_GAP_Y * self._n_active_modules
+                    shape_x += (CHIP_NUM_X - 1) * CHIP_GAP_X
 
         return shape_y, shape_x
 
@@ -432,10 +427,8 @@ class JFDataHandler:
 
     def _get_stripsel_shape_out(self, geometry):
         if geometry:
-            modules_orig_y = self.detector_geometry.origin_y
-            modules_orig_x = self.detector_geometry.origin_x
-            shape_x = max(modules_orig_x) + STRIPSEL_SIZE_X
-            shape_y = max(modules_orig_y) + STRIPSEL_SIZE_Y
+            shape_x = max(self.detector_geometry.origin_x) + STRIPSEL_SIZE_X
+            shape_y = max(self.detector_geometry.origin_y) + STRIPSEL_SIZE_Y
         else:
             shape_y, shape_x = self._shape_in
 
@@ -470,20 +463,12 @@ class JFDataHandler:
             oy = self.detector_geometry.origin_y[i]
             ox = self.detector_geometry.origin_x[i]
 
-        elif gap_pixels:
-            if self.detector_name == "JF02T09V01":
-                oy = 0
-                ox = m * (MODULE_SIZE_X + (CHIP_NUM_X - 1) * CHIP_GAP_X)
-            else:
-                oy = m * (MODULE_SIZE_Y + (CHIP_NUM_Y - 1) * CHIP_GAP_Y)
-                ox = 0
-
         else:
             if self.detector_name == "JF02T09V01":
                 oy = 0
-                ox = m * MODULE_SIZE_X
+                ox = m * (MODULE_FULL_SIZE_X if gap_pixels else MODULE_SIZE_X)
             else:
-                oy = m * MODULE_SIZE_Y
+                oy = m * (MODULE_FULL_SIZE_Y if gap_pixels else MODULE_SIZE_Y)
                 ox = 0
 
         return oy, ox
@@ -636,10 +621,10 @@ class JFDataHandler:
                 mod_tmp_dtype = self.get_dtype_out(images.dtype, conversion=conversion)
                 mod_tmp = np.zeros(shape=mod_tmp_shape, dtype=mod_tmp_dtype)
 
-                _adc_to_energy(mod_tmp, mod, mod_g, mod_p, mod_mask, factor, gap_pixels)
+                _adc_to_energy(mod_tmp, 0, 0, mod, mod_g, mod_p, mod_mask, factor, gap_pixels)
                 _reshape_stripsel_jit[parallel](mod_res, mod_tmp)
             else:
-                _adc_to_energy(mod_res, mod, mod_g, mod_p, mod_mask, factor, gap_pixels)
+                _adc_to_energy(res, oy, ox, mod, mod_g, mod_p, mod_mask, factor, gap_pixels)
                 if double_pixels == "interp":
                     _inplace_interp_double_pixels_jit[parallel](mod_res)
 
@@ -693,7 +678,7 @@ class JFDataHandler:
                 _reshape_stripsel(mod_res, mod)
             else:
                 # this will just copy data to the correct place
-                _adc_to_energy(mod_res, mod, None, None, None, None, gap_pixels)
+                _adc_to_energy(res, oy, ox, mod, None, None, None, None, gap_pixels)
                 if double_pixels == "interp":
                     _inplace_mask_double_pixels_jit(mod_res)
 
@@ -835,7 +820,7 @@ class JFDataHandler:
 
 
 @njit(cache=True)
-def _adc_to_energy(res, image, gain, pedestal, mask, factor, gap_pixels):
+def _adc_to_energy(res, oy, ox, image, gain, pedestal, mask, factor, gap_pixels):
     num, size_y, size_x = image.shape
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
     for i1 in prange(num):  # pylint: disable=not-an-iterable
@@ -844,8 +829,8 @@ def _adc_to_energy(res, image, gain, pedestal, mask, factor, gap_pixels):
                 if mask is not None and not mask[i2, i3]:
                     continue
 
-                ri2 = i2 + i2 // CHIP_SIZE_Y * CHIP_GAP_Y * gap_pixels
-                ri3 = i3 + i3 // CHIP_SIZE_X * CHIP_GAP_X * gap_pixels
+                ri2 = oy + i2 + i2 // CHIP_SIZE_Y * CHIP_GAP_Y * gap_pixels
+                ri3 = ox + i3 + i3 // CHIP_SIZE_X * CHIP_GAP_X * gap_pixels
 
                 if gain is None or pedestal is None:
                     res[i1, ri2, ri3] = image[i1, i2, i3]
@@ -861,7 +846,7 @@ def _adc_to_energy(res, image, gain, pedestal, mask, factor, gap_pixels):
 
 
 @njit(cache=True, parallel=True)
-def _adc_to_energy_parallel(res, image, gain, pedestal, mask, factor, gap_pixels):
+def _adc_to_energy_parallel(res, oy, ox, image, gain, pedestal, mask, factor, gap_pixels):
     num, size_y, size_x = image.shape
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
     for i1 in prange(num):  # pylint: disable=not-an-iterable
@@ -870,8 +855,8 @@ def _adc_to_energy_parallel(res, image, gain, pedestal, mask, factor, gap_pixels
                 if mask is not None and not mask[i2, i3]:
                     continue
 
-                ri2 = i2 + i2 // CHIP_SIZE_Y * CHIP_GAP_Y * gap_pixels
-                ri3 = i3 + i3 // CHIP_SIZE_X * CHIP_GAP_X * gap_pixels
+                ri2 = oy + i2 + i2 // CHIP_SIZE_Y * CHIP_GAP_Y * gap_pixels
+                ri3 = ox + i3 + i3 // CHIP_SIZE_X * CHIP_GAP_X * gap_pixels
 
                 if gain is None or pedestal is None:
                     res[i1, ri2, ri3] = image[i1, i2, i3]
