@@ -1,7 +1,7 @@
 import re
 import warnings
 from collections import namedtuple
-from functools import lru_cache, wraps
+from functools import lru_cache
 
 import h5py
 import numpy as np
@@ -30,25 +30,6 @@ MODULE_FULL_SIZE_Y = MODULE_SIZE_Y + (CHIP_NUM_Y - 1) * CHIP_GAP_Y
 # 18 since we have 6 more pixels in H per gap
 STRIPSEL_SIZE_X = 1024 * 3 + 18  # = 3090
 STRIPSEL_SIZE_Y = 84
-
-
-def _allow_2darray(func):
-    @wraps(func)
-    def wrapper(self, array, *args, **kwargs):
-        if array.ndim == 2:
-            is_2darray = True
-            array = array[np.newaxis]
-        else:
-            is_2darray = False
-
-        array = func(self, array, *args, **kwargs)
-
-        if is_2darray:
-            array = array[0]
-
-        return array
-
-    return wrapper
 
 
 class JFDataHandler:
@@ -473,16 +454,14 @@ class JFDataHandler:
 
         return oy, ox
 
-    @_allow_2darray
     def _get_module_slice(self, data, m):
         if self.detector_name == "JF02T09V01":
-            out = data[:, :, m * MODULE_SIZE_X : (m + 1) * MODULE_SIZE_X]
+            out = data[..., :, m * MODULE_SIZE_X : (m + 1) * MODULE_SIZE_X]
         else:
-            out = data[:, m * MODULE_SIZE_Y : (m + 1) * MODULE_SIZE_Y, :]
+            out = data[..., m * MODULE_SIZE_Y : (m + 1) * MODULE_SIZE_Y, :]
 
         return out
 
-    @_allow_2darray
     def process(
         self,
         images,
@@ -527,6 +506,13 @@ class JFDataHandler:
             if out is not None:
                 out[:] = images
             return images
+
+        # handle 2D data by adding a singleton dimension, making it 3D
+        if images.ndim == 2:
+            is_2darray = True
+            images = images[np.newaxis]
+        else:
+            is_2darray = False
 
         if conversion and not self.can_convert():
             raise RuntimeError("Gain and/or pedestal values are not set.")
@@ -578,6 +564,10 @@ class JFDataHandler:
         # rotate image stack according to a geometry configuration (e.g. for alvra JF06 detectors)
         if geometry and self.detector_geometry.det_rot90:
             out = np.rot90(out, k=self.detector_geometry.det_rot90, axes=(1, 2))
+
+        # remove the singleton dimension if input was 2D
+        if is_2darray:
+            out = out[0]
 
         return out
 
