@@ -19,7 +19,7 @@ def locate_gain_file(file_path, *, verbose=True):
     """
     file_path = Path(file_path)
     if file_path.parts[1] != "sf":
-        raise Exception(f"Gain file needs to be specified explicitly.")
+        raise Exception("Gain file needs to be specified explicitly.")
 
     detector_name = _read_detector_name(file_path)
 

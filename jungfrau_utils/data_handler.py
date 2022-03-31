@@ -26,7 +26,6 @@ MODULE_FULL_SIZE_Y = MODULE_SIZE_Y + (CHIP_NUM_Y - 1) * CHIP_GAP_Y
 
 # 256 not divisible by 3, so we round up to 86
 # the last 4 pixels can be omitted, so the final height is (256 - 4) / 3 = 84
-
 # 18 since we have 6 more pixels in H per gap
 STRIPSEL_SIZE_X = 1024 * 3 + 18  # = 3090
 STRIPSEL_SIZE_Y = 84
@@ -603,7 +602,15 @@ class JFDataHandler:
     def _process(
         self, res, images, conversion, mask, gap_pixels, double_pixels, geometry, parallel
     ):
-        _adc_to_energy = _adc_to_energy_jit[parallel]
+        if parallel:
+            adc_to_energy = _adc_to_energy_parallel_jit
+            reshape_stripsel = _reshape_stripsel_parallel_jit
+            inplace_interp_double_pixels = _inplace_interp_double_pixels_parallel_jit
+        else:
+            adc_to_energy =_adc_to_energy_jit
+            reshape_stripsel = _reshape_stripsel_jit
+            inplace_interp_double_pixels = _inplace_interp_double_pixels_jit
+
         factor = self.factor
         _mask = self._mask(double_pixels)
 
@@ -632,13 +639,13 @@ class JFDataHandler:
                 mod_tmp_dtype = self.get_dtype_out(images.dtype, conversion=conversion)
                 mod_tmp = np.zeros(shape=mod_tmp_shape, dtype=mod_tmp_dtype)
 
-                _adc_to_energy(mod_tmp, mod, mod_g, mod_p, mod_mask, factor, gap_pixels)
-                _reshape_stripsel_jit[parallel](mod_res, mod_tmp)
+                adc_to_energy(mod_tmp, mod, mod_g, mod_p, mod_mask, factor, gap_pixels)
+                reshape_stripsel(mod_res, mod_tmp)
             else:
                 mod_res = np.rot90(mod_res, k=-rot90, axes=(1, 2))
-                _adc_to_energy(mod_res, mod, mod_g, mod_p, mod_mask, factor, gap_pixels)
+                adc_to_energy(mod_res, mod, mod_g, mod_p, mod_mask, factor, gap_pixels)
                 if double_pixels == "interp":
-                    _inplace_interp_double_pixels_jit[parallel](mod_res)
+                    inplace_interp_double_pixels(mod_res)
 
     @lru_cache(maxsize=8)
     def get_pixel_mask(self, *, gap_pixels=True, double_pixels="keep", geometry=True):
@@ -686,11 +693,11 @@ class JFDataHandler:
             mod = self._get_module_slice(_mask, i)
             mod_res = res[:, oy:oy_end, ox:ox_end]
             if self.is_stripsel() and geometry:
-                _reshape_stripsel(mod_res, mod)
+                _reshape_stripsel_jit(mod_res, mod)
             else:
                 mod_res = np.rot90(mod_res, k=-rot90, axes=(1, 2))
                 # this will just copy data to the correct place
-                _adc_to_energy(mod_res, mod, None, None, None, None, gap_pixels)
+                _adc_to_energy_jit(mod_res, mod, None, None, None, None, gap_pixels)
                 if double_pixels == "interp":
                     _inplace_mask_double_pixels_jit(mod_res)
 
@@ -709,7 +716,7 @@ class JFDataHandler:
         geometry=False), but the coordinates represent pixel positions after gap_pixel and geometry
         corrections (gap_pixels=True, double_pixels="keep", geometry=True).
         """
-        if self.detector_geometry.is_stripsel == True:
+        if self.detector_geometry.is_stripsel is True:
             raise RuntimeError("Stripsel detectors are currently unsupported.")
 
         if any(self.detector_geometry.mod_rot90):
@@ -835,7 +842,7 @@ class JFDataHandler:
 
 
 @njit(cache=True)
-def _adc_to_energy(res, image, gain, pedestal, mask, factor, gap_pixels):
+def _adc_to_energy_jit(res, image, gain, pedestal, mask, factor, gap_pixels):
     num, size_y, size_x = image.shape
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
     for i1 in prange(num):  # pylint: disable=not-an-iterable
@@ -861,7 +868,7 @@ def _adc_to_energy(res, image, gain, pedestal, mask, factor, gap_pixels):
 
 
 @njit(cache=True, parallel=True)
-def _adc_to_energy_parallel(res, image, gain, pedestal, mask, factor, gap_pixels):
+def _adc_to_energy_parallel_jit(res, image, gain, pedestal, mask, factor, gap_pixels):
     num, size_y, size_x = image.shape
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
     for i1 in prange(num):  # pylint: disable=not-an-iterable
@@ -887,7 +894,7 @@ def _adc_to_energy_parallel(res, image, gain, pedestal, mask, factor, gap_pixels
 
 
 @njit(cache=True)
-def _reshape_stripsel(res, image):
+def _reshape_stripsel_jit(res, image):
     num = image.shape[0]
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
     for ind in prange(num):  # pylint: disable=not-an-iterable
@@ -922,7 +929,7 @@ def _reshape_stripsel(res, image):
 
 
 @njit(cache=True, parallel=True)
-def _reshape_stripsel_parallel(res, image):
+def _reshape_stripsel_parallel_jit(res, image):
     num = image.shape[0]
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
     for ind in prange(num):  # pylint: disable=not-an-iterable
@@ -957,8 +964,8 @@ def _reshape_stripsel_parallel(res, image):
 
 
 @njit(cache=True)
-def _inplace_interp_double_pixels(res):
-    for i1 in prange(res.shape[0]):
+def _inplace_interp_double_pixels_jit(res):
+    for i1 in prange(res.shape[0]):  # pylint: disable=not-an-iterable
         # corner quad pixels
         for ri2 in (255, 257):
             for ri3 in (255, 257, 513, 515, 771, 773):
@@ -1027,8 +1034,8 @@ def _inplace_interp_double_pixels(res):
 
 
 @njit(cache=True, parallel=True)
-def _inplace_interp_double_pixels_parallel(res):
-    for i1 in prange(res.shape[0]):
+def _inplace_interp_double_pixels_parallel_jit(res):
+    for i1 in prange(res.shape[0]):  # pylint: disable=not-an-iterable
         # corner quad pixels
         for ri2 in (255, 257):
             for ri3 in (255, 257, 513, 515, 771, 773):
@@ -1108,20 +1115,3 @@ def _inplace_mask_double_pixels_jit(res):
         vals = res[:, :514, col - 1] & res[:, :514, col + 2]
         res[:, :514, col] = vals
         res[:, :514, col + 1] = vals
-
-
-# Numba functions
-_adc_to_energy_jit = {
-    True: _adc_to_energy_parallel,
-    False: _adc_to_energy,
-}
-
-_reshape_stripsel_jit = {
-    True: _reshape_stripsel_parallel,
-    False: _reshape_stripsel,
-}
-
-_inplace_interp_double_pixels_jit = {
-    True: _inplace_interp_double_pixels_parallel,
-    False: _inplace_interp_double_pixels,
-}
