@@ -7,6 +7,7 @@ class DetectorGeometry:
     origin_x: Tuple[int] = (0, )
     is_stripsel: bool = False
     det_rot90: int = 0
+    mod_rot90: Tuple[int] = (0, )
 
 
 detector_geometry = {
