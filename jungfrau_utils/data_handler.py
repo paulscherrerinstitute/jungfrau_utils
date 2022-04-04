@@ -359,7 +359,7 @@ class JFDataHandler:
         return np.sum(self.module_map != -1)
 
     def _get_shape_out(self, gap_pixels, geometry):
-        """Return the image shape of a detector without an optional post-processing rotation step.
+        """Return the image shape of a detector without a full-detector rotation step.
 
         Args:
             gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
@@ -371,18 +371,50 @@ class JFDataHandler:
         if self.is_stripsel():
             return self._get_stripsel_shape_out(geometry=geometry)
 
-        oy_all = []
-        ox_all = []
-        for i, m in enumerate(self.module_map):
-            if m == -1 and not geometry:
-                continue
+        if geometry:
+            module_size_x = MODULE_FULL_SIZE_X if gap_pixels else MODULE_SIZE_X
+            module_size_y = MODULE_FULL_SIZE_Y if gap_pixels else MODULE_SIZE_Y
+            origin_y = self.detector_geometry.origin_y
+            origin_x = self.detector_geometry.origin_x
 
-            _, oy_end, _, ox_end, _ = self._get_module_coords(m, i, geometry, gap_pixels)
-            oy_all.append(oy_end)
-            ox_all.append(ox_end)
+            oy_end_all = []
+            ox_end_all = []
+            for i, (oy, ox) in enumerate(zip(origin_y, origin_x)):
+                if len(self.detector_geometry.mod_rot90) == 1:
+                    mod_rot90 = self.detector_geometry.mod_rot90[0]
+                else:
+                    mod_rot90 = self.detector_geometry.mod_rot90[i]
 
-        shape_y = max(oy_all)
-        shape_x = max(ox_all)
+                if mod_rot90 == 1:
+                    oy -= module_size_x
+                elif mod_rot90 == 2:
+                    oy -= module_size_y
+                    ox -= module_size_x
+                elif mod_rot90 == 3:
+                    ox -= module_size_y
+
+                if mod_rot90 % 2 == 0:
+                    oy_end = oy + module_size_y
+                    ox_end = ox + module_size_x
+                else:
+                    oy_end = oy + module_size_x
+                    ox_end = ox + module_size_y
+
+                oy_end_all.append(oy_end)
+                ox_end_all.append(ox_end)
+
+            shape_y = max(oy_end_all)
+            shape_x = max(ox_end_all)
+
+        else:
+            shape_y, shape_x = self._shape_in
+            if gap_pixels:
+                if self.detector_name == "JF02T09V01":
+                    shape_y += (CHIP_NUM_Y - 1) * CHIP_GAP_Y
+                    shape_x += (CHIP_NUM_X - 1) * CHIP_GAP_X * self._n_active_modules
+                else:
+                    shape_y += (CHIP_NUM_Y - 1) * CHIP_GAP_Y * self._n_active_modules
+                    shape_x += (CHIP_NUM_X - 1) * CHIP_GAP_X
 
         return shape_y, shape_x
 
@@ -440,24 +472,36 @@ class JFDataHandler:
         module_size_x = MODULE_FULL_SIZE_X if gap_pixels else MODULE_SIZE_X
 
         if geometry:  # gap pixels are already accounted for in module geometry coordinates
-            if len(self.detector_geometry.mod_rot90) == 1:
-                rot90 = self.detector_geometry.mod_rot90[0]
-            else:
-                rot90 = self.detector_geometry.mod_rot90[i]
-
             oy = self.detector_geometry.origin_y[i]
             ox = self.detector_geometry.origin_x[i]
 
-            if rot90 == 1:
+            det_rot90 = self.detector_geometry.det_rot90
+            if det_rot90:
+                shape_y, shape_x = self._get_shape_out(gap_pixels, geometry)
+                if det_rot90 == 1:  # (x, y) -> (y, -x)
+                    ox, oy = oy, shape_x - ox
+                elif det_rot90 == 2:  # (x, y) -> (-x, -y)
+                    ox, oy = shape_x - ox, shape_y - oy
+                elif det_rot90 == 3:  # (x, y) -> (-y, x)
+                    ox, oy = shape_y - oy, ox
+
+            if len(self.detector_geometry.mod_rot90) == 1:
+                mod_rot90 = self.detector_geometry.mod_rot90[0]
+            else:
+                mod_rot90 = self.detector_geometry.mod_rot90[i]
+
+            mod_rot90 = (mod_rot90 + det_rot90) % 4
+
+            if mod_rot90 == 1:
                 oy -= module_size_x
-            elif rot90 == 2:
+            elif mod_rot90 == 2:
                 oy -= module_size_y
                 ox -= module_size_x
-            elif rot90 == 3:
+            elif mod_rot90 == 3:
                 ox -= module_size_y
 
         else:
-            rot90 = 0
+            mod_rot90 = 0
             if self.detector_name == "JF02T09V01":
                 oy = 0
                 ox = m * module_size_x
@@ -465,14 +509,14 @@ class JFDataHandler:
                 oy = m * module_size_y
                 ox = 0
 
-        if rot90 % 2 == 0:
+        if mod_rot90 % 2 == 0:
             oy_end = oy + module_size_y
             ox_end = ox + module_size_x
         else:
             oy_end = oy + module_size_x
             ox_end = ox + module_size_y
 
-        return oy, oy_end, ox, ox_end, rot90
+        return oy, oy_end, ox, ox_end, mod_rot90
 
     def _get_module_slice(self, data, m):
         if self.detector_name == "JF02T09V01":
@@ -564,26 +608,15 @@ class JFDataHandler:
             )
             double_pixels = "keep"
 
+        out_shape = self.get_shape_out(gap_pixels=gap_pixels, geometry=geometry)
         if out is None:
-            # get the shape without an optional rotation
-            out_shape = self._get_shape_out(gap_pixels, geometry)
             out_dtype = self.get_dtype_out(images.dtype, conversion=conversion)
             out = np.zeros((images.shape[0], *out_shape), dtype=out_dtype)
         else:
-            out_shape = self.get_shape_out(gap_pixels=gap_pixels, geometry=geometry)
             if out.shape[-2:] != out_shape:
                 raise ValueError(f"Expected 'out' shape is {out_shape}, provided is {out.shape}")
 
-            # reshape inplace in case of a detector with an odd detector_geometry.det_rot90 value
-            # it will be rotated to the original shape at the end of this function
-            if geometry and self.detector_geometry.det_rot90 % 2:
-                out.shape = out.shape[0], out.shape[2], out.shape[1]
-
         self._process(out, images, conversion, mask, gap_pixels, double_pixels, geometry, parallel)
-
-        # rotate image stack according to a geometry configuration (e.g. for alvra JF06 detectors)
-        if geometry and self.detector_geometry.det_rot90:
-            out = np.rot90(out, k=self.detector_geometry.det_rot90, axes=(1, 2))
 
         # remove the singleton dimension if input was 2D
         if is_2darray:
@@ -681,7 +714,7 @@ class JFDataHandler:
 
         _mask = self._mask(double_pixels)[np.newaxis]
 
-        res_shape = self._get_shape_out(gap_pixels, geometry)
+        res_shape = self.get_shape_out(gap_pixels=gap_pixels, geometry=geometry)
         res = np.zeros((1, *res_shape), dtype=bool)
 
         for i, m in enumerate(self.module_map):
@@ -701,10 +734,6 @@ class JFDataHandler:
                 if double_pixels == "interp":
                     _inplace_mask_double_pixels_jit(mod_res)
 
-        # rotate mask according to a geometry configuration (e.g. for alvra JF06 detectors)
-        if geometry and self.detector_geometry.det_rot90:
-            res = np.rot90(res, k=self.detector_geometry.det_rot90, axes=(1, 2))
-
         res = res[0]
 
         return res
@@ -722,6 +751,9 @@ class JFDataHandler:
         if any(self.detector_geometry.mod_rot90):
             raise RuntimeError("Detectors with rotated modules are currently unsupported.")
 
+        if self.detector_geometry.det_rot90:
+            raise RuntimeError("Detectors with rotated geometry are currently unsupported.")
+
         _y = np.arange(MODULE_SIZE_Y, dtype=np.float64)
         for n in range(1, CHIP_NUM_Y):
             _y[n * CHIP_SIZE_Y :] += CHIP_GAP_Y
@@ -738,7 +770,7 @@ class JFDataHandler:
 
         y_mod_grid, x_mod_grid = np.meshgrid(_y, _x, indexing="ij")
 
-        shape_out = self._get_shape_out(gap_pixels=False, geometry=False)
+        shape_out = self.get_shape_out(gap_pixels=False, geometry=False)
         x_coord = np.zeros(shape=shape_out)
         y_coord = np.zeros(shape=shape_out)
         z_coord = np.zeros(shape=shape_out)
