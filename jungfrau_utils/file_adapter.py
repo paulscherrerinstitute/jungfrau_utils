@@ -520,6 +520,7 @@ class File:
         """
         if self.file.id:
             self.file.close()
+        self.handler = None # dereference handler since it holds pedestal/gain data
 
     def __len__(self):
         return len(self.file)
