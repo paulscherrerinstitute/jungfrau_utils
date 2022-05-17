@@ -423,8 +423,6 @@ class File:
                 out=out_buffer_view,
             )
 
-            out_buffer_view = np.ascontiguousarray(out_buffer_view)
-
             if roi is None:
                 dtype_size = out_dtype.itemsize
                 bytes_num_elem = struct.pack(">q", image_shape[0] * image_shape[1] * dtype_size)
