@@ -329,21 +329,17 @@ class File:
         h5_dest[f"data/{self.detector_name}/conversion_factor"] = self.handler.factor or np.NaN
 
         pixel_mask = self.get_pixel_mask()
+        out_shape = self.get_shape_out()
+        out_dtype = self.get_dtype_out()
 
         if roi is None:
             # save a pixel mask
             h5_dest[f"data/{self.detector_name}/pixel_mask"] = pixel_mask
 
-            image_shape = self.get_shape_out()
-
-            args["shape"] = (n_images, *image_shape)
-            args["maxshape"] = (n_images, *image_shape)
-            args["chunks"] = (1, *image_shape)
-
-            if dtype is None:
-                args["dtype"] = self.get_dtype_out()
-            else:
-                args["dtype"] = dtype
+            args["shape"] = (n_images, *out_shape)
+            args["maxshape"] = (n_images, *out_shape)
+            args["chunks"] = (1, *out_shape)
+            args["dtype"] = out_dtype if dtype is None else dtype
 
             if compression:
                 args.update(compargs)
@@ -358,7 +354,7 @@ class File:
             h5_dest.create_dataset(f"data/{self.detector_name}/n_roi", data=len(roi))
             for i, (roi_y1, roi_y2, roi_x1, roi_x2) in enumerate(roi):
                 h5_dest.create_dataset(
-                    f"data/{self.detector_name}/roi_{i}", data=[(roi_y1, roi_y2), (roi_x1, roi_x2)]
+                    f"data/{self.detector_name}/roi_{i}", data=[(roi_y1, roi_y2), (roi_x1, roi_x2)],
                 )
 
                 # save a pixel mask for ROI
@@ -373,11 +369,7 @@ class File:
                 args["shape"] = (n_images, *roi_shape)
                 args["maxshape"] = (n_images, *roi_shape)
                 args["chunks"] = (1, *roi_shape)
-
-                if dtype is None:
-                    args["dtype"] = self.get_dtype_out()
-                else:
-                    args["dtype"] = dtype
+                args["dtype"] = out_dtype if dtype is None else dtype
 
                 if compression:
                     args.update(compargs)
@@ -386,9 +378,6 @@ class File:
 
         # prepare buffers to be reused for every batch
         read_buffer = np.empty((batch_size, *data_dset.shape[1:]), dtype=data_dset.dtype)
-
-        out_shape = self.get_shape_out()
-        out_dtype = self.get_dtype_out()
         out_buffer = np.zeros((batch_size, *out_shape), dtype=out_dtype)
 
         # process and write data in batches
@@ -411,8 +400,8 @@ class File:
                 for i, j in enumerate(batch_ind):
                     data_dset.read_direct(read_buffer_view, source_sel=np.s_[j], dest_sel=np.s_[i])
 
-            # Process data
-            out_buffer_view = self.handler.process(
+            # Process data (`out_buffer_view` is modified in-place)
+            self.handler.process(
                 read_buffer_view,
                 conversion=self.conversion,
                 mask=self.mask,
@@ -425,7 +414,7 @@ class File:
 
             if roi is None:
                 dtype_size = out_dtype.itemsize
-                bytes_num_elem = struct.pack(">q", image_shape[0] * image_shape[1] * dtype_size)
+                bytes_num_elem = struct.pack(">q", out_shape[0] * out_shape[1] * dtype_size)
                 bytes_block_size = struct.pack(">i", BLOCK_SIZE * dtype_size)
                 header = bytes_num_elem + bytes_block_size
 
@@ -518,7 +507,7 @@ class File:
         """
         if self.file.id:
             self.file.close()
-        self.handler = None # dereference handler since it holds pedestal/gain data
+        self.handler = None  # dereference handler since it holds pedestal/gain data
 
     def __len__(self):
         return len(self.file)
