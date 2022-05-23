@@ -20,7 +20,7 @@ requirements:
         - h5py >=2.9,<4
         - numpy
         - numba
-        - bitshuffle >=0.3.5
+        - bitshuffle >=0.3.5,<0.4
 
 test:
     source_files:
