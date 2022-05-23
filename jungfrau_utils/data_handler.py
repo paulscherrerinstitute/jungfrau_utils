@@ -609,12 +609,13 @@ class JFDataHandler:
             double_pixels = "keep"
 
         out_shape = self.get_shape_out(gap_pixels=gap_pixels, geometry=geometry)
+        full_out_shape = (images.shape[0], *out_shape)
         if out is None:
             out_dtype = self.get_dtype_out(images.dtype, conversion=conversion)
-            out = np.zeros((images.shape[0], *out_shape), dtype=out_dtype)
+            out = np.zeros(full_out_shape, dtype=out_dtype)
         else:
-            if out.shape[-2:] != out_shape:
-                raise ValueError(f"Expected 'out' shape is {out_shape}, provided is {out.shape}")
+            if out.shape != full_out_shape:
+                raise ValueError(f"Expected 'out' shape: {full_out_shape}, provided: {out.shape}")
 
         self._process(out, images, conversion, mask, gap_pixels, double_pixels, geometry, parallel)
 
