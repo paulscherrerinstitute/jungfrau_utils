@@ -2,7 +2,6 @@ import os
 import struct
 import warnings
 import numbers
-from functools import partial
 from itertools import islice
 from pathlib import Path
 
@@ -267,169 +266,141 @@ class File:
                 running out of memory. Defaults to 100.
         """
         if self._processed:
-            raise RuntimeError("Can not run export, the file is already processed.")
+            raise RuntimeError("Can not export already processed file.")
 
         if index is not None:
             index = np.array(index)  # convert iterable into numpy array
 
         self.handler.factor = factor
 
-        with h5py.File(dest, "w") as h5_dest:
-            # a function for 'visititems' should have the args (name, object)
-            self.file.visititems(
-                partial(
-                    self._visititems,
-                    h5_dest=h5_dest,
-                    index=index,
-                    roi=roi,
-                    compression=compression,
-                    dtype=dtype,
-                    batch_size=batch_size,
-                )
-            )
+        # a function for 'visititems' should have the args (name, object)
+        def _visititems(name, obj):
+            if isinstance(obj, h5py.Dataset) and name == self._data_dset_name:
+                # skip dataset with raw data
+                return
 
-    def _visititems(self, name, obj, h5_dest, index, roi, compression, dtype, batch_size):
-        if isinstance(obj, h5py.Group):
-            h5_dest.create_group(name)
+            if isinstance(obj, h5py.Group):
+                h5_dest.create_group(name)
 
-        elif isinstance(obj, h5py.Dataset):
-            dset_source = self.file[name]
+            else:  # isinstance(obj, h5py.Dataset)
+                dset_source = self.file[name]
 
-            if name == self._data_dset_name:
-                self._process_data(h5_dest, index, roi, compression, dtype, batch_size)
-            else:
                 if name.startswith("data"):
                     # datasets with data per image, so indexing should be applied
-                    if index is None:
-                        data = dset_source[:, :]
-                    else:
-                        data = dset_source[index, :]
-                    args = {"shape": data.shape, "maxshape": data.shape}
-                    h5_dest.create_dataset_like(name, dset_source, data=data, **args)
+                    data = dset_source[:] if index is None else dset_source[index, :]
+
+                    h5_dest.create_dataset_like(name, dset_source, data=data, shape=data.shape)
                 else:
                     h5_dest.create_dataset_like(name, dset_source, data=dset_source)
 
-        else:
-            raise TypeError(f"Unknown h5py object type {obj}")
-
-        # copy attributes if it's not a dataset with the actual data
-        if name != self._data_dset_name:
+            # copy group/dataset attributes (if it's not a dataset with the actual data)
             for key, value in self.file[name].attrs.items():
                 h5_dest[name].attrs[key] = value
 
-    def _process_data(self, h5_dest, index, roi, compression, dtype, batch_size):
-        args = dict()
+        with h5py.File(dest, "w") as h5_dest:
+            # traverse the source file and copy/index all datasets, except the raw data
+            self.file.visititems(_visititems)
 
-        data_dset = self.file[self._data_dset_name]
-        if index is None:
-            n_images = data_dset.shape[0]
-        else:
-            n_images = len(index)
+            # now process the raw data
+            dset = self.file[self._data_dset_name]
+            n_images = dset.shape[0] if index is None else len(index)
 
-        h5_dest[f"data/{self.detector_name}/conversion_factor"] = self.handler.factor or np.NaN
+            h5_dest[f"data/{self.detector_name}/conversion_factor"] = factor or np.NaN
 
-        pixel_mask = self.get_pixel_mask()
-        out_shape = self.get_shape_out()
-        out_dtype = self.get_dtype_out()
+            pixel_mask = self.get_pixel_mask()
+            out_shape = self.get_shape_out()
+            out_dtype = self.get_dtype_out()
 
-        if roi is None:
-            # save a pixel mask
-            h5_dest[f"data/{self.detector_name}/pixel_mask"] = pixel_mask
-
-            args["shape"] = (n_images, *out_shape)
-            args["maxshape"] = (n_images, *out_shape)
-            args["chunks"] = (1, *out_shape)
+            args = dict()
             args["dtype"] = out_dtype if dtype is None else dtype
-
             if compression:
                 args.update(compargs)
 
-            h5_dest.create_dataset_like(data_dset.name, data_dset, **args)
-
-        else:
-            if len(roi) == 4 and all(isinstance(v, int) for v in roi):
-                # this is a single tuple with coordinates, so wrap it in another tuple
-                roi = (roi,)
-
-            h5_dest.create_dataset(f"data/{self.detector_name}/n_roi", data=len(roi))
-            for i, (roi_y1, roi_y2, roi_x1, roi_x2) in enumerate(roi):
-                h5_dest.create_dataset(
-                    f"data/{self.detector_name}/roi_{i}", data=[(roi_y1, roi_y2), (roi_x1, roi_x2)],
-                )
-
-                # save a pixel mask for ROI
-                h5_dest.create_dataset(
-                    f"data/{self.detector_name}/pixel_mask_roi_{i}",
-                    data=pixel_mask[slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)],
-                )
-
-                # prepare ROI datasets
-                roi_shape = (roi_y2 - roi_y1, roi_x2 - roi_x1)
-
-                args["shape"] = (n_images, *roi_shape)
-                args["maxshape"] = (n_images, *roi_shape)
-                args["chunks"] = (1, *roi_shape)
-                args["dtype"] = out_dtype if dtype is None else dtype
-
-                if compression:
-                    args.update(compargs)
-
-                h5_dest.create_dataset(f"{data_dset.name}_roi_{i}", **args)
-
-        # prepare buffers to be reused for every batch
-        read_buffer = np.empty((batch_size, *data_dset.shape[1:]), dtype=data_dset.dtype)
-        out_buffer = np.zeros((batch_size, *out_shape), dtype=out_dtype)
-
-        # process and write data in batches
-        for batch_start_ind in range(0, n_images, batch_size):
-            batch_range = np.arange(batch_start_ind, min(batch_start_ind + batch_size, n_images))
-
-            if index is None:
-                batch_ind = batch_range
-            else:
-                batch_ind = index[batch_range]
-
-            read_buffer_view = read_buffer[: len(batch_ind)]
-            out_buffer_view = out_buffer[: len(batch_ind)]
-
-            # Avoid a stride-bottleneck, see https://github.com/h5py/h5py/issues/977
-            if np.sum(np.diff(batch_ind)) == len(batch_ind) - 1:
-                # consecutive index values
-                data_dset.read_direct(read_buffer_view, source_sel=np.s_[batch_ind])
-            else:
-                for i, j in enumerate(batch_ind):
-                    data_dset.read_direct(read_buffer_view, source_sel=np.s_[j], dest_sel=np.s_[i])
-
-            # Process data (`out_buffer_view` is modified in-place)
-            self.handler.process(
-                read_buffer_view,
-                conversion=self.conversion,
-                mask=self.mask,
-                gap_pixels=self.gap_pixels,
-                double_pixels=self.double_pixels,
-                geometry=self.geometry,
-                parallel=self.parallel,
-                out=out_buffer_view,
-            )
-
             if roi is None:
-                dtype_size = out_dtype.itemsize
-                bytes_num_elem = struct.pack(">q", out_shape[0] * out_shape[1] * dtype_size)
-                bytes_block_size = struct.pack(">i", BLOCK_SIZE * dtype_size)
-                header = bytes_num_elem + bytes_block_size
+                # save a pixel mask
+                h5_dest[f"data/{self.detector_name}/pixel_mask"] = pixel_mask
 
-                for pos, im in zip(batch_range, out_buffer_view):
-                    if compression:
-                        byte_array = header + bitshuffle.compress_lz4(im, BLOCK_SIZE).tobytes()
-                    else:
-                        byte_array = im.tobytes()
+                args["shape"] = (n_images, *out_shape)
+                args["chunks"] = (1, *out_shape)
 
-                    h5_dest[data_dset.name].id.write_direct_chunk((pos, 0, 0), byte_array)
+                h5_dest.create_dataset_like(dset.name, dset, **args)
 
             else:
+                if len(roi) == 4 and all(isinstance(v, int) for v in roi):
+                    # this is a single tuple with coordinates, so wrap it in another tuple
+                    roi = (roi,)
+
+                h5_dest.create_dataset(f"data/{self.detector_name}/n_roi", data=len(roi))
                 for i, (roi_y1, roi_y2, roi_x1, roi_x2) in enumerate(roi):
-                    roi_data = out_buffer_view[:, slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)]
-                    h5_dest[f"{data_dset.name}_roi_{i}"][batch_range] = roi_data
+                    h5_dest.create_dataset(
+                        f"data/{self.detector_name}/roi_{i}",
+                        data=[(roi_y1, roi_y2), (roi_x1, roi_x2)],
+                    )
+
+                    # save a pixel mask for ROI
+                    h5_dest.create_dataset(
+                        f"data/{self.detector_name}/pixel_mask_roi_{i}",
+                        data=pixel_mask[slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)],
+                    )
+
+                    # prepare ROI datasets
+                    roi_shape = (roi_y2 - roi_y1, roi_x2 - roi_x1)
+
+                    args["shape"] = (n_images, *roi_shape)
+                    args["chunks"] = (1, *roi_shape)
+
+                    h5_dest.create_dataset(f"{dset.name}_roi_{i}", **args)
+
+            # prepare buffers to be reused for every batch
+            read_buffer = np.empty((batch_size, *dset.shape[-2:]), dtype=dset.dtype)
+            out_buffer = np.zeros((batch_size, *out_shape), dtype=out_dtype)
+
+            # process and write data in batches
+            for batch_start in range(0, n_images, batch_size):
+                batch_range = np.arange(batch_start, min(batch_start + batch_size, n_images))
+                batch_ind = batch_range if index is None else index[batch_range]
+
+                read_buffer_view = read_buffer[: len(batch_ind)]
+                out_buffer_view = out_buffer[: len(batch_ind)]
+
+                # Avoid a stride-bottleneck, see https://github.com/h5py/h5py/issues/977
+                if np.sum(np.diff(batch_ind)) == len(batch_ind) - 1:
+                    # consecutive index values
+                    dset.read_direct(read_buffer_view, source_sel=np.s_[batch_ind])
+                else:
+                    for i, j in enumerate(batch_ind):
+                        dset.read_direct(read_buffer_view, dest_sel=np.s_[i], source_sel=np.s_[j])
+
+                # Process data (`out_buffer_view` is modified in-place)
+                self.handler.process(
+                    read_buffer_view,
+                    conversion=self.conversion,
+                    mask=self.mask,
+                    gap_pixels=self.gap_pixels,
+                    double_pixels=self.double_pixels,
+                    geometry=self.geometry,
+                    parallel=self.parallel,
+                    out=out_buffer_view,
+                )
+
+                if roi is None:
+                    dtype_size = out_dtype.itemsize
+                    bytes_num_elem = struct.pack(">q", np.prod(out_shape) * dtype_size)
+                    bytes_block_size = struct.pack(">i", BLOCK_SIZE * dtype_size)
+                    header = bytes_num_elem + bytes_block_size
+
+                    for pos, im in zip(batch_range, out_buffer_view):
+                        if compression:
+                            byte_array = header + bitshuffle.compress_lz4(im, BLOCK_SIZE).tobytes()
+                        else:
+                            byte_array = im.tobytes()
+
+                        h5_dest[dset.name].id.write_direct_chunk((pos, 0, 0), byte_array)
+
+                else:
+                    for i, (roi_y1, roi_y2, roi_x1, roi_x2) in enumerate(roi):
+                        roi_data = out_buffer_view[:, slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)]
+                        h5_dest[f"{dset.name}_roi_{i}"][batch_range] = roi_data
 
     def __enter__(self):
         return self
@@ -468,7 +439,7 @@ class File:
             if isinstance(ind, slice):
                 ind = list(islice(range(dset.shape[0]), ind.start, ind.stop, ind.step))
 
-            data = np.empty(shape=(len(ind), *dset.shape[1:]), dtype=dset.dtype)
+            data = np.empty(shape=(len(ind), *dset.shape[-2:]), dtype=dset.dtype)
             for i, j in enumerate(ind):
                 data[i] = dset[j]
 
