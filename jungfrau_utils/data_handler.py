@@ -125,13 +125,13 @@ class JFDataHandler:
             return
 
         if value.ndim != 3:
-            raise ValueError(f"Expected gain dimensions 3, provided gain dimensions {value.ndim}.")
+            raise ValueError(f"Expected gain dimensions 3, provided {value.ndim}.")
 
         g_shape = (4, *self._shape_in_full)
         g_shape_v2 = (6, *self._shape_in_full)
         if value.shape != g_shape and value.shape != g_shape_v2:
             raise ValueError(
-                f"Expected gain shape {g_shape} or {g_shape_v2}, provided gain shape {value.shape}."
+                f"Expected gain shape {g_shape} or {g_shape_v2}, provided {value.shape}."
             )
 
         # convert _gain values to float32
@@ -196,15 +196,13 @@ class JFDataHandler:
             return
 
         if value.ndim != 3:
-            raise ValueError(
-                f"Expected pedestal dimensions 3, provided pedestal dimensions {value.ndim}."
-            )
+            raise ValueError(f"Expected pedestal dimensions 3, provided {value.ndim}.")
 
         p_shape = (4, *self._shape_in_full)
         p_shape_v2 = (3, *self._shape_in_full)
         if value.shape != p_shape and value.shape != p_shape_v2:
             raise ValueError(
-                f"Expected pedestal shapes {p_shape} or {p_shape_v2}, provided pedestal shape {value.shape}."
+                f"Expected pedestal shape {p_shape} or {p_shape_v2}, provided {value.shape}."
             )
 
         # convert _pedestal values to float32
@@ -237,15 +235,11 @@ class JFDataHandler:
             return
 
         if value.ndim != 2:
-            raise ValueError(
-                f"Expected pixel_mask dimensions 2, provided pixel_mask dimensions {value.ndim}."
-            )
+            raise ValueError(f"Expected pixel_mask dimensions 2, provided {value.ndim}.")
 
         pm_shape = self._shape_in_full
         if value.shape != pm_shape:
-            raise ValueError(
-                f"Expected pixel_mask shape {pm_shape}, provided pixel_mask shape {value.shape}."
-            )
+            raise ValueError(f"Expected pixel_mask shape {pm_shape}, provided {value.shape}.")
 
         self._pixel_mask = value
         self.get_pixel_mask.cache_clear()
@@ -328,9 +322,7 @@ class JFDataHandler:
             value = np.arange(n_modules)
 
         if len(value) != n_modules:
-            raise ValueError(
-                f"Expected module_map length {n_modules}, provided module_map length {len(value)}."
-            )
+            raise ValueError(f"Expected module_map length {n_modules}, provided {len(value)}.")
 
         if min(value) < -1 or n_modules <= max(value):
             raise ValueError(f"Valid module_map values are integers between -1 and {n_modules-1}.")
@@ -562,7 +554,7 @@ class JFDataHandler:
         image_shape = images.shape[-2:]
         if image_shape != self._shape_in:
             raise ValueError(
-                f"Expected image shape {self._shape_in}, provided image shape {image_shape}."
+                f"Expected image shape {self._shape_in}, provided {image_shape}."
             )
 
         if not (conversion or mask or gap_pixels or geometry):
@@ -615,7 +607,7 @@ class JFDataHandler:
             out = np.zeros(full_out_shape, dtype=out_dtype)
         else:
             if out.shape != full_out_shape:
-                raise ValueError(f"Expected 'out' shape: {full_out_shape}, provided: {out.shape}")
+                raise ValueError(f"Expected out shape {full_out_shape}, provided {out.shape}.")
 
         self._process(out, images, conversion, mask, gap_pixels, double_pixels, geometry, parallel)
 
@@ -641,7 +633,7 @@ class JFDataHandler:
             reshape_stripsel = _reshape_stripsel_parallel_jit
             inplace_interp_double_pixels = _inplace_interp_double_pixels_parallel_jit
         else:
-            adc_to_energy =_adc_to_energy_jit
+            adc_to_energy = _adc_to_energy_jit
             reshape_stripsel = _reshape_stripsel_jit
             inplace_interp_double_pixels = _inplace_interp_double_pixels_jit
 
@@ -812,7 +804,7 @@ class JFDataHandler:
             ndarray: Gain values of pixels.
         """
         if images.dtype != np.uint16:
-            raise TypeError(f"Expected image type {np.uint16}, provided data type {images.dtype}.")
+            raise TypeError(f"Expected image type {np.uint16}, provided {images.dtype}.")
 
         if double_pixels == "interp":
             # interpolation makes sense only for final keV values
@@ -848,7 +840,7 @@ class JFDataHandler:
             tuple: Indices of saturated pixels.
         """
         if images.dtype != np.uint16:
-            raise TypeError(f"Expected image type {np.uint16}, provided data type {images.dtype}.")
+            raise TypeError(f"Expected image type {np.uint16}, provided {images.dtype}.")
 
         if double_pixels == "interp":
             # interpolation makes sense only for final keV values
