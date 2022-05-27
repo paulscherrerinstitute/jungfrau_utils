@@ -33,9 +33,9 @@ converted_image_single_mask = converted_image_stack_mask[0]
 
 MM_DATA_SHAPE = (2 * 512, 1024)
 MM_DATA_SHAPE_WITH_GAPS = (2 * (512 + 2), 1024 + 6)
-mm_image_single = image_single[: 2 * 512, :]
-mm_expected_image_single = converted_image_single_mask[: 2 * 512, :]
-mm_pixel_mask = pixel_mask[: 2 * 512, :]
+mm_image_single = image_single[-2 * 512 :, :]
+mm_expected_image_single = converted_image_single_mask[-2 * 512 :, :]
+mm_pixel_mask = pixel_mask[-2 * 512 :, :]
 
 
 @pytest.fixture(name="empty_handler", scope="function")
@@ -335,7 +335,7 @@ def test_handler_process_mm_all(handler, conversion, mask, gap_pixels, geometry,
 @pytest.mark.parametrize("gap_pixels", [True, False])
 @pytest.mark.parametrize("geometry", [True, False])
 def test_handler_process_mm_missing(handler, gap_pixels, geometry):
-    handler.module_map = np.array([0, 1, -1])
+    handler.module_map = np.array([-1, 0, 1])
 
     res = handler.process(mm_image_single, gap_pixels=gap_pixels, geometry=geometry)
 
@@ -352,15 +352,15 @@ def test_handler_process_mm_missing(handler, gap_pixels, geometry):
         assert res.shape == MM_DATA_SHAPE
 
     # check data for chips in all 4 corners
-    assert np.allclose(res[:256, :256], mm_expected_image_single[:256, :256])
-    assert np.allclose(res[:256, -256:], mm_expected_image_single[:256, -256:])
-
     if geometry:
-        assert np.allclose(res[-256:, :256], 0)
-        assert np.allclose(res[-256:, -256:], 0)
+        assert np.allclose(res[:256, :256], 0)
+        assert np.allclose(res[:256, -256:], 0)
     else:
-        assert np.allclose(res[-256:, :256], mm_expected_image_single[-256:, :256])
-        assert np.allclose(res[-256:, -256:], mm_expected_image_single[-256:, -256:])
+        assert np.allclose(res[:256, :256], mm_expected_image_single[:256, :256])
+        assert np.allclose(res[:256, -256:], mm_expected_image_single[:256, -256:])
+
+    assert np.allclose(res[-256:, :256], mm_expected_image_single[-256:, :256])
+    assert np.allclose(res[-256:, -256:], mm_expected_image_single[-256:, -256:])
 
 
 @pytest.mark.parametrize("gap_pixels", [True, False])
@@ -393,7 +393,7 @@ def test_handler_shaped_pixel_mask(handler, gap_pixels, geometry, module_map):
 @pytest.mark.parametrize("gap_pixels", [True, False])
 @pytest.mark.parametrize("geometry", [True, False])
 def test_handler_shaped_pixel_mask_mm_missing(handler, gap_pixels, geometry):
-    handler.module_map = np.array([0, 1, -1])
+    handler.module_map = np.array([-1, 0, 1])
 
     res = np.invert(handler.get_pixel_mask(gap_pixels=gap_pixels, geometry=geometry))
 
@@ -410,15 +410,15 @@ def test_handler_shaped_pixel_mask_mm_missing(handler, gap_pixels, geometry):
         assert res.shape == MM_DATA_SHAPE
 
     # check data for chips in all 4 corners
-    assert np.allclose(res[:256, :256], mm_pixel_mask[:256, :256])
-    assert np.allclose(res[:256, -256:], mm_pixel_mask[:256, -256:])
-
     if geometry:
-        assert np.allclose(res[-256:, :256], True)
-        assert np.allclose(res[-256:, -256:], True)
+        assert np.allclose(res[:256, :256], True)
+        assert np.allclose(res[:256, -256:], True)
     else:
-        assert np.allclose(res[-256:, :256], mm_pixel_mask[-256:, :256])
-        assert np.allclose(res[-256:, -256:], mm_pixel_mask[-256:, -256:])
+        assert np.allclose(res[:256, :256], mm_pixel_mask[:256, :256])
+        assert np.allclose(res[:256, -256:], mm_pixel_mask[:256, -256:])
+
+    assert np.allclose(res[-256:, :256], mm_pixel_mask[-256:, :256])
+    assert np.allclose(res[-256:, -256:], mm_pixel_mask[-256:, -256:])
 
 
 def test_handler_get_gains(handler):
