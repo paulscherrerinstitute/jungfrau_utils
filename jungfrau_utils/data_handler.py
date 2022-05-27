@@ -552,16 +552,10 @@ class JFDataHandler:
             ndarray: Resulting image stack or single image
         """
         image_shape = images.shape[-2:]
-        if image_shape != self._shape_in:
+        if image_shape not in (self._shape_in, self._shape_in_full):
             raise ValueError(
-                f"Expected image shape {self._shape_in}, provided {image_shape}."
+                f"Expected image shape {self._shape_in} or {self._shape_in_full}, provided {image_shape}."
             )
-
-        if not (conversion or mask or gap_pixels or geometry):
-            # no need to continue, return unchanged images
-            if out is not None:
-                out[:] = images
-            return images
 
         # handle 2D data by adding a singleton dimension, making it 3D
         if images.ndim == 2:
@@ -645,7 +639,11 @@ class JFDataHandler:
                 continue
 
             oy, oy_end, ox, ox_end, rot90 = self._get_module_coords(m, i, geometry, gap_pixels)
-            mod = self._get_module_slice(images, m)
+
+            if images.shape[-2:] == self._shape_in_full:
+                mod = self._get_module_slice(images, i)
+            else:  # images.shape[-2:] == self._shape_in
+                mod = self._get_module_slice(images, m)
 
             if mask:
                 mod_mask = self._get_module_slice(_mask, i)

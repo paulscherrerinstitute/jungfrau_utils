@@ -365,6 +365,37 @@ def test_handler_process_mm_missing(handler, gap_pixels, geometry):
 
 @pytest.mark.parametrize("gap_pixels", [True, False])
 @pytest.mark.parametrize("geometry", [True, False])
+def test_handler_process_mm_missing_full(handler, gap_pixels, geometry):
+    handler.module_map = np.array([-1, 0, 1])
+
+    res = handler.process(image_single, gap_pixels=gap_pixels, geometry=geometry)
+
+    assert res.ndim == 2
+    assert res.dtype == np.float32
+
+    if gap_pixels and geometry:
+        assert res.shape == DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY
+    elif not gap_pixels and geometry:
+        assert res.shape == DATA_SHAPE_WITH_GEOMETRY
+    elif gap_pixels and not geometry:
+        assert res.shape == MM_DATA_SHAPE_WITH_GAPS
+    elif not gap_pixels and not geometry:
+        assert res.shape == MM_DATA_SHAPE
+
+    # check data for chips in all 4 corners
+    if geometry:
+        assert np.allclose(res[:256, :256], 0)
+        assert np.allclose(res[:256, -256:], 0)
+    else:
+        assert np.allclose(res[:256, :256], mm_expected_image_single[:256, :256])
+        assert np.allclose(res[:256, -256:], mm_expected_image_single[:256, -256:])
+
+    assert np.allclose(res[-256:, :256], mm_expected_image_single[-256:, :256])
+    assert np.allclose(res[-256:, -256:], mm_expected_image_single[-256:, -256:])
+
+
+@pytest.mark.parametrize("gap_pixels", [True, False])
+@pytest.mark.parametrize("geometry", [True, False])
 @pytest.mark.parametrize("module_map", [None, np.array([0, 1, 2])])
 def test_handler_shaped_pixel_mask(handler, gap_pixels, geometry, module_map):
     handler.module_map = module_map
