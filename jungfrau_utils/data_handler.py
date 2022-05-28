@@ -551,18 +551,18 @@ class JFDataHandler:
         Returns:
             ndarray: Resulting image stack or single image
         """
-        image_shape = images.shape[-2:]
-        if image_shape not in (self._shape_in, self._shape_in_full):
-            raise ValueError(
-                f"Expected image shape {self._shape_in} or {self._shape_in_full}, provided {image_shape}."
-            )
-
         # handle 2D data by adding a singleton dimension, making it 3D
         if images.ndim == 2:
             is_2darray = True
             images = images[np.newaxis]
         else:
             is_2darray = False
+
+        n_images, image_shape = images.shape[0], images.shape[1:]
+        if image_shape not in (self._shape_in, self._shape_in_full):
+            raise ValueError(
+                f"Expected image shape {self._shape_in} or {self._shape_in_full}, provided {image_shape}."
+            )
 
         if conversion and not self.can_convert():
             raise RuntimeError("Gain and/or pedestal values are not set.")
@@ -595,15 +595,61 @@ class JFDataHandler:
             double_pixels = "keep"
 
         out_shape = self.get_shape_out(gap_pixels=gap_pixels, geometry=geometry)
-        full_out_shape = (images.shape[0], *out_shape)
+        stack_out_shape = (n_images, *out_shape)
         if out is None:
             out_dtype = self.get_dtype_out(images.dtype, conversion=conversion)
-            out = np.zeros(full_out_shape, dtype=out_dtype)
+            out = np.zeros(stack_out_shape, dtype=out_dtype)
         else:
-            if out.shape != full_out_shape:
-                raise ValueError(f"Expected out shape {full_out_shape}, provided {out.shape}.")
+            if out.shape != stack_out_shape:
+                raise ValueError(f"Expected out shape {stack_out_shape}, provided {out.shape}.")
 
-        self._process(out, images, conversion, mask, gap_pixels, double_pixels, geometry, parallel)
+        if parallel:
+            adc_to_energy = _adc_to_energy_par_jit
+            reshape_stripsel = _reshape_stripsel_par_jit
+            inplace_interp_dp = _inplace_interp_dp_par_jit
+        else:
+            adc_to_energy = _adc_to_energy_jit
+            reshape_stripsel = _reshape_stripsel_jit
+            inplace_interp_dp = _inplace_interp_dp_jit
+
+        _mask = self._mask(double_pixels)
+
+        for i, m in enumerate(self.module_map):
+            if m == -1:
+                continue
+
+            if image_shape == self._shape_in_full:
+                mod = self._get_module_slice(images, i)
+            else:
+                mod = self._get_module_slice(images, m)
+
+            if conversion:
+                mod_g = self._get_module_slice(self._g, i)
+                mod_p = self._get_module_slice(self._p, i)
+            else:
+                mod_g = None
+                mod_p = None
+
+            if mask:
+                mod_mask = self._get_module_slice(_mask, i)
+            else:
+                mod_mask = None
+
+            oy, oy_end, ox, ox_end, rot90 = self._get_module_coords(m, i, geometry, gap_pixels)
+            mod_out = out[:, oy:oy_end, ox:ox_end]
+
+            if self.is_stripsel() and geometry:
+                mod_tmp_shape = (n_images, MODULE_SIZE_Y, MODULE_SIZE_X)
+                mod_tmp_dtype = self.get_dtype_out(images.dtype, conversion=conversion)
+                mod_tmp = np.zeros(shape=mod_tmp_shape, dtype=mod_tmp_dtype)
+
+                adc_to_energy(mod_tmp, mod, mod_g, mod_p, mod_mask, self.factor, gap_pixels)
+                reshape_stripsel(mod_out, mod_tmp)
+            else:
+                mod_out = np.rot90(mod_out, k=-rot90, axes=(1, 2))
+                adc_to_energy(mod_out, mod, mod_g, mod_p, mod_mask, self.factor, gap_pixels)
+                if double_pixels == "interp":
+                    inplace_interp_dp(mod_out)
 
         # remove the singleton dimension if input was 2D
         if is_2darray:
@@ -618,58 +664,6 @@ class JFDataHandler:
             bool: Return true if all data for gain/pedestal conversion is present.
         """
         return (self.gain is not None) and (self.pedestal is not None)
-
-    def _process(
-        self, res, images, conversion, mask, gap_pixels, double_pixels, geometry, parallel
-    ):
-        if parallel:
-            adc_to_energy = _adc_to_energy_parallel_jit
-            reshape_stripsel = _reshape_stripsel_parallel_jit
-            inplace_interp_double_pixels = _inplace_interp_double_pixels_parallel_jit
-        else:
-            adc_to_energy = _adc_to_energy_jit
-            reshape_stripsel = _reshape_stripsel_jit
-            inplace_interp_double_pixels = _inplace_interp_double_pixels_jit
-
-        factor = self.factor
-        _mask = self._mask(double_pixels)
-
-        for i, m in enumerate(self.module_map):
-            if m == -1:
-                continue
-
-            oy, oy_end, ox, ox_end, rot90 = self._get_module_coords(m, i, geometry, gap_pixels)
-
-            if images.shape[-2:] == self._shape_in_full:
-                mod = self._get_module_slice(images, i)
-            else:  # images.shape[-2:] == self._shape_in
-                mod = self._get_module_slice(images, m)
-
-            if mask:
-                mod_mask = self._get_module_slice(_mask, i)
-            else:
-                mod_mask = None
-
-            if conversion:
-                mod_g = self._get_module_slice(self._g, i)
-                mod_p = self._get_module_slice(self._p, i)
-            else:
-                mod_g = None
-                mod_p = None
-
-            mod_res = res[:, oy:oy_end, ox:ox_end]
-            if self.is_stripsel() and geometry:
-                mod_tmp_shape = (images.shape[0], MODULE_SIZE_Y, MODULE_SIZE_X)
-                mod_tmp_dtype = self.get_dtype_out(images.dtype, conversion=conversion)
-                mod_tmp = np.zeros(shape=mod_tmp_shape, dtype=mod_tmp_dtype)
-
-                adc_to_energy(mod_tmp, mod, mod_g, mod_p, mod_mask, factor, gap_pixels)
-                reshape_stripsel(mod_res, mod_tmp)
-            else:
-                mod_res = np.rot90(mod_res, k=-rot90, axes=(1, 2))
-                adc_to_energy(mod_res, mod, mod_g, mod_p, mod_mask, factor, gap_pixels)
-                if double_pixels == "interp":
-                    inplace_interp_double_pixels(mod_res)
 
     @lru_cache(maxsize=8)
     def get_pixel_mask(self, *, gap_pixels=True, double_pixels="keep", geometry=True):
@@ -712,9 +706,9 @@ class JFDataHandler:
             if m == -1:
                 continue
 
-            oy, oy_end, ox, ox_end, rot90 = self._get_module_coords(m, i, geometry, gap_pixels)
-
             mod = self._get_module_slice(_mask, i)
+
+            oy, oy_end, ox, ox_end, rot90 = self._get_module_coords(m, i, geometry, gap_pixels)
             mod_res = res[:, oy:oy_end, ox:ox_end]
             if self.is_stripsel() and geometry:
                 _reshape_stripsel_jit(mod_res, mod)
@@ -723,7 +717,7 @@ class JFDataHandler:
                 # this will just copy data to the correct place
                 _adc_to_energy_jit(mod_res, mod, None, None, None, None, gap_pixels)
                 if double_pixels == "interp":
-                    _inplace_mask_double_pixels_jit(mod_res)
+                    _inplace_mask_dp_jit(mod_res)
 
         res = res[0]
 
@@ -770,9 +764,10 @@ class JFDataHandler:
             if m == -1:
                 continue
 
-            oy, _, ox, _, _ = self._get_module_coords(m, i, geometry=True, gap_pixels=True)
             y_mod = self._get_module_slice(y_coord, i)
             x_mod = self._get_module_slice(x_coord, i)
+
+            oy, _, ox, _, _ = self._get_module_coords(m, i, geometry=True, gap_pixels=True)
             y_mod[:] = y_mod_grid + oy
             x_mod[:] = x_mod_grid + ox
 
@@ -891,7 +886,7 @@ def _adc_to_energy_jit(res, image, gain, pedestal, mask, factor, gap_pixels):
 
 
 @njit(cache=True, parallel=True)
-def _adc_to_energy_parallel_jit(res, image, gain, pedestal, mask, factor, gap_pixels):
+def _adc_to_energy_par_jit(res, image, gain, pedestal, mask, factor, gap_pixels):
     num, size_y, size_x = image.shape
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
     for i1 in prange(num):  # pylint: disable=not-an-iterable
@@ -952,7 +947,7 @@ def _reshape_stripsel_jit(res, image):
 
 
 @njit(cache=True, parallel=True)
-def _reshape_stripsel_parallel_jit(res, image):
+def _reshape_stripsel_par_jit(res, image):
     num = image.shape[0]
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
     for ind in prange(num):  # pylint: disable=not-an-iterable
@@ -987,7 +982,7 @@ def _reshape_stripsel_parallel_jit(res, image):
 
 
 @njit(cache=True)
-def _inplace_interp_double_pixels_jit(res):
+def _inplace_interp_dp_jit(res):
     for i1 in prange(res.shape[0]):  # pylint: disable=not-an-iterable
         # corner quad pixels
         for ri2 in (255, 257):
@@ -1057,7 +1052,7 @@ def _inplace_interp_double_pixels_jit(res):
 
 
 @njit(cache=True, parallel=True)
-def _inplace_interp_double_pixels_parallel_jit(res):
+def _inplace_interp_dp_par_jit(res):
     for i1 in prange(res.shape[0]):  # pylint: disable=not-an-iterable
         # corner quad pixels
         for ri2 in (255, 257):
@@ -1127,7 +1122,7 @@ def _inplace_interp_double_pixels_parallel_jit(res):
 
 
 @njit(cache=True)
-def _inplace_mask_double_pixels_jit(res):
+def _inplace_mask_dp_jit(res):
     # gap_pixels is always True here
     for row in (256,):
         vals = res[:, row - 1, :1030] & res[:, row + 2, :1030]
