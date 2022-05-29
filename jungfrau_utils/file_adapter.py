@@ -327,7 +327,8 @@ class File:
             if disabled_modules:
                 h5_dest[f"{det_path}/module_map"] = np.tile(module_map, (n_images, 1))
 
-            h5_dest[f"{det_path}/conversion_factor"] = factor or np.NaN
+            if self.conversion or self.mask or self.gap_pixels or self.geometry or roi or factor:
+                h5_dest[f"{det_path}/conversion_factor"] = factor or np.NaN
 
             pixel_mask = self.get_pixel_mask()
             out_shape = self.get_shape_out()
