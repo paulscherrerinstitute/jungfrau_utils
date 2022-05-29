@@ -241,6 +241,7 @@ class File:
         self,
         dest,
         *,
+        disabled_modules=(),
         index=None,
         roi=None,
         compression=False,
@@ -252,6 +253,8 @@ class File:
 
         Args:
             dest (str): Destination hdf5 file path.
+            disabled_modules (iterable): Exclude data of provided module indices from processing.
+                Defaults to ().
             index (iterable): An iterable with indexes of images to be exported.
                 Export all images if None. Defaults to None.
             roi (tuple): A single tuple, or a tuple of tuples with image ROIs in a form
@@ -272,6 +275,21 @@ class File:
             index = np.array(index)  # convert iterable into numpy array
 
         self.handler.factor = factor
+
+        if disabled_modules:
+            if -1 in self.handler.module_map:
+                raise ValueError("Can not disable modules when file contains disabled modules.")
+
+            n_modules = self.handler.detector.n_modules
+            if min(disabled_modules) < 0 or max(disabled_modules) >= n_modules:
+                raise ValueError(f"Disabled modules must be within 0 {n_modules-1} range.")
+
+            module_map = np.arange(n_modules)
+            for ind in sorted(disabled_modules):
+                module_map[ind] = -1
+                module_map[ind + 1 :] -= 1
+
+            self.handler.module_map = module_map
 
         # a function for 'visititems' should have the args (name, object)
         def _visititems(name, obj):
@@ -302,10 +320,14 @@ class File:
             self.file.visititems(_visititems)
 
             # now process the raw data
+            det_path = f"data/{self.detector_name}"
             dset = self.file[self._data_dset_name]
             n_images = dset.shape[0] if index is None else len(index)
 
-            h5_dest[f"data/{self.detector_name}/conversion_factor"] = factor or np.NaN
+            if disabled_modules:
+                h5_dest[f"{det_path}/module_map"] = np.tile(module_map, (n_images, 1))
+
+            h5_dest[f"{det_path}/conversion_factor"] = factor or np.NaN
 
             pixel_mask = self.get_pixel_mask()
             out_shape = self.get_shape_out()
@@ -318,7 +340,7 @@ class File:
 
             if roi is None:
                 # save a pixel mask
-                h5_dest[f"data/{self.detector_name}/pixel_mask"] = pixel_mask
+                h5_dest[f"{det_path}/pixel_mask"] = pixel_mask
 
                 args["shape"] = (n_images, *out_shape)
                 args["chunks"] = (1, *out_shape)
@@ -330,16 +352,15 @@ class File:
                     # this is a single tuple with coordinates, so wrap it in another tuple
                     roi = (roi,)
 
-                h5_dest.create_dataset(f"data/{self.detector_name}/n_roi", data=len(roi))
+                h5_dest.create_dataset(f"{det_path}/n_roi", data=len(roi))
                 for i, (roi_y1, roi_y2, roi_x1, roi_x2) in enumerate(roi):
                     h5_dest.create_dataset(
-                        f"data/{self.detector_name}/roi_{i}",
-                        data=[(roi_y1, roi_y2), (roi_x1, roi_x2)],
+                        f"{det_path}/roi_{i}", data=[(roi_y1, roi_y2), (roi_x1, roi_x2)],
                     )
 
                     # save a pixel mask for ROI
                     h5_dest.create_dataset(
-                        f"data/{self.detector_name}/pixel_mask_roi_{i}",
+                        f"{det_path}/pixel_mask_roi_{i}",
                         data=pixel_mask[slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)],
                     )
 
