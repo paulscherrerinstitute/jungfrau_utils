@@ -215,6 +215,9 @@ class File:
         Returns:
             tuple: Height and width of a resulting image.
         """
+        if self._processed:
+            return self.file[self._data_dset_name].shape[-2:]
+
         return self.handler.get_shape_out(gap_pixels=self.gap_pixels, geometry=self.geometry)
 
     def get_dtype_out(self):
@@ -223,6 +226,9 @@ class File:
         Returns:
             dtype: dtype of a resulting image.
         """
+        if self._processed:
+            return self.file[self._data_dset_name].dtype
+
         return self.handler.get_dtype_out(
             self.file[self._data_dset_name].dtype, conversion=self.conversion
         )
@@ -233,6 +239,9 @@ class File:
         Returns:
             ndarray: Resulting pixel mask, where True values correspond to valid pixels.
         """
+        if self._processed:
+            return self.file[f"data/{self.detector_name}/pixel_mask"][:]
+
         return self.handler.get_pixel_mask(
             gap_pixels=self.gap_pixels, double_pixels=self.double_pixels, geometry=self.geometry
         )
@@ -327,9 +336,6 @@ class File:
             if disabled_modules:
                 h5_dest[f"{det_path}/module_map"] = np.tile(module_map, (n_images, 1))
 
-            if self.conversion or self.mask or self.gap_pixels or self.geometry or roi or factor:
-                h5_dest[f"{det_path}/conversion_factor"] = factor or np.NaN
-
             pixel_mask = self.get_pixel_mask()
             out_shape = self.get_shape_out()
             out_dtype = self.get_dtype_out()
@@ -423,6 +429,10 @@ class File:
                     for i, (roi_y1, roi_y2, roi_x1, roi_x2) in enumerate(roi):
                         roi_data = out_buffer_view[:, slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)]
                         h5_dest[f"{dset.name}_roi_{i}"][batch_range] = roi_data
+
+            # this also sets file as processed
+            if self.conversion or self.mask or self.gap_pixels or self.geometry or roi or factor:
+                h5_dest[f"{det_path}/conversion_factor"] = factor or np.NaN
 
     def __enter__(self):
         return self
