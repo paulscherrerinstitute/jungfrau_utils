@@ -1,7 +1,7 @@
+import numbers
 import os
 import struct
 import warnings
-import numbers
 from itertools import islice
 from pathlib import Path
 
@@ -9,6 +9,7 @@ import bitshuffle
 import h5py
 import numpy as np
 from bitshuffle.h5 import H5_COMPRESS_LZ4, H5FILTER  # pylint: disable=no-name-in-module
+from numba import njit
 
 from jungfrau_utils.data_handler import JFDataHandler
 from jungfrau_utils.swissfel_helpers import locate_gain_file, locate_pedestal_file
@@ -253,6 +254,7 @@ class File:
         disabled_modules=(),
         index=None,
         roi=None,
+        downsample=False,
         compression=False,
         factor=None,
         dtype=None,
@@ -262,12 +264,14 @@ class File:
 
         Args:
             dest (str): Destination hdf5 file path.
-            disabled_modules (iterable): Exclude data of provided module indices from processing.
-                Defaults to ().
-            index (iterable): An iterable with indexes of images to be exported.
+            disabled_modules (iterable, optional): Exclude data of provided module indices from
+                processing. Defaults to ().
+            index (iterable, optional): An iterable with indexes of images to be exported.
                 Export all images if None. Defaults to None.
-            roi (tuple): A single tuple, or a tuple of tuples with image ROIs in a form
+            roi (tuple, optional): A single tuple, or a tuple of tuples with image ROIs in a form
                 (bottom, top, left, right). Export whole images if None. Defaults to None.
+            downsample (bool, optional): Reduce image size in 2x2 pixel blocks, resulting in a sum
+                of corresponding pixels. Defaults to False.
             compression (bool, optional): Apply bitshuffle+lz4 compression. Defaults to False.
             factor (float, optional): If conversion is True, use this factor to divide converted
                 values. The output values are also rounded and casted to np.int32 dtype. Keep the
@@ -280,10 +284,18 @@ class File:
         if self._processed:
             raise RuntimeError("Can not export already processed file.")
 
+        if roi and downsample:
+            raise ValueError("Unsupported mode: roi with downsample.")
+
         if index is not None:
             index = np.array(index)  # convert iterable into numpy array
 
-        self.handler.factor = factor
+        if downsample:
+            # factor division and rounding should occur after downsampling, so we do it not via
+            # JFDataHandler
+            self.handler.factor = None
+        else:
+            self.handler.factor = factor
 
         if disabled_modules:
             if -1 in self.handler.module_map:
@@ -340,6 +352,12 @@ class File:
             out_shape = self.get_shape_out()
             out_dtype = self.get_dtype_out()
 
+            if downsample:
+                pixel_mask = _downsample_mask(pixel_mask)
+                out_shape = tuple(shape // 2 for shape in out_shape)
+                if factor is not None:
+                    out_dtype = np.dtype(np.int32)
+
             args = dict()
             args["dtype"] = out_dtype if dtype is None else dtype
             if compression:
@@ -381,7 +399,8 @@ class File:
 
             # prepare buffers to be reused for every batch
             read_buffer = np.empty((batch_size, *dset.shape[-2:]), dtype=dset.dtype)
-            out_buffer = np.zeros((batch_size, *out_shape), dtype=out_dtype)
+            # shape_out could be changed if downsample is True, so use get_shape_out() directly
+            out_buffer = np.zeros((batch_size, *self.get_shape_out()), dtype=out_dtype)
 
             # process and write data in batches
             for batch_start in range(0, n_images, batch_size):
@@ -418,6 +437,9 @@ class File:
                     header = bytes_num_elem + bytes_block_size
 
                     for pos, im in zip(batch_range, out_buffer_view):
+                        if downsample:
+                            im = _downsample_image(im, factor, pixel_mask)
+
                         if compression:
                             byte_array = header + bitshuffle.compress_lz4(im, BLOCK_SIZE).tobytes()
                         else:
@@ -517,3 +539,41 @@ class File:
 
     def __getattr__(self, name):
         return getattr(self.file, name)
+
+
+@njit(cache=True)
+def _downsample_mask(data):
+    out_shape_y = data.shape[0] // 2
+    out_shape_x = data.shape[1] // 2
+    mask_view = data.ravel()
+
+    ind = 0
+    for i1 in range(out_shape_y):
+        for i2 in range(out_shape_x):
+            mask_view[ind] = np.all(data[2 * i1 : 2 * i1 + 2, 2 * i2 : 2 * i2 + 2])
+            ind += 1
+
+    return mask_view[:ind].reshape(out_shape_y, out_shape_x)
+
+
+@njit(cache=True)
+def _downsample_image(data, factor, mask):
+    out_shape_y = data.shape[0] // 2
+    out_shape_x = data.shape[1] // 2
+    image_view = data.ravel()
+
+    ind = 0
+    for i1 in range(out_shape_y):
+        for i2 in range(out_shape_x):
+            if mask[i1, i2]:
+                tmp_res = np.sum(data[2 * i1 : 2 * i1 + 2, 2 * i2 : 2 * i2 + 2])
+            else:
+                tmp_res = 0
+
+            if factor is None:
+                image_view[ind] = tmp_res
+            else:
+                image_view[ind] = round(tmp_res / factor)
+            ind += 1
+
+    return image_view[:ind].reshape(out_shape_y, out_shape_x)
