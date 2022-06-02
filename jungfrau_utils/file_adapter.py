@@ -9,7 +9,7 @@ import bitshuffle
 import h5py
 import numpy as np
 from bitshuffle.h5 import H5_COMPRESS_LZ4, H5FILTER  # pylint: disable=no-name-in-module
-from numba import njit
+from numba import njit, prange
 
 from jungfrau_utils.data_handler import JFDataHandler
 from jungfrau_utils.swissfel_helpers import locate_gain_file, locate_pedestal_file
@@ -430,6 +430,12 @@ class File:
                     out=out_buffer_view,
                 )
 
+                if downsample:
+                    if self.parallel:
+                        _downsample_image_par_jit(out_buffer_view, factor, pixel_mask)
+                    else:
+                        _downsample_image_jit(out_buffer_view, factor, pixel_mask)
+
                 if roi is None:
                     dtype_size = out_dtype.itemsize
                     bytes_num_elem = struct.pack(">q", np.prod(out_shape) * dtype_size)
@@ -438,7 +444,7 @@ class File:
 
                     for pos, im in zip(batch_range, out_buffer_view):
                         if downsample:
-                            im = _downsample_image(im, factor, pixel_mask)
+                            im = im.ravel()[:np.prod(out_shape)]
 
                         if compression:
                             byte_array = header + bitshuffle.compress_lz4(im, BLOCK_SIZE).tobytes()
@@ -543,37 +549,57 @@ class File:
 
 @njit(cache=True)
 def _downsample_mask(data):
-    out_shape_y = data.shape[0] // 2
-    out_shape_x = data.shape[1] // 2
-    mask_view = data.ravel()
+    size_y, size_x = data.shape
+    out_shape_y = size_y // 2
+    out_shape_x = size_x // 2
+    data_view = data.ravel()
 
     ind = 0
     for i1 in range(out_shape_y):
         for i2 in range(out_shape_x):
-            mask_view[ind] = np.all(data[2 * i1 : 2 * i1 + 2, 2 * i2 : 2 * i2 + 2])
+            data_view[ind] = np.all(data[2 * i1 : 2 * i1 + 2, 2 * i2 : 2 * i2 + 2])
             ind += 1
 
-    return mask_view[:ind].reshape(out_shape_y, out_shape_x)
+    return data_view[:ind].reshape(out_shape_y, out_shape_x)
 
 
 @njit(cache=True)
-def _downsample_image(data, factor, mask):
-    out_shape_y = data.shape[0] // 2
-    out_shape_x = data.shape[1] // 2
-    image_view = data.ravel()
+def _downsample_image_jit(data, factor, mask):
+    num, size_y, size_x = data.shape
+    data_view = data.ravel()
 
-    ind = 0
-    for i1 in range(out_shape_y):
-        for i2 in range(out_shape_x):
-            if mask[i1, i2]:
-                tmp_res = np.sum(data[2 * i1 : 2 * i1 + 2, 2 * i2 : 2 * i2 + 2])
-            else:
-                tmp_res = 0
+    for i1 in prange(num):  # pylint: disable=not-an-iterable
+        ind = 0
+        for i2 in range(size_y // 2):
+            for i3 in range(size_x // 2):
+                if mask[i2, i3]:
+                    tmp_res = np.sum(data[i1, 2 * i2 : 2 * i2 + 2, 2 * i3 : 2 * i3 + 2])
+                else:
+                    tmp_res = 0
 
-            if factor is None:
-                image_view[ind] = tmp_res
-            else:
-                image_view[ind] = round(tmp_res / factor)
-            ind += 1
+                if factor is None:
+                    data_view[ind] = tmp_res
+                else:
+                    data_view[ind] = round(tmp_res / factor)
+                ind += 1
 
-    return image_view[:ind].reshape(out_shape_y, out_shape_x)
+
+@njit(cache=True, parallel=True)
+def _downsample_image_par_jit(data, factor, mask):
+    num, size_y, size_x = data.shape
+    data_view = data.ravel()
+
+    for i1 in prange(num):  # pylint: disable=not-an-iterable
+        ind = 0
+        for i2 in range(size_y // 2):
+            for i3 in range(size_x // 2):
+                if mask[i2, i3]:
+                    tmp_res = np.sum(data[i1, 2 * i2 : 2 * i2 + 2, 2 * i3 : 2 * i3 + 2])
+                else:
+                    tmp_res = 0
+
+                if factor is None:
+                    data_view[ind] = tmp_res
+                else:
+                    data_view[ind] = round(tmp_res / factor)
+                ind += 1
