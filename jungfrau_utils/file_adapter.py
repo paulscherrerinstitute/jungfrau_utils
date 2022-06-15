@@ -566,7 +566,7 @@ def _downsample_mask(data):
 @njit(cache=True)
 def _downsample_image_jit(data, factor, mask):
     num, size_y, size_x = data.shape
-    data_view = data.ravel()
+    data_view = data.reshape((num, -1))
 
     for i1 in prange(num):  # pylint: disable=not-an-iterable
         ind = 0
@@ -578,16 +578,16 @@ def _downsample_image_jit(data, factor, mask):
                     tmp_res = 0
 
                 if factor is None:
-                    data_view[ind] = tmp_res
+                    data_view[i1, ind] = tmp_res
                 else:
-                    data_view[ind] = round(tmp_res / factor)
+                    data_view[i1, ind] = round(tmp_res / factor)
                 ind += 1
 
 
 @njit(cache=True, parallel=True)
 def _downsample_image_par_jit(data, factor, mask):
     num, size_y, size_x = data.shape
-    data_view = data.ravel()
+    data_view = data.reshape((num, -1))
 
     for i1 in prange(num):  # pylint: disable=not-an-iterable
         ind = 0
@@ -599,7 +599,7 @@ def _downsample_image_par_jit(data, factor, mask):
                     tmp_res = 0
 
                 if factor is None:
-                    data_view[ind] = tmp_res
+                    data_view[i1, ind] = tmp_res
                 else:
-                    data_view[ind] = round(tmp_res / factor)
+                    data_view[i1, ind] = round(tmp_res / factor)
                 ind += 1
