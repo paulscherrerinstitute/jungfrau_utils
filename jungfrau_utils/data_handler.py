@@ -68,32 +68,27 @@ class JFDataHandler:
 
     @property
     def detector_name(self):
-        """Detector name (readonly).
-        """
+        """Detector name (readonly)."""
         return self._detector_name
 
     @property
     def detector_geometry(self):
-        """Detector geometry configuration (readonly).
-        """
+        """Detector geometry configuration (readonly)."""
         return self._detector_geometry
 
     def is_stripsel(self):
-        """Return true if detector is a stripsel.
-        """
+        """Return true if detector is a stripsel."""
         return self.detector_geometry.is_stripsel
 
     @property
     def detector(self):
-        """A namedtuple of detector parameters extracted from its name (readonly).
-        """
+        """A namedtuple of detector parameters extracted from its name (readonly)."""
         det = namedtuple("Detector", ["id", "n_modules", "version"])
         return det(*(int(d) for d in re.findall(r"\d+", self.detector_name)))
 
     @property
     def gain_file(self):
-        """Return current gain filepath.
-        """
+        """Return current gain filepath."""
         return self._gain_file
 
     @gain_file.setter
@@ -114,8 +109,7 @@ class JFDataHandler:
 
     @property
     def gain(self):
-        """Current gain values.
-        """
+        """Current gain values."""
         return self._gain
 
     @gain.setter
@@ -160,8 +154,7 @@ class JFDataHandler:
 
     @property
     def pedestal_file(self):
-        """Return current pedestal filepath.
-        """
+        """Return current pedestal filepath."""
         return self._pedestal_file
 
     @pedestal_file.setter
@@ -185,8 +178,7 @@ class JFDataHandler:
 
     @property
     def pedestal(self):
-        """Current pedestal values.
-        """
+        """Current pedestal values."""
         return self._pedestal
 
     @pedestal.setter
@@ -223,8 +215,7 @@ class JFDataHandler:
 
     @property
     def pixel_mask(self):
-        """Current raw pixel mask values.
-        """
+        """Current raw pixel mask values."""
         return self._pixel_mask
 
     @pixel_mask.setter
@@ -294,8 +285,7 @@ class JFDataHandler:
 
     @property
     def highgain(self):
-        """Current flag for highgain.
-        """
+        """Current flag for highgain."""
         return self._highgain
 
     @highgain.setter
@@ -307,8 +297,7 @@ class JFDataHandler:
 
     @property
     def module_map(self):
-        """Current module map.
-        """
+        """Current module map."""
         return self._module_map
 
     @module_map.setter

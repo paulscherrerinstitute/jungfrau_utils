@@ -102,26 +102,22 @@ class File:
 
     @property
     def detector_name(self):
-        """Detector name (readonly).
-        """
+        """Detector name (readonly)."""
         return self.handler.detector_name
 
     @property
     def gain_file(self):
-        """Gain file path (readonly).
-        """
+        """Gain file path (readonly)."""
         return self.handler.gain_file
 
     @property
     def pedestal_file(self):
-        """Pedestal file path (readonly).
-        """
+        """Pedestal file path (readonly)."""
         return self.handler.pedestal_file
 
     @property
     def conversion(self):
-        """A flag for applying pedestal correction and gain conversion.
-        """
+        """A flag for applying pedestal correction and gain conversion."""
         return self._conversion
 
     @conversion.setter
@@ -134,8 +130,7 @@ class File:
 
     @property
     def mask(self):
-        """A flag for masking bad pixels.
-        """
+        """A flag for masking bad pixels."""
         return self._mask
 
     @mask.setter
@@ -148,8 +143,7 @@ class File:
 
     @property
     def gap_pixels(self):
-        """A flag for adding gap pixels.
-        """
+        """A flag for adding gap pixels."""
         return self._gap_pixels
 
     @gap_pixels.setter
@@ -162,8 +156,7 @@ class File:
 
     @property
     def double_pixels(self):
-        """A parameter for making modifications to double pixels.
-        """
+        """A parameter for making modifications to double pixels."""
         return self._double_pixels
 
     @double_pixels.setter
@@ -176,8 +169,7 @@ class File:
 
     @property
     def geometry(self):
-        """A flag for applying geometry.
-        """
+        """A flag for applying geometry."""
         return self._geometry
 
     @geometry.setter
@@ -190,8 +182,7 @@ class File:
 
     @property
     def parallel(self):
-        """A flag for using parallelization.
-        """
+        """A flag for using parallelization."""
         return self._parallel
 
     @parallel.setter
@@ -380,7 +371,8 @@ class File:
                 h5_dest.create_dataset(f"{det_path}/n_roi", data=len(roi))
                 for i, (roi_y1, roi_y2, roi_x1, roi_x2) in enumerate(roi):
                     h5_dest.create_dataset(
-                        f"{det_path}/roi_{i}", data=[(roi_y1, roi_y2), (roi_x1, roi_x2)],
+                        f"{det_path}/roi_{i}",
+                        data=[(roi_y1, roi_y2), (roi_x1, roi_x2)],
                     )
 
                     # save a pixel mask for ROI
@@ -444,7 +436,7 @@ class File:
 
                     for pos, im in zip(batch_range, out_buffer_view):
                         if downsample:
-                            im = im.ravel()[:np.prod(out_shape)]
+                            im = im.ravel()[: np.prod(out_shape)]
 
                         if compression:
                             byte_array = header + bitshuffle.compress_lz4(im, BLOCK_SIZE).tobytes()
@@ -534,8 +526,7 @@ class File:
         return r
 
     def close(self):
-        """Close Jungfrau file.
-        """
+        """Close Jungfrau file."""
         if self.file.id:
             self.file.close()
         self.handler = None  # dereference handler since it holds pedestal/gain data
