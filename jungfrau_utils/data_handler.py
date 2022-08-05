@@ -603,6 +603,11 @@ class JFDataHandler:
 
         _mask = self._mask(double_pixels)
 
+        ry = np.arange(MODULE_SIZE_Y, dtype=np.uint32)
+        ry += ry // CHIP_SIZE_Y * CHIP_GAP_Y * gap_pixels
+        rx = np.arange(MODULE_SIZE_X, dtype=np.uint32)
+        rx += rx // CHIP_SIZE_X * CHIP_GAP_X * gap_pixels
+
         for i, m in enumerate(self.module_map):
             if m == -1:
                 continue
@@ -632,11 +637,11 @@ class JFDataHandler:
                 mod_tmp_dtype = self.get_dtype_out(images.dtype, conversion=conversion)
                 mod_tmp = np.zeros(shape=mod_tmp_shape, dtype=mod_tmp_dtype)
 
-                adc_to_energy(mod_tmp, mod, mod_g, mod_p, mod_mask, self.factor, gap_pixels)
+                adc_to_energy(mod_tmp, mod, mod_g, mod_p, mod_mask, self.factor, ry, rx)
                 reshape_stripsel(mod_out, mod_tmp)
             else:
                 mod_out = np.rot90(mod_out, k=-rot90, axes=(1, 2))
-                adc_to_energy(mod_out, mod, mod_g, mod_p, mod_mask, self.factor, gap_pixels)
+                adc_to_energy(mod_out, mod, mod_g, mod_p, mod_mask, self.factor, ry, rx)
                 if double_pixels == "interp":
                     inplace_interp_dp(mod_out)
 
@@ -691,6 +696,11 @@ class JFDataHandler:
         res_shape = self.get_shape_out(gap_pixels=gap_pixels, geometry=geometry)
         res = np.zeros((1, *res_shape), dtype=bool)
 
+        ry = np.arange(MODULE_SIZE_Y, dtype=np.uint32)
+        ry += ry // CHIP_SIZE_Y * CHIP_GAP_Y * gap_pixels
+        rx = np.arange(MODULE_SIZE_X, dtype=np.uint32)
+        rx += rx // CHIP_SIZE_X * CHIP_GAP_X * gap_pixels
+
         for i, m in enumerate(self.module_map):
             if m == -1:
                 continue
@@ -704,7 +714,7 @@ class JFDataHandler:
             else:
                 mod_res = np.rot90(mod_res, k=-rot90, axes=(1, 2))
                 # this will just copy data to the correct place
-                _adc_to_energy_jit(mod_res, mod, None, None, None, None, gap_pixels)
+                _adc_to_energy_jit(mod_res, mod, None, None, None, None, ry, rx)
                 if double_pixels == "interp":
                     _inplace_mask_dp_jit(mod_res)
 
@@ -849,22 +859,18 @@ class JFDataHandler:
 
 
 @njit(cache=True)
-def _adc_to_energy_jit(res, image, gain, pedestal, mask, factor, gap_pixels):
-    num, size_y, size_x = image.shape
+def _adc_to_energy_jit(res, image, gain, pedestal, mask, factor, ry, rx):
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
-    for i1 in prange(num):  # pylint: disable=not-an-iterable
-        for i2 in range(size_y):
-            for i3 in range(size_x):
+    for i1 in prange(image.shape[0]):  # pylint: disable=not-an-iterable
+        for i2, ri2 in enumerate(ry):
+            for i3, ri3 in enumerate(rx):
                 if mask is not None and not mask[i2, i3]:
                     continue
-
-                ri2 = i2 + i2 // CHIP_SIZE_Y * CHIP_GAP_Y * gap_pixels
-                ri3 = i3 + i3 // CHIP_SIZE_X * CHIP_GAP_X * gap_pixels
 
                 if gain is None or pedestal is None:
                     res[i1, ri2, ri3] = image[i1, i2, i3]
                 else:
-                    gm = np.right_shift(image[i1, i2, i3], 14)
+                    gm = np.uint32(np.right_shift(image[i1, i2, i3], 14))
                     val = np.float32(image[i1, i2, i3] & 0x3FFF)
                     tmp_res = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
 
@@ -875,22 +881,18 @@ def _adc_to_energy_jit(res, image, gain, pedestal, mask, factor, gap_pixels):
 
 
 @njit(cache=True, parallel=True)
-def _adc_to_energy_par_jit(res, image, gain, pedestal, mask, factor, gap_pixels):
-    num, size_y, size_x = image.shape
+def _adc_to_energy_par_jit(res, image, gain, pedestal, mask, factor, ry, rx):
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
-    for i1 in prange(num):  # pylint: disable=not-an-iterable
-        for i2 in range(size_y):
-            for i3 in range(size_x):
+    for i1 in prange(image.shape[0]):  # pylint: disable=not-an-iterable
+        for i2, ri2 in enumerate(ry):
+            for i3, ri3 in enumerate(rx):
                 if mask is not None and not mask[i2, i3]:
                     continue
-
-                ri2 = i2 + i2 // CHIP_SIZE_Y * CHIP_GAP_Y * gap_pixels
-                ri3 = i3 + i3 // CHIP_SIZE_X * CHIP_GAP_X * gap_pixels
 
                 if gain is None or pedestal is None:
                     res[i1, ri2, ri3] = image[i1, i2, i3]
                 else:
-                    gm = np.right_shift(image[i1, i2, i3], 14)
+                    gm = np.uint32(np.right_shift(image[i1, i2, i3], 14))
                     val = np.float32(image[i1, i2, i3] & 0x3FFF)
                     tmp_res = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
 
@@ -902,9 +904,8 @@ def _adc_to_energy_par_jit(res, image, gain, pedestal, mask, factor, gap_pixels)
 
 @njit(cache=True)
 def _reshape_stripsel_jit(res, image):
-    num = image.shape[0]
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
-    for ind in prange(num):  # pylint: disable=not-an-iterable
+    for ind in prange(image.shape[0]):  # pylint: disable=not-an-iterable
         # first we fill the normal pixels, the gap ones will be overwritten later
         for yin in range(252):
             for xin in range(1024):
@@ -937,9 +938,8 @@ def _reshape_stripsel_jit(res, image):
 
 @njit(cache=True, parallel=True)
 def _reshape_stripsel_par_jit(res, image):
-    num = image.shape[0]
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
-    for ind in prange(num):  # pylint: disable=not-an-iterable
+    for ind in prange(image.shape[0]):  # pylint: disable=not-an-iterable
         # first we fill the normal pixels, the gap ones will be overwritten later
         for yin in range(252):
             for xin in range(1024):
