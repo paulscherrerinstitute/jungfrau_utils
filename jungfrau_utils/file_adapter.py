@@ -17,7 +17,7 @@ from jungfrau_utils.swissfel_helpers import locate_gain_file, locate_pedestal_fi
 warnings.filterwarnings("default", category=DeprecationWarning)
 
 # bitshuffle hdf5 filter params
-BLOCK_SIZE = 2048
+BLOCK_SIZE = 65536
 compargs = {"compression": H5FILTER, "compression_opts": (BLOCK_SIZE, H5_COMPRESS_LZ4)}
 # limit bitshuffle omp to a single thread
 # a better fix would be to use bitshuffle compiled without omp support
