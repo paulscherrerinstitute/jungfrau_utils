@@ -439,11 +439,9 @@ class File:
                             im = im.ravel()[: np.prod(out_shape)]
 
                         if compression:
-                            byte_array = header + bitshuffle.compress_lz4(im, BLOCK_SIZE).tobytes()
-                        else:
-                            byte_array = im.tobytes()
+                            im = header + bitshuffle.compress_lz4(im, BLOCK_SIZE).tobytes()
 
-                        h5_dest[dset.name].id.write_direct_chunk((pos, 0, 0), byte_array)
+                        h5_dest[dset.name].id.write_direct_chunk((pos, 0, 0), im)
 
                 else:
                     for i, (roi_y1, roi_y2, roi_x1, roi_x2) in enumerate(roi):
