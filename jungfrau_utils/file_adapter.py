@@ -318,10 +318,9 @@ class File:
                 if name.startswith("data"):
                     # datasets with data per image, so indexing should be applied
                     data = dset_source[:] if index is None else dset_source[index, :]
-
-                    h5_dest.create_dataset_like(name, dset_source, data=data, shape=data.shape)
+                    h5_dest.create_dataset(name, data=data)
                 else:
-                    h5_dest.create_dataset_like(name, dset_source, data=dset_source)
+                    h5_dest.create_dataset(name, data=dset_source)
 
             # copy group/dataset attributes (if it's not a dataset with the actual data)
             for key, value in self.file[name].attrs.items():
@@ -349,7 +348,7 @@ class File:
                 if factor is not None:
                     out_dtype = np.dtype(np.int32)
 
-            args = dict()
+            args = {}
             args["dtype"] = out_dtype if dtype is None else dtype
             if compression:
                 args.update(compargs)
@@ -361,7 +360,7 @@ class File:
                 args["shape"] = (n_images, *out_shape)
                 args["chunks"] = (1, *out_shape)
 
-                h5_dest.create_dataset_like(dset.name, dset, **args)
+                h5_dest.create_dataset(dset.name, **args)
 
             else:
                 if len(roi) == 4 and all(isinstance(v, int) for v in roi):
