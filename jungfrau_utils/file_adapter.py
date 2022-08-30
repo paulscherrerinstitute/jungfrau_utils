@@ -274,6 +274,18 @@ class File:
         if roi and downsample:
             raise ValueError("Unsupported mode: roi with downsample.")
 
+        if roi:
+            if len(roi) == 4 and all(isinstance(v, int) for v in roi):
+                # this is a single tuple with coordinates, so wrap it in another tuple
+                roi = (roi,)
+
+            out_shape = self.get_shape_out()
+            for roi_y1, roi_y2, roi_x1, roi_x2 in roi:
+                if roi_y1 >= roi_y2 or roi_x1 >= roi_x2:
+                    raise ValueError("ROI must have corresponding coordinates in ascending order.")
+                if roi_y1 < 0 or roi_y2 >= out_shape[0] or roi_x1 < 0 or roi_x2 >= out_shape[1]:
+                    raise ValueError(f"ROI is outside of resulting image size {out_shape}.")
+
         if index is not None:
             index = np.array(index)  # convert iterable into numpy array
 
@@ -359,10 +371,6 @@ class File:
                 h5_dest.create_dataset(dset.name, **args)
 
             else:
-                if len(roi) == 4 and all(isinstance(v, int) for v in roi):
-                    # this is a single tuple with coordinates, so wrap it in another tuple
-                    roi = (roi,)
-
                 h5_dest.create_dataset(f"{det_path}/n_roi", data=len(roi))
                 for i, (roi_y1, roi_y2, roi_x1, roi_x2) in enumerate(roi):
                     h5_dest.create_dataset(
