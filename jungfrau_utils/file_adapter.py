@@ -323,7 +323,7 @@ class File:
             else:  # isinstance(obj, h5py.Dataset)
                 dset_source = self.file[name]
 
-                if name.startswith("data"):
+                if name.startswith("data") and not name.endswith("pixel_mask"):
                     # datasets with data per image, so indexing should be applied
                     data = dset_source[:] if index is None else dset_source[index, :]
                     h5_dest.create_dataset(name, data=data)
