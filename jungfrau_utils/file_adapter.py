@@ -78,11 +78,11 @@ class File:
 
         self.handler.pedestal_file = pedestal_file
 
-        if "module_map" in self.file[f"data/{self.detector_name}"]:
+        if "module_map" in self._meta_group:
             # Pick only the first row (module_map of the first frame), because it is not expected
             # that module_map ever changes during a run. In fact, it is forseen in the future that
             # this data will be saved as a single row for the whole run.
-            module_map = self.file[f"data/{self.detector_name}/module_map"][0, :]
+            module_map = self._meta_group["module_map"][0, :]
         else:
             module_map = None
 
@@ -92,7 +92,7 @@ class File:
         # value can be different for later pulses and this needs to be taken care of. Currently,
         # _allow_n_images decorator applies a function in a loop, making it impossible to change
         # highgain for separate images in a 3D stack.
-        daq_rec = self.file[f"data/{self.detector_name}/daq_rec"][0]
+        daq_rec = self._data_group["daq_rec"][0]
 
         self.handler.highgain = daq_rec & 0b1
 
@@ -191,11 +191,21 @@ class File:
 
     @property
     def _processed(self):
-        return f"data/{self.detector_name}/conversion_factor" in self.file
+        return "conversion_factor" in self._meta_group
 
     @property
     def _data_dset_name(self):
         return f"data/{self.detector_name}/data"
+
+    @property
+    def _data_group(self):
+        return self.file[f"data/{self.detector_name}"]
+
+    @property
+    def _meta_group(self):
+        if "meta" in self._data_group and isinstance(self._data_group["meta"], h5py.Group):
+            return self._data_group["meta"]
+        return self._data_group
 
     def get_shape_out(self):
         """Return the final image shape of a detector, based on gap_pixel and geometry flags.
@@ -228,7 +238,7 @@ class File:
             ndarray: Resulting pixel mask, where True values correspond to valid pixels.
         """
         if self._processed:
-            return self.file[f"data/{self.detector_name}/pixel_mask"][:]
+            return self._meta_group["pixel_mask"][:]
 
         return self.handler.get_pixel_mask(
             gap_pixels=self.gap_pixels, double_pixels=self.double_pixels, geometry=self.geometry
@@ -342,13 +352,16 @@ class File:
             # traverse the source file and copy/index all datasets, except the raw data
             self.file.visititems(_visititems)
 
+            # create `meta` group
+            meta_path = f"/data/{self.detector_name}/meta"
+            meta_group = h5_dest.create_group(meta_path)
+
             # now process the raw data
-            det_path = f"data/{self.detector_name}"
             dset = self.file[self._data_dset_name]
             n_images = dset.shape[0] if index is None else len(index)
 
             if disabled_modules:
-                h5_dest[f"{det_path}/module_map"] = np.tile(module_map, (n_images, 1))
+                meta_group["module_map"] = np.tile(module_map, (n_images, 1))
 
             pixel_mask = self.get_pixel_mask()
             out_shape = self.get_shape_out()
@@ -367,7 +380,7 @@ class File:
 
             if roi is None:
                 # save a pixel mask
-                h5_dest[f"{det_path}/pixel_mask"] = pixel_mask
+                meta_group["pixel_mask"] = pixel_mask
 
                 args["shape"] = (n_images, *out_shape)
                 args["chunks"] = (1, *out_shape)
@@ -375,18 +388,14 @@ class File:
                 h5_dest.create_dataset(dset.name, **args)
 
             else:
-                h5_dest.create_dataset(f"{det_path}/n_roi", data=len(roi))
+                meta_group["n_roi"] = len(roi)
                 for i, (roi_y1, roi_y2, roi_x1, roi_x2) in enumerate(roi):
-                    h5_dest.create_dataset(
-                        f"{det_path}/roi_{i}",
-                        data=[(roi_y1, roi_y2), (roi_x1, roi_x2)],
-                    )
+                    meta_group[f"roi_{i}"] = [(roi_y1, roi_y2), (roi_x1, roi_x2)]
 
                     # save a pixel mask for ROI
-                    h5_dest.create_dataset(
-                        f"{det_path}/pixel_mask_roi_{i}",
-                        data=pixel_mask[slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)],
-                    )
+                    meta_group[f"pixel_mask_roi_{i}"] = pixel_mask[
+                        slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)
+                    ]
 
                     # prepare ROI datasets
                     roi_shape = (roi_y2 - roi_y1, roi_x2 - roi_x1)
@@ -457,7 +466,7 @@ class File:
 
             # this also sets file as processed
             if self.conversion or self.mask or self.gap_pixels or self.geometry or roi or factor:
-                h5_dest[f"{det_path}/conversion_factor"] = factor or np.NaN
+                meta_group["conversion_factor"] = factor or np.NaN
 
     def __enter__(self):
         return self
@@ -467,8 +476,8 @@ class File:
 
     def __getitem__(self, item):
         if isinstance(item, str):
-            # metadata entry (lazy)
-            return self.file[f"data/{self.detector_name}/{item}"]
+            # per pulse data entry (lazy)
+            return self._data_group[item]
 
         if isinstance(item, tuple):
             # multiple arguments: first is index, the rest is roi
@@ -502,7 +511,7 @@ class File:
 
         if self._processed:
             # recover keV values if there was a factor used upon exporting
-            conversion_factor = self.file[f"data/{self.detector_name}/conversion_factor"]
+            conversion_factor = self._meta_group["conversion_factor"]
             if not np.isnan(conversion_factor):
                 data = np.multiply(data, conversion_factor, dtype=np.float32)
         else:
