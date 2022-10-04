@@ -79,19 +79,18 @@ class File:
         self.handler.pedestal_file = pedestal_file
 
         if "module_map" in self._meta_group:
-            # Pick only the first row (module_map of the first frame), because it is not expected
-            # that module_map ever changes during a run. In fact, it is forseen in the future that
-            # this data will be saved as a single row for the whole run.
-            module_map = self._meta_group["module_map"][0, :]
+            module_map = self._meta_group["module_map"][:]
+            if module_map.ndim == 2:
+                # This is an old format. Pick only the first row (module_map of the first frame),
+                # because it is not expected that module_map ever changes during a run.
+                module_map = module_map[0, :]
         else:
             module_map = None
 
         self.handler.module_map = module_map
 
         # TODO: Here we use daq_rec only of the first pulse within an hdf5 file, however its
-        # value can be different for later pulses and this needs to be taken care of. Currently,
-        # _allow_n_images decorator applies a function in a loop, making it impossible to change
-        # highgain for separate images in a 3D stack.
+        # value can be different for later pulses and this needs to be taken care of.
         daq_rec = self._data_group["daq_rec"][0]
 
         self.handler.highgain = daq_rec & 0b1
@@ -361,7 +360,7 @@ class File:
             n_images = dset.shape[0] if index is None else len(index)
 
             if disabled_modules:
-                meta_group["module_map"] = np.tile(module_map, (n_images, 1))
+                meta_group["module_map"] = module_map
 
             pixel_mask = self.get_pixel_mask()
             out_shape = self.get_shape_out()
