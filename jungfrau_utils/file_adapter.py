@@ -313,9 +313,13 @@ class File:
 
         # a function for 'visititems' should have the args (name, object)
         def _visititems(name, obj):
-            if isinstance(obj, h5py.Dataset) and name == self._data_dset_name:
-                # skip dataset with raw data
-                return
+            if isinstance(obj, h5py.Dataset):
+                if (
+                    name == self._data_dset_name
+                    or name.endswith("frame_index")
+                    or (self.conversion and name.endswith("daq_rec"))
+                ):
+                    return
 
             if isinstance(obj, h5py.Group):
                 h5_dest.create_group(name)
