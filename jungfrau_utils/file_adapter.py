@@ -324,6 +324,7 @@ class File:
         if index is not None:
             index = np.array(index)  # convert iterable into numpy array
 
+        _factor = self.handler.factor
         if downsample:
             # factor division and rounding should occur after downsampling, so we do it not via
             # JFDataHandler
@@ -331,6 +332,7 @@ class File:
         else:
             self.handler.factor = factor
 
+        _module_map = self.handler.module_map
         if disabled_modules:
             if -1 in self.handler.module_map:
                 raise ValueError("Can not disable modules when file contains disabled modules.")
@@ -499,6 +501,10 @@ class File:
                     for i, (roi_y1, roi_y2, roi_x1, roi_x2) in enumerate(roi):
                         roi_data = out_buffer_view[:, slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)]
                         h5_dest[f"/data/{self.detector_name}:ROI_{i}/data"][batch_range] = roi_data
+
+        # restore original factor and module_map
+        self.handler.factor = _factor
+        self.handler.module_map = _module_map
 
     def __enter__(self):
         return self
