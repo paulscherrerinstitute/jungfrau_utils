@@ -66,7 +66,9 @@ class File:
                     detector_name = group_name
                     break
 
-        self.handler = JFDataHandler(detector_name)
+        # placeholders for processed files
+        self.handler = None
+        self._detector_name = detector_name
 
         self._conversion = conversion
         self._mask = mask
@@ -78,6 +80,8 @@ class File:
         # No need for any further setup if the file is already processed
         if self._processed:
             return
+
+        self.handler = JFDataHandler(detector_name)
 
         # Gain file
         if not gain_file:
@@ -111,16 +115,25 @@ class File:
     @property
     def detector_name(self):
         """Detector name (readonly)."""
+        if self.handler is None:
+            return self._detector_name
+
         return self.handler.detector_name
 
     @property
     def gain_file(self):
         """Gain file path (readonly)."""
+        if self.handler is None:
+            return ""
+
         return self.handler.gain_file
 
     @property
     def pedestal_file(self):
         """Pedestal file path (readonly)."""
+        if self.handler is None:
+            return ""
+
         return self.handler.pedestal_file
 
     @property
