@@ -310,7 +310,7 @@ def test_file_export_roi1(file_adapter, tmpdir_factory):
     file_adapter.export(exported_file, roi=roi)
 
     with h5py.File(exported_file, "r") as h5f:
-        res = h5f[f"/data/{DETECTOR_NAME}/data_roi_0"]
+        res = h5f[f"/data/{DETECTOR_NAME}:ROI_0/data"]
         assert np.allclose(res[:], converted_image_stack_mask[:, :256, :256])
 
 
@@ -320,7 +320,7 @@ def test_file_export_roi2(file_adapter, tmpdir_factory):
     file_adapter.export(exported_file, roi=roi)
 
     with h5py.File(exported_file, "r") as h5f:
-        res = h5f[f"/data/{DETECTOR_NAME}/data_roi_0"]
+        res = h5f[f"/data/{DETECTOR_NAME}:ROI_0/data"]
         assert np.allclose(res[:], converted_image_stack_mask[:, :256, :256])
 
 
@@ -330,8 +330,8 @@ def test_file_export_roi3(file_adapter, tmpdir_factory):
     file_adapter.export(exported_file, roi=roi)
 
     with h5py.File(exported_file, "r") as h5f:
-        res = h5f[f"/data/{DETECTOR_NAME}/data_roi_0"]
+        res = h5f[f"/data/{DETECTOR_NAME}:ROI_0/data"]
         assert np.allclose(res[:], converted_image_stack_mask[:, :256, :256])
 
-        res = h5f[f"/data/{DETECTOR_NAME}/data_roi_1"]
+        res = h5f[f"/data/{DETECTOR_NAME}:ROI_1/data"]
         assert np.allclose(res[:], converted_image_stack_mask[:, 16:32, 64:128])

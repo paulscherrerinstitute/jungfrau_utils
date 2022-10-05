@@ -362,6 +362,10 @@ class File:
             if disabled_modules:
                 meta_group["module_map"] = module_map
 
+            # this also sets detector group (channel) as processed
+            if self.conversion or self.mask or self.gap_pixels or self.geometry or roi or factor:
+                meta_group["conversion_factor"] = factor or np.NaN
+
             pixel_mask = self.get_pixel_mask()
             out_shape = self.get_shape_out()
             out_dtype = self.get_dtype_out()
@@ -378,7 +382,6 @@ class File:
                 args.update(compargs)
 
             if roi is None:
-                # save a pixel mask
                 meta_group["pixel_mask"] = pixel_mask
 
                 args["shape"] = (n_images, *out_shape)
@@ -387,22 +390,30 @@ class File:
                 h5_dest.create_dataset(dset.name, **args)
 
             else:
-                meta_group["n_roi"] = len(roi)
+                # replace the full detector data group with per ROI data groups
                 for i, (roi_y1, roi_y2, roi_x1, roi_x2) in enumerate(roi):
-                    meta_group[f"roi_{i}"] = [(roi_y1, roi_y2), (roi_x1, roi_x2)]
+                    h5_dest.copy(
+                        source=h5_dest[f"/data/{self.detector_name}"],
+                        dest=h5_dest["/data"],
+                        name=f"/data/{self.detector_name}:ROI_{i}",
+                    )
 
-                    # save a pixel mask for ROI
-                    meta_group[f"pixel_mask_roi_{i}"] = pixel_mask[
+                    roi_data_group = h5_dest[f"/data/{self.detector_name}:ROI_{i}"]
+                    roi_meta_group = roi_data_group["meta"]
+
+                    roi_meta_group["roi"] = [(roi_y1, roi_y2), (roi_x1, roi_x2)]
+                    roi_meta_group["pixel_mask"] = pixel_mask[
                         slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)
                     ]
 
-                    # prepare ROI datasets
                     roi_shape = (roi_y2 - roi_y1, roi_x2 - roi_x1)
 
                     args["shape"] = (n_images, *roi_shape)
                     args["chunks"] = (1, *roi_shape)
 
-                    h5_dest.create_dataset(f"{dset.name}_roi_{i}", **args)
+                    roi_data_group.create_dataset("data", **args)
+
+                del h5_dest[f"/data/{self.detector_name}"]
 
             # prepare buffers to be reused for every batch
             read_buffer = np.empty((batch_size, *dset.shape[-2:]), dtype=dset.dtype)
@@ -461,11 +472,7 @@ class File:
                 else:
                     for i, (roi_y1, roi_y2, roi_x1, roi_x2) in enumerate(roi):
                         roi_data = out_buffer_view[:, slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)]
-                        h5_dest[f"{dset.name}_roi_{i}"][batch_range] = roi_data
-
-            # this also sets file as processed
-            if self.conversion or self.mask or self.gap_pixels or self.geometry or roi or factor:
-                meta_group["conversion_factor"] = factor or np.NaN
+                        h5_dest[f"/data/{self.detector_name}:ROI_{i}/data"][batch_range] = roi_data
 
     def __enter__(self):
         return self
