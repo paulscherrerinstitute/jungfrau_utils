@@ -290,8 +290,10 @@ class File:
                 processing. Defaults to ().
             index (iterable, optional): An iterable with indexes of images to be exported.
                 Export all images if None. Defaults to None.
-            roi (tuple, optional): A single tuple, or a tuple of tuples with image ROIs in a form
-                (bottom, top, left, right). Export whole images if None. Defaults to None.
+            roi (tuple or dict, optional): A single tuple, or a tuple of tuples with image ROIs in
+                a form (bottom, top, left, right), or a dict where each key is a ROI label and
+                a corresponding value is a tuple with ROI coordinates. Export whole images if None.
+                Defaults to None.
             downsample (bool, optional): Reduce image size in 2x2 pixel blocks, resulting in a sum
                 of corresponding pixels. Defaults to False.
             compression (bool, optional): Apply bitshuffle+lz4 compression. Defaults to False.
@@ -310,9 +312,15 @@ class File:
             raise ValueError("Unsupported mode: roi with downsample.")
 
         if roi:
-            if len(roi) == 4 and all(isinstance(v, int) for v in roi):
+            if isinstance(roi, tuple) and len(roi) == 4 and all(isinstance(v, int) for v in roi):
                 # this is a single tuple with coordinates, so wrap it in another tuple
                 roi = (roi,)
+
+            if isinstance(roi, dict):
+                roi_labels = roi.keys()
+                roi = roi.values()
+            else:
+                roi_labels = range(len(roi))
 
             out_shape = self.get_shape_out()
             for roi_y1, roi_y2, roi_x1, roi_x2 in roi:
@@ -419,14 +427,14 @@ class File:
 
             else:
                 # replace the full detector data group with per ROI data groups
-                for i, (roi_y1, roi_y2, roi_x1, roi_x2) in enumerate(roi):
+                for l, (roi_y1, roi_y2, roi_x1, roi_x2) in zip(roi_labels, roi):
                     h5_dest.copy(
                         source=h5_dest[f"/data/{self.detector_name}"],
                         dest=h5_dest["/data"],
-                        name=f"/data/{self.detector_name}:ROI_{i}",
+                        name=f"/data/{self.detector_name}:ROI_{l}",
                     )
 
-                    roi_data_group = h5_dest[f"/data/{self.detector_name}:ROI_{i}"]
+                    roi_data_group = h5_dest[f"/data/{self.detector_name}:ROI_{l}"]
                     roi_meta_group = roi_data_group["meta"]
 
                     roi_meta_group["roi"] = [(roi_y1, roi_y2), (roi_x1, roi_x2)]
@@ -498,9 +506,9 @@ class File:
                         h5_dest[dset.name].id.write_direct_chunk((pos, 0, 0), im)
 
                 else:
-                    for i, (roi_y1, roi_y2, roi_x1, roi_x2) in enumerate(roi):
+                    for l, (roi_y1, roi_y2, roi_x1, roi_x2) in zip(roi_labels, roi):
                         roi_data = out_buffer_view[:, slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)]
-                        h5_dest[f"/data/{self.detector_name}:ROI_{i}/data"][batch_range] = roi_data
+                        h5_dest[f"/data/{self.detector_name}:ROI_{l}/data"][batch_range] = roi_data
 
         # restore original factor and module_map
         self.handler.factor = _factor
