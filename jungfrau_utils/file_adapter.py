@@ -1,5 +1,4 @@
 import numbers
-import re
 import struct
 import warnings
 from itertools import islice
@@ -26,9 +25,9 @@ class File:
 
     Args:
         file_path (str): Path to Jungfrau file
-        detector_name (str, optional): Name of a detector, which data should be processed (if there
-            are multiple detector's data present in the file). If empty, take the first group name
-            that matches the detector name format ``JF<id>T<nmod>V<version>``. Defaults to ''.
+        detector_name (str, optional): Name of a detector, which data should be processed if there
+            are multiple detector's data present in the file. If empty, the file must contain data
+            for a single detector only. Defaults to ''.
         gain_file (str, optional): Path to gain file. Auto-locate if empty. Defaults to ''.
         pedestal_file (str, optional): Path to pedestal file. Auto-locate if empty. Defaults to ''.
         conversion (bool, optional): Apply gain conversion and pedestal correction.
@@ -59,12 +58,20 @@ class File:
         self.file = h5py.File(self.file_path, "r")
 
         if not detector_name:
-            # find out which detector's data is present and use the first detected
-            pattern = re.compile(r"JF\d{2}T\d{2}V\d{2}")
-            for group_name in self.file["/data"]:
-                if pattern.fullmatch(group_name):
-                    detector_name = group_name
-                    break
+            n_groups = 0
+            for name, obj in self.file["/data"].items():
+                if isinstance(obj, h5py.Group):
+                    n_groups += 1
+                    detector_name = name
+
+            # raise an exception if n_groups != 1
+            if n_groups == 0:
+                raise Exception("File doesn't contain detector data.")
+
+            if n_groups > 1:
+                raise Exception(
+                    "Specify `detector_name` as the file contains data for multiple detectors."
+                )
 
         # placeholders for processed files
         self.handler = None
