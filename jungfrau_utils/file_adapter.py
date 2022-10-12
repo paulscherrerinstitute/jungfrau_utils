@@ -404,8 +404,7 @@ class File:
             dset = self.file[self._data_dset_name]
             n_images = dset.shape[0] if index is None else len(index)
 
-            if disabled_modules:
-                meta_group["module_map"] = module_map
+            meta_group["module_map"] = self.handler.module_map
 
             # this also sets detector group (channel) as processed
             if self.conversion or self.mask or self.gap_pixels or self.geometry or roi or factor:
