@@ -400,15 +400,21 @@ class File:
             meta_path = f"/data/{self.detector_name}/meta"
             meta_group = h5_dest.create_group(meta_path)
 
-            # now process the raw data
-            dset = self.file[self._data_dset_name]
-            n_images = dset.shape[0] if index is None else len(index)
-
+            # save processing parameters in `meta`
             meta_group["module_map"] = self.handler.module_map
+            meta_group["conversion"] = self.conversion
+            meta_group["mask"] = self.mask
+            meta_group["gap_pixels"] = self.gap_pixels
+            meta_group["double_pixels"] = self.double_pixels
+            meta_group["geometry"] = self.geometry
 
             # this also sets detector group (channel) as processed
             if self.conversion or self.mask or self.gap_pixels or self.geometry or roi or factor:
                 meta_group["conversion_factor"] = factor or np.NaN
+
+            # now process the raw data
+            dset = self.file[self._data_dset_name]
+            n_images = dset.shape[0] if index is None else len(index)
 
             pixel_mask = self.get_pixel_mask()
             out_shape = self.get_shape_out()
