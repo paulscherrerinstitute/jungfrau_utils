@@ -17,10 +17,10 @@ requirements:
         - setuptools
     run:
         - python >=3.7
-        - h5py >=2.10,<=3.6
+        - h5py >=2.10,<4
         - numpy
         - numba
-        - bitshuffle
+        - bitshuffle >=0.3.5,<0.4
 
 test:
     source_files:
