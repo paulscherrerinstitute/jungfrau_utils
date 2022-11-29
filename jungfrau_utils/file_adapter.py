@@ -369,7 +369,6 @@ class File:
                 if (
                     name == self._data_dset_name
                     or name.endswith("frame_index")
-                    or (self.conversion and name.endswith("daq_rec"))
                     or name == f"data/{self.detector_name}/module_map"
                     or name == f"data/{self.detector_name}/pixel_mask"
                 ):
