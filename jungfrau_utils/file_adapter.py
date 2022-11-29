@@ -128,10 +128,7 @@ class File:
     @property
     def detector_name(self):
         """Detector name (readonly)."""
-        if self.handler is None:
-            return self._detector_name
-
-        return self.handler.detector_name
+        return self._detector_name
 
     @property
     def gain_file(self):
@@ -232,8 +229,8 @@ class File:
         return "conversion_factor" in self._meta_group
 
     @property
-    def _data_dset_name(self):
-        return f"data/{self.detector_name}/data"
+    def _data_dset(self):
+        return self.file[f"data/{self.detector_name}/data"]
 
     @property
     def _data_group(self):
@@ -252,7 +249,7 @@ class File:
             tuple: Height and width of a resulting image.
         """
         if self._processed:
-            return self.file[self._data_dset_name].shape[-2:]
+            return self._data_dset.shape[-2:]
 
         return self.handler.get_shape_out(gap_pixels=self.gap_pixels, geometry=self.geometry)
 
@@ -263,11 +260,9 @@ class File:
             dtype: dtype of a resulting image.
         """
         if self._processed:
-            return self.file[self._data_dset_name].dtype
+            return self._data_dset.dtype
 
-        return self.handler.get_dtype_out(
-            self.file[self._data_dset_name].dtype, conversion=self.conversion
-        )
+        return self.handler.get_dtype_out(self._data_dset.dtype, conversion=self.conversion)
 
     def get_pixel_mask(self):
         """Return pixel mask, shaped according to gap_pixel and geometry flags.
@@ -373,7 +368,7 @@ class File:
         def _visititems(name, obj):
             if isinstance(obj, h5py.Dataset):
                 if (
-                    name == self._data_dset_name
+                    name == f"data/{self.detector_name}/data"
                     or name.endswith("frame_index")
                     or name == f"data/{self.detector_name}/module_map"
                     or name == f"data/{self.detector_name}/pixel_mask"
@@ -420,7 +415,7 @@ class File:
                 meta_group["conversion_factor"] = factor or np.NaN
 
             # now process the raw data
-            dset = self.file[self._data_dset_name]
+            dset = self._data_dset
             n_images = dset.shape[0] if index is None else len(index)
 
             pixel_mask = self.get_pixel_mask()
@@ -565,7 +560,7 @@ class File:
         else:
             raise TypeError("Unknown index type")
 
-        dset = self.file[self._data_dset_name]
+        dset = self._data_dset
         if is_index_consecutive:
             data = dset[ind]
         else:
