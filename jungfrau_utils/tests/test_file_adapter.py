@@ -62,6 +62,7 @@ def _jungfrau_file(tmpdir_factory):
         h5f["/general/detector_name"] = bytes(DETECTOR_NAME, encoding='utf-8')
         h5f[f"/data/{DETECTOR_NAME}/daq_rec"] = 3840 * np.ones((STACK_SHAPE[0], 1)).astype(np.int64)
         h5f[f"/data/{DETECTOR_NAME}/data"] = image_stack
+        h5f[f"/data/{DETECTOR_NAME}/is_good_frame"] = np.ones((STACK_SHAPE[0], 1)).astype(bool)
 
     return jungfrau_file
 
