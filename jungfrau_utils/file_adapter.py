@@ -116,8 +116,12 @@ class File:
         # TODO: Here we use daq_rec only of the first pulse, where is_good_frame is True, within
         # an hdf5 file, however its value can be different for later pulses and this needs to be
         # taken care of.
-        first_good_frame_idx = np.nonzero(self._data_group["is_good_frame"])[0][0]
-        daq_rec = self._data_group["daq_rec"][first_good_frame_idx]
+        good_frame_idx = np.nonzero(self._data_group["is_good_frame"])[0]
+        if good_frame_idx.size > 0:
+            daq_rec = self._data_group["daq_rec"][good_frame_idx[0]]
+        else:
+            warnings.warn("The file doesn't contain good frames. Highgain is set to False.")
+            daq_rec = 0
 
         self.handler.highgain = daq_rec & 0b1
 
