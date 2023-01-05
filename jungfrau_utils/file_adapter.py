@@ -2,7 +2,6 @@ import numbers
 import struct
 import warnings
 from itertools import islice
-from pathlib import Path
 
 import bitshuffle
 import h5py
@@ -58,8 +57,7 @@ class File:
         geometry=True,
         parallel=True,
     ):
-        self.file_path = Path(file_path)
-        self.file = h5py.File(self.file_path, "r")
+        self.file = h5py.File(file_path, "r")
 
         if not detector_name:
             detector_name = get_single_detector_name(file_path)
@@ -587,7 +585,7 @@ class File:
 
     def __repr__(self):
         if self.file.id:
-            r = f'<Jungfrau file "{self.file_path.name}">'
+            r = f'<Jungfrau file "{self.file.filename}">'
         else:
             r = "<Closed Jungfrau file>"
         return r
