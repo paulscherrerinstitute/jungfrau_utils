@@ -556,7 +556,8 @@ class JFDataHandler:
         n_images, image_shape = images.shape[0], images.shape[1:]
         if image_shape not in (self._shape_in, self._shape_in_full):
             raise ValueError(
-                f"Expected image shape {self._shape_in} or {self._shape_in_full}, provided {image_shape}."
+                f"Expected image shape {self._shape_in} or {self._shape_in_full}, "
+                f"provided {image_shape}."
             )
 
         if conversion and not self.can_convert():

@@ -59,7 +59,7 @@ def _jungfrau_file(tmpdir_factory):
     jungfrau_file = tmpdir_factory.mktemp("data").join("test_jf.h5")
 
     with h5py.File(jungfrau_file, "w") as h5f:
-        h5f["/general/detector_name"] = bytes(DETECTOR_NAME, encoding='utf-8')
+        h5f["/general/detector_name"] = bytes(DETECTOR_NAME, encoding="utf-8")
         h5f[f"/data/{DETECTOR_NAME}/daq_rec"] = 3840 * np.ones((STACK_SHAPE[0], 1)).astype(np.int64)
         h5f[f"/data/{DETECTOR_NAME}/data"] = image_stack
         h5f[f"/data/{DETECTOR_NAME}/is_good_frame"] = np.ones((STACK_SHAPE[0], 1)).astype(bool)
@@ -316,7 +316,7 @@ def test_file_export_roi1(file_adapter, tmpdir_factory):
 
 
 def test_file_export_roi2(file_adapter, tmpdir_factory):
-    roi = ((0, 256, 0, 256), )
+    roi = ((0, 256, 0, 256),)
     exported_file = tmpdir_factory.mktemp("export").join("test.h5")
     file_adapter.export(exported_file, roi=roi)
 
