@@ -11,7 +11,11 @@ from bitshuffle.h5 import H5_COMPRESS_LZ4, H5FILTER  # pylint: disable=no-name-i
 from numba import njit, prange
 
 from jungfrau_utils.data_handler import JFDataHandler
-from jungfrau_utils.swissfel_helpers import locate_gain_file, locate_pedestal_file
+from jungfrau_utils.swissfel_helpers import (
+    get_single_detector_name,
+    locate_gain_file,
+    locate_pedestal_file,
+)
 
 warnings.filterwarnings("default", category=DeprecationWarning)
 
@@ -26,7 +30,7 @@ class File:
     Args:
         file_path (str): Path to Jungfrau file
         detector_name (str, optional): Name of a detector, which data should be processed if there
-            are multiple detector's data present in the file. If empty, the file must contain data
+            are multiple detectors' data present in the file. If empty, the file must contain data
             for a single detector only. Defaults to ''.
         gain_file (str, optional): Path to gain file. Auto-locate if empty. Defaults to ''.
         pedestal_file (str, optional): Path to pedestal file. Auto-locate if empty. Defaults to ''.
@@ -58,20 +62,7 @@ class File:
         self.file = h5py.File(self.file_path, "r")
 
         if not detector_name:
-            n_groups = 0
-            for name, obj in self.file["/data"].items():
-                if isinstance(obj, h5py.Group):
-                    n_groups += 1
-                    detector_name = name
-
-            # raise an exception if n_groups != 1
-            if n_groups == 0:
-                raise Exception("File doesn't contain detector data.")
-
-            if n_groups > 1:
-                raise Exception(
-                    "Specify `detector_name` as the file contains data for multiple detectors."
-                )
+            detector_name = get_single_detector_name(file_path)
 
         # placeholders for processed files
         self.handler = None
@@ -92,13 +83,13 @@ class File:
 
         # Gain file
         if not gain_file:
-            gain_file = locate_gain_file(file_path)
+            gain_file = locate_gain_file(file_path, detector_name=detector_name)
 
         self.handler.gain_file = gain_file
 
         # Pedestal file (with a pixel mask)
         if not pedestal_file:
-            pedestal_file = locate_pedestal_file(file_path)
+            pedestal_file = locate_pedestal_file(file_path, detector_name=detector_name)
 
         self.handler.pedestal_file = pedestal_file
 

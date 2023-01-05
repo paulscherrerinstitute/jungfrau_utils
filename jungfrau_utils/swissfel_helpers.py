@@ -1,17 +1,20 @@
-from datetime import timedelta, datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import h5py
 
 
-def locate_gain_file(file_path, *, verbose=True):
+def locate_gain_file(file_path, *, detector_name="", verbose=True):
     """Locate gain file in default location at swissfel.
 
     The default gain file location is
     `/sf/jungfrau/config/gainMaps/<detector>/gains.h5``.
 
     Args:
-        file_path (str or Path): File path of a jungfrau data file.
+        file_path (str): File path of a jungfrau data file.
+        detector_name (str, optional): Name of a detector, which gain file should be located if
+            there are multiple detectors' data present in the file. If empty, the file must contain
+            data for a single detector only. Defaults to ''.
         verbose (bool, optional): Print info about located gain file.
 
     Returns:
@@ -21,7 +24,8 @@ def locate_gain_file(file_path, *, verbose=True):
     if file_path.parts[1] != "sf":
         raise Exception("Gain file needs to be specified explicitly.")
 
-    detector_name = _read_detector_name(file_path)
+    if not detector_name:
+        detector_name = get_single_detector_name(file_path)
 
     gain_path = Path("/sf/jungfrau/config/gainMaps/")
     gain_file = gain_path.joinpath(detector_name, "gains.h5")
@@ -35,7 +39,7 @@ def locate_gain_file(file_path, *, verbose=True):
     return gain_file.as_posix()
 
 
-def locate_pedestal_file(file_path, *, verbose=True):
+def locate_pedestal_file(file_path, *, detector_name="", verbose=True):
     """Locate pedestal file in default location at swissfel.
 
     The default pedestal file paths for a particula p-group are
@@ -44,7 +48,10 @@ def locate_pedestal_file(file_path, *, verbose=True):
     ``/sf/<beamline>/data/<p-group>/raw/JF_pedestals/`` (new daq).
 
     Args:
-        file_path (str or Path): File path of a jungfrau data file.
+        file_path (str): File path of a jungfrau data file.
+        detector_name (str, optional): Name of a detector, which pedestal file should be located if
+            there are multiple detectors' data present in the file. If empty, the file must contain
+            data for a single detector only. Defaults to ''.
         verbose (bool, optional): Print info about located pedestal file.
 
     Returns:
@@ -52,9 +59,10 @@ def locate_pedestal_file(file_path, *, verbose=True):
     """
     file_path = Path(file_path)
     if file_path.parts[1] != "sf":
-        raise Exception(f"Pedestal file needs to be specified explicitly.")
+        raise Exception("Pedestal file needs to be specified explicitly.")
 
-    detector_name = _read_detector_name(file_path)
+    if not detector_name:
+        detector_name = get_single_detector_name(file_path)
 
     pedestal_paths = (
         Path(*file_path.parts[:5]).joinpath("res", "JF_pedestals"),
@@ -96,8 +104,29 @@ def locate_pedestal_file(file_path, *, verbose=True):
     return closest_pedestal_file.as_posix()
 
 
-def _read_detector_name(file_path):
+def get_single_detector_name(file_path):
+    """Get detector name from file that contains only single detector data.
+
+    Args:
+        file_path (str): File path of a jungfrau data file.
+
+    Returns:
+        str: Name of single detector in file.
+    """
     with h5py.File(file_path, "r") as h5f:
-        detector_name = h5f["/general/detector_name"][()].decode()
+        n_groups = 0
+        for name, obj in h5f["/data"].items():
+            if isinstance(obj, h5py.Group):
+                n_groups += 1
+                detector_name = name
+
+        # raise an exception if n_groups != 1
+        if n_groups == 0:
+            raise Exception("File doesn't contain detector data.")
+
+        if n_groups > 1:
+            raise Exception(
+                "Specify `detector_name` as the file contains data for multiple detectors."
+            )
 
     return detector_name

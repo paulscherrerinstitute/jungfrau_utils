@@ -1,7 +1,11 @@
 import h5py
 
 from jungfrau_utils.data_handler import JFDataHandler
-from jungfrau_utils.swissfel_helpers import locate_gain_file, locate_pedestal_file
+from jungfrau_utils.swissfel_helpers import (
+    get_single_detector_name,
+    locate_gain_file,
+    locate_pedestal_file,
+)
 
 
 class EscapeAdapter:
@@ -10,13 +14,18 @@ class EscapeAdapter:
     Args:
         file_path (str): Path to Jungfrau file, which metadata should be used for jungfrau data
             handler setup.
+        detector_name (str, optional): Name of a detector, which data should be processed if there
+            are multiple detectors' data present in the file. If empty, the file must contain data
+            for a single detector only. Defaults to ''.
         gain_file (str, optional): Path to gain file. Auto-locate if empty. Defaults to "".
         pedestal_file (str, optional): Path to pedestal file. Auto-locate if empty. Defaults to "".
     """
 
-    def __init__(self, file_path, *, gain_file="", pedestal_file=""):
+    def __init__(self, file_path, *, detector_name="", gain_file="", pedestal_file=""):
+        if not detector_name:
+            detector_name = get_single_detector_name(file_path)
+
         with h5py.File(file_path, "r") as h5f:
-            detector_name = h5f["/general/detector_name"][()].decode()
             self.handler = JFDataHandler(detector_name)
 
             if "module_map" in h5f[f"/data/{detector_name}"]:
@@ -36,13 +45,13 @@ class EscapeAdapter:
 
         # Gain file
         if not gain_file:
-            gain_file = locate_gain_file(file_path)
+            gain_file = locate_gain_file(file_path, detector_name=detector_name)
 
         self.handler.gain_file = gain_file
 
         # Pedestal file (with a pixel mask)
         if not pedestal_file:
-            pedestal_file = locate_pedestal_file(file_path)
+            pedestal_file = locate_pedestal_file(file_path, detector_name=detector_name)
 
         self.handler.pedestal_file = pedestal_file
 
