@@ -1,5 +1,5 @@
-import pytest
 import numpy as np
+import pytest
 
 from jungfrau_utils import JFDataHandler
 
@@ -78,7 +78,7 @@ def test_handler_init(empty_handler):
     assert empty_handler.gain is None
     assert empty_handler.pixel_mask is None
 
-    assert empty_handler.is_stripsel()
+    assert empty_handler.detector_geometry.is_stripsel
 
 
 def test_handler_set_gain(empty_handler):

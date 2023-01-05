@@ -115,6 +115,13 @@ class File:
         self.handler.highgain = daq_rec & 0b1
 
     @property
+    def file_path(self):
+        warnings.warn(
+            "file_path is deprecated and will be removed in jungfrau_utils/4.0", DeprecationWarning
+        )
+        return self.file.filename
+
+    @property
     def detector_name(self):
         """Detector name (readonly)."""
         return self._detector_name

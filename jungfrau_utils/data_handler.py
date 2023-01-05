@@ -9,6 +9,8 @@ from numba import njit, prange
 
 from jungfrau_utils.geometry import detector_geometry
 
+warnings.filterwarnings("default", category=DeprecationWarning)
+
 CHIP_SIZE_X = 256
 CHIP_SIZE_Y = 256
 
@@ -78,6 +80,10 @@ class JFDataHandler:
 
     def is_stripsel(self):
         """Return true if detector is a stripsel."""
+        warnings.warn(
+            "is_stripsel() is deprecated and will be removed in jungfrau_utils/4.0",
+            DeprecationWarning,
+        )
         return self.detector_geometry.is_stripsel
 
     @property
@@ -240,7 +246,7 @@ class JFDataHandler:
         self._mask_all[False] = mask.copy()
 
         # original + double pixels mask -> self._mask_all[True]
-        if not self.is_stripsel():
+        if not self.detector_geometry.is_stripsel:
             for m in range(self.detector.n_modules):
                 module_mask = self._get_module_slice(mask, m)
                 for n in range(1, CHIP_NUM_X):
@@ -349,7 +355,7 @@ class JFDataHandler:
         Returns:
             tuple: Height and width of a resulting image.
         """
-        if self.is_stripsel():
+        if self.detector_geometry.is_stripsel:
             return self._get_stripsel_shape_out(geometry=geometry)
 
         if geometry:
@@ -573,11 +579,11 @@ class JFDataHandler:
         if double_pixels == "interp" and self.factor is not None:
             raise ValueError("Unsupported mode: double_pixels='interp' with a factor value.")
 
-        if self.is_stripsel() and gap_pixels:
+        if self.detector_geometry.is_stripsel and gap_pixels:
             warnings.warn("'gap_pixels' flag has no effect on stripsel detectors", RuntimeWarning)
             gap_pixels = False
 
-        if self.is_stripsel() and double_pixels != "keep":
+        if self.detector_geometry.is_stripsel and double_pixels != "keep":
             warnings.warn(
                 "Handling double pixels has no effect on stripsel detectors", RuntimeWarning
             )
@@ -632,7 +638,7 @@ class JFDataHandler:
             oy, oy_end, ox, ox_end, rot90 = self._get_module_coords(m, i, geometry, gap_pixels)
             mod_out = out[:, oy:oy_end, ox:ox_end]
 
-            if self.is_stripsel() and geometry:
+            if self.detector_geometry.is_stripsel and geometry:
                 mod_tmp_shape = (n_images, MODULE_SIZE_Y, MODULE_SIZE_X)
                 mod_tmp_dtype = self.get_dtype_out(images.dtype, conversion=conversion)
                 mod_tmp = np.zeros(shape=mod_tmp_shape, dtype=mod_tmp_dtype)
@@ -678,11 +684,11 @@ class JFDataHandler:
         if double_pixels == "interp" and not gap_pixels:
             raise RuntimeError("Double pixel interpolation requires 'gap_pixels' to be True.")
 
-        if self.is_stripsel() and gap_pixels:
+        if self.detector_geometry.is_stripsel and gap_pixels:
             warnings.warn("'gap_pixels' flag has no effect on stripsel detectors", RuntimeWarning)
             gap_pixels = False
 
-        if self.is_stripsel() and double_pixels != "keep":
+        if self.detector_geometry.is_stripsel and double_pixels != "keep":
             warnings.warn(
                 "Handling double pixels has no effect on stripsel detectors", RuntimeWarning
             )
@@ -709,7 +715,7 @@ class JFDataHandler:
 
             oy, oy_end, ox, ox_end, rot90 = self._get_module_coords(m, i, geometry, gap_pixels)
             mod_res = res[:, oy:oy_end, ox:ox_end]
-            if self.is_stripsel() and geometry:
+            if self.detector_geometry.is_stripsel and geometry:
                 _reshape_stripsel_jit(mod_res, mod)
             else:
                 mod_res = np.rot90(mod_res, k=-rot90, axes=(1, 2))
@@ -729,7 +735,7 @@ class JFDataHandler:
         geometry=False), but the coordinates represent pixel positions after gap_pixel and geometry
         corrections (gap_pixels=True, double_pixels="keep", geometry=True).
         """
-        if self.detector_geometry.is_stripsel is True:
+        if self.detector_geometry.is_stripsel:
             raise RuntimeError("Stripsel detectors are currently unsupported.")
 
         if any(self.detector_geometry.mod_rot90):
