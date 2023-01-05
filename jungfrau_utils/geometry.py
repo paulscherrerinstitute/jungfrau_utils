@@ -1,15 +1,17 @@
 from dataclasses import dataclass
 from typing import Tuple
 
+
 @dataclass
 class DetectorGeometry:
-    origin_y: Tuple[int] = (0, )
-    origin_x: Tuple[int] = (0, )
+    origin_y: Tuple[int] = (0,)
+    origin_x: Tuple[int] = (0,)
     is_stripsel: bool = False
     det_rot90: int = 0
-    mod_rot90: Tuple[int] = (0, )
+    mod_rot90: Tuple[int] = (0,)
 
 
+# fmt: off
 detector_geometry = {
     "JF01T03V01": DetectorGeometry(
         origin_y=(0, 520, 1040),
@@ -207,3 +209,4 @@ detector_geometry = {
         ),
     ),
 }
+# fmt: on
