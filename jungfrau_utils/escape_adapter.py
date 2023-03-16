@@ -1,4 +1,7 @@
+import warnings
+
 import h5py
+import numpy as np
 
 from jungfrau_utils.data_handler import JFDataHandler
 from jungfrau_utils.swissfel_helpers import (
@@ -6,6 +9,8 @@ from jungfrau_utils.swissfel_helpers import (
     locate_gain_file,
     locate_pedestal_file,
 )
+
+warnings.filterwarnings("default", category=DeprecationWarning)
 
 
 class EscapeAdapter:
@@ -25,23 +30,7 @@ class EscapeAdapter:
         if not detector_name:
             detector_name = get_single_detector_name(file_path)
 
-        with h5py.File(file_path, "r") as h5f:
-            self.handler = JFDataHandler(detector_name)
-
-            if "module_map" in h5f[f"/data/{detector_name}"]:
-                # Pick only the first row (module_map of the first frame), because it is not
-                # expected that module_map ever changes during a run. In fact, it is forseen in the
-                # future that this data will be saved as a single row for the whole run.
-                module_map = h5f[f"/data/{detector_name}/module_map"][0, :]
-            else:
-                module_map = None
-
-            self.handler.module_map = module_map
-
-            # TODO: Here we use daq_rec only of the first pulse within an hdf5 file, however its
-            # value can be different for later pulses and this needs to be taken care of.
-            daq_rec = h5f[f"/data/{detector_name}/daq_rec"][0]
-            self.handler.highgain = daq_rec & 0b1
+        self.handler = JFDataHandler(detector_name)
 
         # Gain file
         if not gain_file:
@@ -54,6 +43,37 @@ class EscapeAdapter:
             pedestal_file = locate_pedestal_file(file_path, detector_name=detector_name)
 
         self.handler.pedestal_file = pedestal_file
+
+        with h5py.File(file_path, "r") as h5f:
+            data_group = h5f[f"data/{detector_name}"]
+            meta_group = (
+                data_group["meta"]
+                if "meta" in data_group and isinstance(data_group["meta"], h5py.Group)
+                else data_group
+            )
+
+            if "module_map" in meta_group:
+                module_map = meta_group["module_map"][:]
+                if module_map.ndim == 2:
+                    # This is an old format. Pick only the first row (module_map of the first frame),
+                    # because it is not expected that module_map ever changes during a run.
+                    module_map = module_map[0, :]
+            else:
+                module_map = None
+
+            self.handler.module_map = module_map
+
+            # TODO: Here we use daq_rec only of the first pulse, where is_good_frame is True, within
+            # an hdf5 file, however its value can be different for later pulses and this needs to be
+            # taken care of.
+            good_frame_idx = np.nonzero(data_group["is_good_frame"])[0]
+            if good_frame_idx.size > 0:
+                daq_rec = data_group["daq_rec"][good_frame_idx[0]]
+            else:
+                warnings.warn("The file doesn't contain good frames. Highgain is set to False.")
+                daq_rec = 0
+
+            self.handler.highgain = daq_rec & 0b1
 
     @property
     def process(self):
