@@ -353,6 +353,11 @@ class File:
         if index is not None:
             index = np.array(index)  # convert iterable into numpy array
 
+        _mask = self.mask
+        if downsample and not _mask:
+            warnings.warn("Only masked data can be downsampled, `mask` is set to True")
+            self.mask = True
+
         _factor = self.handler.factor
         if downsample:
             # factor division and rounding should occur after downsampling, so we do it not via
@@ -539,7 +544,8 @@ class File:
                         roi_data = out_buffer_view[:, slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)]
                         h5_dest[f"/data/{self.detector_name}:ROI_{l}/data"][batch_range] = roi_data
 
-        # restore original factor and module_map
+        # restore original values
+        self.mask = _mask
         self.handler.factor = _factor
         self.handler.module_map = _module_map
 
