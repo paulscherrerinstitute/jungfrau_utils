@@ -280,7 +280,7 @@ class File:
         disabled_modules=(),
         index=None,
         roi=None,
-        downsample=False,
+        downsample=None,
         compression=False,
         factor=None,
         dtype=None,
@@ -298,8 +298,9 @@ class File:
                 a form (bottom, top, left, right), or a dict where each key is a ROI label and
                 a corresponding value is a tuple with ROI coordinates. Export whole images if None.
                 Defaults to None.
-            downsample (bool, optional): Reduce image size in 2x2 pixel blocks, resulting in a sum
-                of corresponding pixels. Defaults to False.
+            downsample (tuple, optional): A tuple of 2 integers (N, M). Reduce image size in NxM
+                pixel blocks, resulting in a sum of corresponding pixels. Effectively no
+                downsampling is happening in case of (1, 1) or None. Defaults to None.
             compression (bool, optional): Apply bitshuffle+lz4 compression. Defaults to False.
             factor (float, optional): If conversion is True, use this factor to divide converted
                 values. The output values are also rounded and casted to np.int32 dtype. Keep the
@@ -311,6 +312,22 @@ class File:
         """
         if self._processed:
             raise RuntimeError("Can not export already processed file.")
+
+        # Deprecated support for boolean downsample parameter (to be removed in ju/4.0)
+        if isinstance(downsample, bool):
+            warnings.warn(
+                "Passing a boolean `downsample` value is deprecated and will be removed in "
+                "jungfrau_utils/4.0. Use `(2, 2)` instead of True and `None` instead of False.",
+                DeprecationWarning,
+            )
+            downsample = (2, 2) if downsample else None
+
+        if downsample:
+            if len(downsample) != 2:
+                raise ValueError("Parameter `downsample` must have lenght of 2.")
+
+            if downsample == (1, 1):
+                downsample = None
 
         if roi and downsample:
             raise ValueError("Unsupported mode: roi with downsample.")
@@ -404,7 +421,7 @@ class File:
             meta_group["double_pixels"] = self.double_pixels
             meta_group["geometry"] = self.geometry
 
-            meta_group["downsample"] = downsample
+            meta_group["downsample"] = downsample if downsample else (1, 1)
 
             # this also sets detector group (channel) as processed
             if self.conversion or self.mask or self.gap_pixels or self.geometry or roi or factor:
@@ -419,8 +436,8 @@ class File:
             out_dtype = self.get_dtype_out()
 
             if downsample:
-                pixel_mask = _downsample_mask(pixel_mask)
-                out_shape = tuple(shape // 2 for shape in out_shape)
+                pixel_mask = _downsample_mask(pixel_mask, downsample)
+                out_shape = tuple(shape // ds for shape, ds in zip(out_shape, downsample))
                 if factor is not None:
                     out_dtype = np.dtype(np.int32)
 
@@ -465,7 +482,7 @@ class File:
 
             # prepare buffers to be reused for every batch
             read_buffer = np.empty((batch_size, *dset.shape[-2:]), dtype=dset.dtype)
-            # shape_out could be changed if downsample is True, so use get_shape_out() directly
+            # shape_out is changed if downsample != (1, 1), so use get_shape_out() once again
             out_buffer = np.zeros((batch_size, *self.get_shape_out()), dtype=out_dtype)
 
             # process and write data in batches
@@ -498,9 +515,9 @@ class File:
 
                 if downsample:
                     if self.parallel:
-                        _downsample_image_par_jit(out_buffer_view, factor, pixel_mask)
+                        _downsample_image_par_jit(out_buffer_view, downsample, factor, pixel_mask)
                     else:
-                        _downsample_image_jit(out_buffer_view, factor, pixel_mask)
+                        _downsample_image_jit(out_buffer_view, downsample, factor, pixel_mask)
 
                 if roi is None:
                     dtype_size = out_dtype.itemsize
@@ -611,32 +628,38 @@ class File:
 
 
 @njit(cache=True)
-def _downsample_mask(data):
+def _downsample_mask(data, downsample):
     size_y, size_x = data.shape
-    out_shape_y = size_y // 2
-    out_shape_x = size_x // 2
+    ds_y, ds_x = downsample
+    out_shape_y = size_y // ds_y
+    out_shape_x = size_x // ds_x
     data_view = data.ravel()
 
     ind = 0
     for i1 in range(out_shape_y):
+        i_y = ds_y * i1
         for i2 in range(out_shape_x):
-            data_view[ind] = np.all(data[2 * i1 : 2 * i1 + 2, 2 * i2 : 2 * i2 + 2])
+            i_x = ds_x * i2
+            data_view[ind] = np.all(data[i_y : i_y + ds_y, i_x : i_x + ds_x])
             ind += 1
 
     return data_view[:ind].reshape(out_shape_y, out_shape_x)
 
 
 @njit(cache=True)
-def _downsample_image_jit(data, factor, mask):
+def _downsample_image_jit(data, downsample, factor, mask):
     num, size_y, size_x = data.shape
+    ds_y, ds_x = downsample
     data_view = data.reshape((num, -1))
 
     for i1 in prange(num):  # pylint: disable=not-an-iterable
         ind = 0
-        for i2 in range(size_y // 2):
-            for i3 in range(size_x // 2):
+        for i2 in range(size_y // ds_y):
+            i_y = ds_y * i2
+            for i3 in range(size_x // ds_x):
+                i_x = ds_x * i3
                 if mask[i2, i3]:
-                    tmp_res = np.sum(data[i1, 2 * i2 : 2 * i2 + 2, 2 * i3 : 2 * i3 + 2])
+                    tmp_res = np.sum(data[i1, i_y : i_y + ds_y, i_x : i_x + ds_x])
                 else:
                     tmp_res = 0
 
@@ -648,16 +671,19 @@ def _downsample_image_jit(data, factor, mask):
 
 
 @njit(cache=True, parallel=True)
-def _downsample_image_par_jit(data, factor, mask):
+def _downsample_image_par_jit(data, downsample, factor, mask):
     num, size_y, size_x = data.shape
+    ds_y, ds_x = downsample
     data_view = data.reshape((num, -1))
 
     for i1 in prange(num):  # pylint: disable=not-an-iterable
         ind = 0
-        for i2 in range(size_y // 2):
-            for i3 in range(size_x // 2):
+        for i2 in range(size_y // ds_y):
+            i_y = ds_y * i2
+            for i3 in range(size_x // ds_x):
+                i_x = ds_x * i3
                 if mask[i2, i3]:
-                    tmp_res = np.sum(data[i1, 2 * i2 : 2 * i2 + 2, 2 * i3 : 2 * i3 + 2])
+                    tmp_res = np.sum(data[i1, i_y : i_y + ds_y, i_x : i_x + ds_x])
                 else:
                     tmp_res = 0
 
