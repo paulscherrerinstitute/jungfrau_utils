@@ -520,9 +520,9 @@ class File:
 
                 if downsample:
                     if self.parallel:
-                        _downsample_image_par_jit(out_buffer_view, downsample, factor, pixel_mask)
+                        _downsample_image_par_jit(out_buffer_view, downsample, factor)
                     else:
-                        _downsample_image_jit(out_buffer_view, downsample, factor, pixel_mask)
+                        _downsample_image_jit(out_buffer_view, downsample, factor)
 
                 if roi is None:
                     dtype_size = out_dtype.itemsize
@@ -653,7 +653,7 @@ def _downsample_mask(data, downsample):
 
 
 @njit(cache=True)
-def _downsample_image_jit(data, downsample, factor, mask):
+def _downsample_image_jit(data, downsample, factor):
     num, size_y, size_x = data.shape
     ds_y, ds_x = downsample
     data_view = data.reshape((num, -1))
@@ -664,10 +664,7 @@ def _downsample_image_jit(data, downsample, factor, mask):
             i_y = ds_y * i2
             for i3 in range(size_x // ds_x):
                 i_x = ds_x * i3
-                if mask[i2, i3]:
-                    tmp_res = np.sum(data[i1, i_y : i_y + ds_y, i_x : i_x + ds_x])
-                else:
-                    tmp_res = 0
+                tmp_res = np.sum(data[i1, i_y : i_y + ds_y, i_x : i_x + ds_x])
 
                 if factor is None:
                     data_view[i1, ind] = tmp_res
@@ -677,7 +674,7 @@ def _downsample_image_jit(data, downsample, factor, mask):
 
 
 @njit(cache=True, parallel=True)
-def _downsample_image_par_jit(data, downsample, factor, mask):
+def _downsample_image_par_jit(data, downsample, factor):
     num, size_y, size_x = data.shape
     ds_y, ds_x = downsample
     data_view = data.reshape((num, -1))
@@ -688,10 +685,7 @@ def _downsample_image_par_jit(data, downsample, factor, mask):
             i_y = ds_y * i2
             for i3 in range(size_x // ds_x):
                 i_x = ds_x * i3
-                if mask[i2, i3]:
-                    tmp_res = np.sum(data[i1, i_y : i_y + ds_y, i_x : i_x + ds_x])
-                else:
-                    tmp_res = 0
+                tmp_res = np.sum(data[i1, i_y : i_y + ds_y, i_x : i_x + ds_x])
 
                 if factor is None:
                     data_view[i1, ind] = tmp_res
