@@ -441,10 +441,12 @@ class File:
             out_dtype = self.get_dtype_out()
 
             if downsample:
-                pixel_mask = _downsample_mask(pixel_mask, downsample)
+                pixel_mask, good_pixel_ratio = _downsample_mask_jit(pixel_mask, downsample)
                 out_shape = tuple(shape // ds for shape, ds in zip(out_shape, downsample))
                 if factor is not None:
                     out_dtype = np.dtype(np.int32)
+            else:
+                good_pixel_ratio = pixel_mask.astype(np.float64)
 
             args = {}
             args["dtype"] = out_dtype if dtype is None else dtype
@@ -453,6 +455,7 @@ class File:
 
             if roi is None:
                 meta_group["pixel_mask"] = pixel_mask
+                meta_group["good_pixel_ratio"] = good_pixel_ratio
 
                 args["shape"] = (n_images, *out_shape)
                 args["chunks"] = (1, *out_shape)
@@ -520,9 +523,10 @@ class File:
 
                 if downsample:
                     if self.parallel:
-                        _downsample_image_par_jit(out_buffer_view, downsample, factor)
+                        downsample_image = _downsample_image_par_jit
                     else:
-                        _downsample_image_jit(out_buffer_view, downsample, factor)
+                        downsample_image = _downsample_image_jit
+                    downsample_image(out_buffer_view, downsample, factor, good_pixel_ratio)
 
                 if roi is None:
                     dtype_size = out_dtype.itemsize
@@ -634,26 +638,29 @@ class File:
 
 
 @njit(cache=True)
-def _downsample_mask(data, downsample):
-    size_y, size_x = data.shape
+def _downsample_mask_jit(mask, downsample):
+    size_y, size_x = mask.shape
     ds_y, ds_x = downsample
+    downsample_pix_num = ds_y * ds_x
     out_shape_y = size_y // ds_y
     out_shape_x = size_x // ds_x
-    data_view = data.ravel()
 
-    ind = 0
+    downsampled_mask = np.zeros(shape=(out_shape_y, out_shape_x), dtype=np.bool_)
+    good_pixel_ratio = np.zeros(shape=(out_shape_y, out_shape_x), dtype=np.float64)
+
     for i1 in range(out_shape_y):
         i_y = ds_y * i1
         for i2 in range(out_shape_x):
             i_x = ds_x * i2
-            data_view[ind] = np.all(data[i_y : i_y + ds_y, i_x : i_x + ds_x])
-            ind += 1
+            _mask = mask[i_y : i_y + ds_y, i_x : i_x + ds_x]
+            downsampled_mask[i1, i2] = np.all(_mask)
+            good_pixel_ratio[i1, i2] = np.count_nonzero(_mask) / downsample_pix_num
 
-    return data_view[:ind].reshape(out_shape_y, out_shape_x)
+    return downsampled_mask, good_pixel_ratio
 
 
 @njit(cache=True)
-def _downsample_image_jit(data, downsample, factor):
+def _downsample_image_jit(data, downsample, factor, good_pixel_ratio):
     num, size_y, size_x = data.shape
     ds_y, ds_x = downsample
     data_view = data.reshape((num, -1))
@@ -664,7 +671,9 @@ def _downsample_image_jit(data, downsample, factor):
             i_y = ds_y * i2
             for i3 in range(size_x // ds_x):
                 i_x = ds_x * i3
-                tmp_res = np.sum(data[i1, i_y : i_y + ds_y, i_x : i_x + ds_x])
+
+                gpr = good_pixel_ratio[i1, i2]
+                tmp_res = np.sum(data[i1, i_y : i_y + ds_y, i_x : i_x + ds_x]) / gpr if gpr else 0
 
                 if factor is None:
                     data_view[i1, ind] = tmp_res
@@ -674,7 +683,7 @@ def _downsample_image_jit(data, downsample, factor):
 
 
 @njit(cache=True, parallel=True)
-def _downsample_image_par_jit(data, downsample, factor):
+def _downsample_image_par_jit(data, downsample, factor, good_pixel_ratio):
     num, size_y, size_x = data.shape
     ds_y, ds_x = downsample
     data_view = data.reshape((num, -1))
@@ -685,7 +694,9 @@ def _downsample_image_par_jit(data, downsample, factor):
             i_y = ds_y * i2
             for i3 in range(size_x // ds_x):
                 i_x = ds_x * i3
-                tmp_res = np.sum(data[i1, i_y : i_y + ds_y, i_x : i_x + ds_x])
+
+                gpr = good_pixel_ratio[i1, i2]
+                tmp_res = np.sum(data[i1, i_y : i_y + ds_y, i_x : i_x + ds_x]) / gpr if gpr else 0
 
                 if factor is None:
                     data_view[i1, ind] = tmp_res
