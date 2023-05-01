@@ -442,7 +442,9 @@ class File:
 
             if downsample:
                 pixel_mask, good_pixel_ratio = _downsample_mask_jit(pixel_mask, downsample)
-                out_shape = tuple(shape // ds for shape, ds in zip(out_shape, downsample))
+                out_shape = tuple(
+                    (shape + ds - 1) // ds for shape, ds in zip(out_shape, downsample)
+                )
                 if factor is not None:
                     out_dtype = np.dtype(np.int32)
             else:
@@ -642,8 +644,8 @@ def _downsample_mask_jit(mask, downsample):
     size_y, size_x = mask.shape
     ds_y, ds_x = downsample
     downsample_pix_num = ds_y * ds_x
-    out_shape_y = size_y // ds_y
-    out_shape_x = size_x // ds_x
+    out_shape_y = (size_y + ds_y - 1) // ds_y
+    out_shape_x = (size_x + ds_x - 1) // ds_x
 
     downsampled_mask = np.zeros(shape=(out_shape_y, out_shape_x), dtype=np.bool_)
     good_pixel_ratio = np.zeros(shape=(out_shape_y, out_shape_x), dtype=np.float64)
@@ -653,7 +655,11 @@ def _downsample_mask_jit(mask, downsample):
         for i2 in range(out_shape_x):
             i_x = ds_x * i2
             _mask = mask[i_y : i_y + ds_y, i_x : i_x + ds_x]
-            downsampled_mask[i1, i2] = np.all(_mask)
+            if i_y + ds_y > size_y or i_x + ds_x > size_x:
+                # set mask to False for pixels including remainder pixels
+                downsampled_mask[i1, i2] = False
+            else:
+                downsampled_mask[i1, i2] = np.all(_mask)
             good_pixel_ratio[i1, i2] = np.count_nonzero(_mask) / downsample_pix_num
 
     return downsampled_mask, good_pixel_ratio
@@ -663,13 +669,15 @@ def _downsample_mask_jit(mask, downsample):
 def _downsample_image_jit(data, downsample, factor, good_pixel_ratio):
     num, size_y, size_x = data.shape
     ds_y, ds_x = downsample
+    out_shape_y = (size_y + ds_y - 1) // ds_y
+    out_shape_x = (size_x + ds_x - 1) // ds_x
     data_view = data.reshape((num, -1))
 
     for i1 in prange(num):  # pylint: disable=not-an-iterable
         ind = 0
-        for i2 in range(size_y // ds_y):
+        for i2 in range(out_shape_y):
             i_y = ds_y * i2
-            for i3 in range(size_x // ds_x):
+            for i3 in range(out_shape_x):
                 i_x = ds_x * i3
 
                 gpr = good_pixel_ratio[i1, i2]
@@ -686,13 +694,15 @@ def _downsample_image_jit(data, downsample, factor, good_pixel_ratio):
 def _downsample_image_par_jit(data, downsample, factor, good_pixel_ratio):
     num, size_y, size_x = data.shape
     ds_y, ds_x = downsample
+    out_shape_y = (size_y + ds_y - 1) // ds_y
+    out_shape_x = (size_x + ds_x - 1) // ds_x
     data_view = data.reshape((num, -1))
 
     for i1 in prange(num):  # pylint: disable=not-an-iterable
         ind = 0
-        for i2 in range(size_y // ds_y):
+        for i2 in range(out_shape_y):
             i_y = ds_y * i2
-            for i3 in range(size_x // ds_x):
+            for i3 in range(out_shape_x):
                 i_x = ds_x * i3
 
                 gpr = good_pixel_ratio[i1, i2]
