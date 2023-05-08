@@ -441,14 +441,14 @@ class File:
             out_dtype = self.get_dtype_out()
 
             if downsample:
-                pixel_mask, good_pixel_ratio = _downsample_mask_jit(pixel_mask, downsample)
+                pixel_mask, good_pixels_fraction = _downsample_mask_jit(pixel_mask, downsample)
                 out_shape = tuple(
                     (shape + ds - 1) // ds for shape, ds in zip(out_shape, downsample)
                 )
                 if factor is not None:
                     out_dtype = np.dtype(np.int32)
             else:
-                good_pixel_ratio = pixel_mask.astype(np.float64)
+                good_pixels_fraction = pixel_mask.astype(np.float64)
 
             args = {}
             args["dtype"] = out_dtype if dtype is None else dtype
@@ -457,7 +457,7 @@ class File:
 
             if roi is None:
                 meta_group["pixel_mask"] = pixel_mask
-                meta_group["good_pixel_ratio"] = good_pixel_ratio
+                meta_group["good_pixels_fraction"] = good_pixels_fraction
 
                 args["shape"] = (n_images, *out_shape)
                 args["chunks"] = (1, *out_shape)
@@ -528,7 +528,7 @@ class File:
                         downsample_image = _downsample_image_par_jit
                     else:
                         downsample_image = _downsample_image_jit
-                    downsample_image(out_buffer_view, downsample, factor, good_pixel_ratio)
+                    downsample_image(out_buffer_view, downsample, factor, good_pixels_fraction)
 
                 if roi is None:
                     dtype_size = out_dtype.itemsize
@@ -648,7 +648,7 @@ def _downsample_mask_jit(mask, downsample):
     out_shape_x = (size_x + ds_x - 1) // ds_x
 
     downsampled_mask = np.zeros(shape=(out_shape_y, out_shape_x), dtype=np.bool_)
-    good_pixel_ratio = np.zeros(shape=(out_shape_y, out_shape_x), dtype=np.float64)
+    good_pixels_fraction = np.zeros(shape=(out_shape_y, out_shape_x), dtype=np.float64)
 
     for i1 in range(out_shape_y):
         i_y = ds_y * i1
@@ -660,13 +660,13 @@ def _downsample_mask_jit(mask, downsample):
                 downsampled_mask[i1, i2] = False
             else:
                 downsampled_mask[i1, i2] = np.all(_mask)
-            good_pixel_ratio[i1, i2] = np.count_nonzero(_mask) / downsample_pix_num
+            good_pixels_fraction[i1, i2] = np.count_nonzero(_mask) / downsample_pix_num
 
-    return downsampled_mask, good_pixel_ratio
+    return downsampled_mask, good_pixels_fraction
 
 
 @njit(cache=True)
-def _downsample_image_jit(data, downsample, factor, good_pixel_ratio):
+def _downsample_image_jit(data, downsample, factor, good_pixels_fraction):
     num, size_y, size_x = data.shape
     ds_y, ds_x = downsample
     out_shape_y = (size_y + ds_y - 1) // ds_y
@@ -680,7 +680,7 @@ def _downsample_image_jit(data, downsample, factor, good_pixel_ratio):
             for i3 in range(out_shape_x):
                 i_x = ds_x * i3
 
-                gpr = good_pixel_ratio[i1, i2]
+                gpr = good_pixels_fraction[i1, i2]
                 tmp_res = np.sum(data[i1, i_y : i_y + ds_y, i_x : i_x + ds_x]) / gpr if gpr else 0
 
                 if factor is None:
@@ -691,7 +691,7 @@ def _downsample_image_jit(data, downsample, factor, good_pixel_ratio):
 
 
 @njit(cache=True, parallel=True)
-def _downsample_image_par_jit(data, downsample, factor, good_pixel_ratio):
+def _downsample_image_par_jit(data, downsample, factor, good_pixels_fraction):
     num, size_y, size_x = data.shape
     ds_y, ds_x = downsample
     out_shape_y = (size_y + ds_y - 1) // ds_y
@@ -705,7 +705,7 @@ def _downsample_image_par_jit(data, downsample, factor, good_pixel_ratio):
             for i3 in range(out_shape_x):
                 i_x = ds_x * i3
 
-                gpr = good_pixel_ratio[i1, i2]
+                gpr = good_pixels_fraction[i1, i2]
                 tmp_res = np.sum(data[i1, i_y : i_y + ds_y, i_x : i_x + ds_x]) / gpr if gpr else 0
 
                 if factor is None:
