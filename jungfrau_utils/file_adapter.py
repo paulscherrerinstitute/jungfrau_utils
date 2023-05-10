@@ -680,7 +680,7 @@ def _downsample_image_jit(data, downsample, factor, good_pixels_fraction):
             for i3 in range(out_shape_x):
                 i_x = ds_x * i3
 
-                gpr = good_pixels_fraction[i1, i2]
+                gpr = good_pixels_fraction[i2, i3]
                 tmp_res = np.sum(data[i1, i_y : i_y + ds_y, i_x : i_x + ds_x]) / gpr if gpr else 0
 
                 if factor is None:
@@ -705,7 +705,7 @@ def _downsample_image_par_jit(data, downsample, factor, good_pixels_fraction):
             for i3 in range(out_shape_x):
                 i_x = ds_x * i3
 
-                gpr = good_pixels_fraction[i1, i2]
+                gpr = good_pixels_fraction[i2, i3]
                 tmp_res = np.sum(data[i1, i_y : i_y + ds_y, i_x : i_x + ds_x]) / gpr if gpr else 0
 
                 if factor is None:
