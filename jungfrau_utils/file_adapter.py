@@ -493,7 +493,10 @@ class File:
             # prepare buffers to be reused for every batch
             read_buffer = np.empty((batch_size, *dset.shape[-2:]), dtype=dset.dtype)
             # shape_out is changed if downsample != (1, 1), so use get_shape_out() once again
-            out_buffer = np.zeros((batch_size, *self.get_shape_out()), dtype=out_dtype)
+            if downsample and factor is not None:
+                out_buffer = np.zeros((batch_size, *self.get_shape_out()), dtype=np.float32)
+            else:
+                out_buffer = np.zeros((batch_size, *self.get_shape_out()), dtype=out_dtype)
 
             # process and write data in batches
             for batch_start in range(0, n_images, batch_size):
@@ -538,7 +541,7 @@ class File:
 
                     for pos, im in zip(batch_range, out_buffer_view):
                         if downsample:
-                            im = im.ravel()[: np.prod(out_shape)]
+                            im = im.ravel()[: np.prod(out_shape)].astype(out_dtype)
 
                         if compression:
                             im = header + bitshuffle.compress_lz4(im, BLOCK_SIZE).tobytes()
