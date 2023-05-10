@@ -497,6 +497,8 @@ class File:
                 out_buffer = np.zeros((batch_size, *self.get_shape_out()), dtype=np.float32)
             else:
                 out_buffer = np.zeros((batch_size, *self.get_shape_out()), dtype=out_dtype)
+            if downsample:
+                ds_buffer = np.zeros((batch_size, *out_shape), dtype=out_dtype)
 
             # process and write data in batches
             for batch_start in range(0, n_images, batch_size):
@@ -505,6 +507,8 @@ class File:
 
                 read_buffer_view = read_buffer[: len(batch_ind)]
                 out_buffer_view = out_buffer[: len(batch_ind)]
+                if downsample:
+                    ds_buffer_view = ds_buffer[: len(batch_ind)]
 
                 # Avoid a stride-bottleneck, see https://github.com/h5py/h5py/issues/977
                 if np.sum(np.diff(batch_ind)) == len(batch_ind) - 1:
@@ -531,7 +535,9 @@ class File:
                         downsample_image = _downsample_image_par_jit
                     else:
                         downsample_image = _downsample_image_jit
-                    downsample_image(out_buffer_view, downsample, factor, good_pixels_fraction)
+                    downsample_image(
+                        ds_buffer_view, out_buffer_view, downsample, factor, good_pixels_fraction
+                    )
 
                 if roi is None:
                     dtype_size = out_dtype.itemsize
@@ -539,17 +545,14 @@ class File:
                     bytes_block_size = struct.pack(">i", BLOCK_SIZE * dtype_size)
                     header = bytes_num_elem + bytes_block_size
 
-                    for pos, im in zip(batch_range, out_buffer_view):
-                        if downsample:
-                            im = im.ravel()[: np.prod(out_shape)].astype(out_dtype)
+                    if downsample:
+                        out_buffer_view = ds_buffer_view
 
+                    for pos, im in zip(batch_range, out_buffer_view):
                         if compression:
                             im = header + bitshuffle.compress_lz4(im, BLOCK_SIZE).tobytes()
 
                         h5_dest[dset.name].id.write_direct_chunk((pos, 0, 0), im)
-
-                    if downsample:
-                        out_buffer_view[:] = 0
 
                 else:
                     for l, (roi_y1, roi_y2, roi_x1, roi_x2) in zip(roi_labels, roi):
@@ -672,50 +675,40 @@ def _downsample_mask_jit(mask, downsample):
 
 
 @njit(cache=True)
-def _downsample_image_jit(data, downsample, factor, good_pixels_fraction):
-    num, size_y, size_x = data.shape
+def _downsample_image_jit(res, image, downsample, factor, good_pixels_fraction):
+    num, out_shape_y, out_shape_x = res.shape
     ds_y, ds_x = downsample
-    out_shape_y = (size_y + ds_y - 1) // ds_y
-    out_shape_x = (size_x + ds_x - 1) // ds_x
-    data_view = data.reshape((num, -1))
 
     for i1 in prange(num):  # pylint: disable=not-an-iterable
-        ind = 0
         for i2 in range(out_shape_y):
             i_y = ds_y * i2
             for i3 in range(out_shape_x):
                 i_x = ds_x * i3
 
                 gpr = good_pixels_fraction[i2, i3]
-                tmp_res = np.sum(data[i1, i_y : i_y + ds_y, i_x : i_x + ds_x]) / gpr if gpr else 0
+                tmp_res = np.sum(image[i1, i_y : i_y + ds_y, i_x : i_x + ds_x]) / gpr if gpr else 0
 
                 if factor is None:
-                    data_view[i1, ind] = tmp_res
+                    res[i1, i2, i3] = tmp_res
                 else:
-                    data_view[i1, ind] = round(tmp_res / factor)
-                ind += 1
+                    res[i1, i2, i3] = round(tmp_res / factor)
 
 
 @njit(cache=True, parallel=True)
-def _downsample_image_par_jit(data, downsample, factor, good_pixels_fraction):
-    num, size_y, size_x = data.shape
+def _downsample_image_par_jit(res, image, downsample, factor, good_pixels_fraction):
+    num, out_shape_y, out_shape_x = res.shape
     ds_y, ds_x = downsample
-    out_shape_y = (size_y + ds_y - 1) // ds_y
-    out_shape_x = (size_x + ds_x - 1) // ds_x
-    data_view = data.reshape((num, -1))
 
     for i1 in prange(num):  # pylint: disable=not-an-iterable
-        ind = 0
         for i2 in range(out_shape_y):
             i_y = ds_y * i2
             for i3 in range(out_shape_x):
                 i_x = ds_x * i3
 
                 gpr = good_pixels_fraction[i2, i3]
-                tmp_res = np.sum(data[i1, i_y : i_y + ds_y, i_x : i_x + ds_x]) / gpr if gpr else 0
+                tmp_res = np.sum(image[i1, i_y : i_y + ds_y, i_x : i_x + ds_x]) / gpr if gpr else 0
 
                 if factor is None:
-                    data_view[i1, ind] = tmp_res
+                    res[i1, i2, i3] = tmp_res
                 else:
-                    data_view[i1, ind] = round(tmp_res / factor)
-                ind += 1
+                    res[i1, i2, i3] = round(tmp_res / factor)
