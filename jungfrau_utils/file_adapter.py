@@ -545,6 +545,9 @@ class File:
 
                         h5_dest[dset.name].id.write_direct_chunk((pos, 0, 0), im)
 
+                    if downsample:
+                        out_buffer_view[:] = 0
+
                 else:
                     for l, (roi_y1, roi_y2, roi_x1, roi_x2) in zip(roi_labels, roi):
                         roi_data = out_buffer_view[:, slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)]
