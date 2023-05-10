@@ -492,13 +492,25 @@ class File:
 
             # prepare buffers to be reused for every batch
             read_buffer = np.empty((batch_size, *dset.shape[-2:]), dtype=dset.dtype)
+            # in case of downsample with a factor, the intermediate out_buffer should have
+            # np.float32 dtype
+            out_buffer_dtype = np.float32 if downsample and factor is not None else out_dtype
             # shape_out is changed if downsample != (1, 1), so use get_shape_out() once again
-            if downsample and factor is not None:
-                out_buffer = np.zeros((batch_size, *self.get_shape_out()), dtype=np.float32)
-            else:
-                out_buffer = np.zeros((batch_size, *self.get_shape_out()), dtype=out_dtype)
+            out_buffer = np.zeros((batch_size, *self.get_shape_out()), dtype=out_buffer_dtype)
             if downsample:
                 ds_buffer = np.zeros((batch_size, *out_shape), dtype=out_dtype)
+
+            # prepare utility vars
+            if downsample and self.parallel:
+                downsample_image = _downsample_image_par_jit
+            else:
+                downsample_image = _downsample_image_jit
+
+            if compression:
+                dtype_size = out_dtype.itemsize
+                bytes_num_elem = struct.pack(">q", np.prod(out_shape) * dtype_size)
+                bytes_block_size = struct.pack(">i", BLOCK_SIZE * dtype_size)
+                header = bytes_num_elem + bytes_block_size
 
             # process and write data in batches
             for batch_start in range(0, n_images, batch_size):
@@ -531,23 +543,12 @@ class File:
                 )
 
                 if downsample:
-                    if self.parallel:
-                        downsample_image = _downsample_image_par_jit
-                    else:
-                        downsample_image = _downsample_image_jit
                     downsample_image(
                         ds_buffer_view, out_buffer_view, downsample, factor, good_pixels_fraction
                     )
+                    out_buffer_view = ds_buffer_view
 
                 if roi is None:
-                    dtype_size = out_dtype.itemsize
-                    bytes_num_elem = struct.pack(">q", np.prod(out_shape) * dtype_size)
-                    bytes_block_size = struct.pack(">i", BLOCK_SIZE * dtype_size)
-                    header = bytes_num_elem + bytes_block_size
-
-                    if downsample:
-                        out_buffer_view = ds_buffer_view
-
                     for pos, im in zip(batch_range, out_buffer_view):
                         if compression:
                             im = header + bitshuffle.compress_lz4(im, BLOCK_SIZE).tobytes()
