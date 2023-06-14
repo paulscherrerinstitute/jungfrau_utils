@@ -24,7 +24,7 @@ requirements:
 
 test:
     source_files:
-        - jungfrau_utils/tests
+        - tests
     requires:
         - pytest
 
