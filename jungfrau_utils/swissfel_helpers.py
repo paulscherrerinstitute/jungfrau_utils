@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 from datetime import datetime, timedelta
 from pathlib import Path
 
 import h5py
 
 
-def locate_gain_file(file_path, *, detector_name="", verbose=True):
+def locate_gain_file(file_path: str, *, detector_name: str = "", verbose: bool = True) -> str:
     """Locate gain file in default location at swissfel.
 
     The default gain file location is
@@ -39,7 +41,7 @@ def locate_gain_file(file_path, *, detector_name="", verbose=True):
     return gain_file.as_posix()
 
 
-def locate_pedestal_file(file_path, *, detector_name="", verbose=True):
+def locate_pedestal_file(file_path: str, *, detector_name: str = "", verbose: bool = True) -> str:
     """Locate pedestal file in default location at swissfel.
 
     The default pedestal file paths for a particula p-group are
@@ -104,7 +106,7 @@ def locate_pedestal_file(file_path, *, detector_name="", verbose=True):
     return closest_pedestal_file.as_posix()
 
 
-def get_single_detector_name(file_path):
+def get_single_detector_name(file_path: str) -> str:
     """Get detector name from file that contains only single detector data.
 
     Args:

@@ -1,36 +1,40 @@
+from __future__ import annotations
+
 import re
 import warnings
 from collections import namedtuple
 from functools import lru_cache
+from typing import NamedTuple
 
 import h5py
 import numpy as np
 from numba import njit, prange
+from numpy.typing import NDArray
 
-from jungfrau_utils.geometry import detector_geometry
+from jungfrau_utils.geometry import DetectorGeometry, detector_geometry
 
 warnings.filterwarnings("default", category=DeprecationWarning)
 
-CHIP_SIZE_X = 256
-CHIP_SIZE_Y = 256
+CHIP_SIZE_X: int = 256
+CHIP_SIZE_Y: int = 256
 
-CHIP_NUM_X = 4
-CHIP_NUM_Y = 2
+CHIP_NUM_X: int = 4
+CHIP_NUM_Y: int = 2
 
-MODULE_SIZE_X = CHIP_NUM_X * CHIP_SIZE_X
-MODULE_SIZE_Y = CHIP_NUM_Y * CHIP_SIZE_Y
+MODULE_SIZE_X: int = CHIP_NUM_X * CHIP_SIZE_X
+MODULE_SIZE_Y: int = CHIP_NUM_Y * CHIP_SIZE_Y
 
-CHIP_GAP_X = 2
-CHIP_GAP_Y = 2
+CHIP_GAP_X: int = 2
+CHIP_GAP_Y: int = 2
 
-MODULE_FULL_SIZE_X = MODULE_SIZE_X + (CHIP_NUM_X - 1) * CHIP_GAP_X
-MODULE_FULL_SIZE_Y = MODULE_SIZE_Y + (CHIP_NUM_Y - 1) * CHIP_GAP_Y
+MODULE_FULL_SIZE_X: int = MODULE_SIZE_X + (CHIP_NUM_X - 1) * CHIP_GAP_X
+MODULE_FULL_SIZE_Y: int = MODULE_SIZE_Y + (CHIP_NUM_Y - 1) * CHIP_GAP_Y
 
 # 256 not divisible by 3, so we round up to 86
 # the last 4 pixels can be omitted, so the final height is (256 - 4) / 3 = 84
 # 18 since we have 6 more pixels in H per gap
-STRIPSEL_SIZE_X = 1024 * 3 + 18  # = 3090
-STRIPSEL_SIZE_Y = 84
+STRIPSEL_SIZE_X: int = 1024 * 3 + 18  # = 3090
+STRIPSEL_SIZE_Y: int = 84
 
 
 class JFDataHandler:
@@ -41,7 +45,7 @@ class JFDataHandler:
         detector_name (str): name of a detector in the form ``JF<id>T<nmod>V<version>``
     """
 
-    def __init__(self, detector_name):
+    def __init__(self, detector_name: str) -> None:
         # detector_name needs to be a valid name
         if detector_name in detector_geometry:
             self._detector_name = detector_name
@@ -49,36 +53,36 @@ class JFDataHandler:
         else:
             raise KeyError(f"Geometry for '{detector_name}' detector is not present.")
 
-        self._gain_file = ""
-        self._pedestal_file = ""
+        self._gain_file: str = ""
+        self._pedestal_file: str = ""
 
         # these values store the original gains/pedestal values
-        self._gain = None
-        self._pedestal = None
-        self._pixel_mask = None
+        self._gain: NDArray | None = None
+        self._pedestal: NDArray | None = None
+        self._pixel_mask: NDArray | None = None
 
-        self._factor = None
-        self._highgain = False
+        self._factor: float | None = None
+        self._highgain: bool = False
 
         # gain and pedestal arrays with better memory layout for the actual data conversion
-        self._g_all = {True: None, False: None}
-        self._p_all = {True: None, False: None}
+        self._g_all: dict[bool, NDArray | None] = {True: None, False: None}
+        self._p_all: dict[bool, NDArray | None] = {True: None, False: None}
 
-        self._module_map = np.arange(self.detector.n_modules)
+        self._module_map: NDArray = np.arange(self.detector.n_modules)
 
-        self._mask_all = {True: None, False: None}
+        self._mask_all: dict[bool, NDArray | None] = {True: None, False: None}
 
     @property
-    def detector_name(self):
+    def detector_name(self) -> str:
         """Detector name (readonly)."""
         return self._detector_name
 
     @property
-    def detector_geometry(self):
+    def detector_geometry(self) -> DetectorGeometry:
         """Detector geometry configuration (readonly)."""
         return self._detector_geometry
 
-    def is_stripsel(self):
+    def is_stripsel(self) -> bool:
         """Return true if detector is a stripsel."""
         warnings.warn(
             "is_stripsel() is deprecated and will be removed in jungfrau_utils/4.0",
@@ -87,18 +91,18 @@ class JFDataHandler:
         return self.detector_geometry.is_stripsel
 
     @property
-    def detector(self):
+    def detector(self) -> NamedTuple:
         """A namedtuple of detector parameters extracted from its name (readonly)."""
         det = namedtuple("Detector", ["id", "n_modules", "version"])
         return det(*(int(d) for d in re.findall(r"\d+", self.detector_name)))
 
     @property
-    def gain_file(self):
+    def gain_file(self) -> str:
         """Return current gain filepath."""
         return self._gain_file
 
     @gain_file.setter
-    def gain_file(self, filepath):
+    def gain_file(self, filepath: str) -> None:
         if not filepath:
             self._gain_file = ""
             self.gain = None
@@ -114,12 +118,12 @@ class JFDataHandler:
         self.gain = gains
 
     @property
-    def gain(self):
+    def gain(self) -> NDArray | None:
         """Current gain values."""
         return self._gain
 
     @gain.setter
-    def gain(self, value):
+    def gain(self, value: NDArray | None) -> None:
         if value is None:
             self._gain = None
             return
@@ -138,7 +142,7 @@ class JFDataHandler:
         self._gain = value.astype(np.float32, copy=False)
         self._update_g_all()
 
-    def _update_g_all(self):
+    def _update_g_all(self) -> None:
         if self.factor is None:
             _g = 1 / self._gain
         else:
@@ -155,16 +159,16 @@ class JFDataHandler:
             self._g_all[True] = np.stack((_g[3], _g[4], _g[5], _g[5]))
 
     @property
-    def _g(self):
+    def _g(self) -> NDArray | None:
         return self._g_all[self.highgain]
 
     @property
-    def pedestal_file(self):
+    def pedestal_file(self) -> str:
         """Return current pedestal filepath."""
         return self._pedestal_file
 
     @pedestal_file.setter
-    def pedestal_file(self, filepath):
+    def pedestal_file(self, filepath: str) -> None:
         if not filepath:
             self._pedestal_file = ""
             self.pedestal = None
@@ -183,12 +187,12 @@ class JFDataHandler:
         self.pixel_mask = pixel_mask
 
     @property
-    def pedestal(self):
+    def pedestal(self) -> NDArray | None:
         """Current pedestal values."""
         return self._pedestal
 
     @pedestal.setter
-    def pedestal(self, value):
+    def pedestal(self, value: NDArray | None) -> None:
         if value is None:
             self._pedestal = None
             return
@@ -216,16 +220,16 @@ class JFDataHandler:
             self._p_all[True] = np.stack((_p[0], _p[1], _p[2], _p[2]))
 
     @property
-    def _p(self):
+    def _p(self) -> NDArray | None:
         return self._p_all[self.highgain]
 
     @property
-    def pixel_mask(self):
+    def pixel_mask(self) -> NDArray | None:
         """Current raw pixel mask values."""
         return self._pixel_mask
 
     @pixel_mask.setter
-    def pixel_mask(self, value):
+    def pixel_mask(self, value: NDArray | None) -> None:
         if value is None:
             self._pixel_mask = None
             self.get_pixel_mask.cache_clear()
@@ -259,7 +263,7 @@ class JFDataHandler:
 
         self._mask_all[True] = mask
 
-    def _mask(self, double_pixels):
+    def _mask(self, double_pixels: str) -> NDArray | None:
         if double_pixels in ("keep", "interp"):
             return self._mask_all[False]
         elif double_pixels == "mask":
@@ -268,7 +272,7 @@ class JFDataHandler:
             raise ValueError("'double_pixels' can only be 'keep', 'mask', or 'interp'")
 
     @property
-    def factor(self):
+    def factor(self) -> float | None:
         """A factor value.
 
         If conversion is True, use this factor to divide converted values. The output values are
@@ -277,7 +281,7 @@ class JFDataHandler:
         return self._factor
 
     @factor.setter
-    def factor(self, value):
+    def factor(self, value: float | None) -> None:
         if value is not None:
             value = float(value)
 
@@ -290,24 +294,24 @@ class JFDataHandler:
             self._update_g_all()
 
     @property
-    def highgain(self):
+    def highgain(self) -> bool:
         """Current flag for highgain."""
         return self._highgain
 
     @highgain.setter
-    def highgain(self, value):
+    def highgain(self, value: bool) -> None:
         if not isinstance(value, bool):
             value = bool(value)
 
         self._highgain = value
 
     @property
-    def module_map(self):
+    def module_map(self) -> NDArray:
         """Current module map."""
         return self._module_map
 
     @module_map.setter
-    def module_map(self, value):
+    def module_map(self, value: NDArray) -> None:
         if np.array_equal(self._module_map, value):
             return
 
@@ -325,7 +329,7 @@ class JFDataHandler:
         self._module_map = value
         self.get_pixel_mask.cache_clear()
 
-    def _get_shape_in_n_modules(self, n):
+    def _get_shape_in_n_modules(self, n: int) -> tuple[int, int]:
         if self.detector_name == "JF02T09V01":  # a special case
             shape_y, shape_x = MODULE_SIZE_Y, MODULE_SIZE_X * n
         else:
@@ -334,18 +338,18 @@ class JFDataHandler:
         return shape_y, shape_x
 
     @property
-    def _shape_in_full(self):
+    def _shape_in_full(self) -> tuple[int, int]:
         return self._get_shape_in_n_modules(self.detector.n_modules)
 
     @property
-    def _shape_in(self):
+    def _shape_in(self) -> tuple[int, int]:
         return self._get_shape_in_n_modules(self._n_active_modules)
 
     @property
-    def _n_active_modules(self):
+    def _n_active_modules(self) -> int:
         return np.sum(self.module_map != -1)
 
-    def _get_shape_out(self, gap_pixels, geometry):
+    def _get_shape_out(self, gap_pixels: bool, geometry: bool) -> tuple[int, int]:
         """Return the image shape of a detector without a full-detector rotation step.
 
         Args:
@@ -405,7 +409,7 @@ class JFDataHandler:
 
         return shape_y, shape_x
 
-    def get_shape_out(self, *, gap_pixels=True, geometry=True):
+    def get_shape_out(self, *, gap_pixels: bool = True, geometry: bool = True) -> tuple[int, int]:
         """Return the final image shape of a detector.
 
         Args:
@@ -421,7 +425,7 @@ class JFDataHandler:
 
         return shape_y, shape_x
 
-    def _get_stripsel_shape_out(self, geometry):
+    def _get_stripsel_shape_out(self, geometry: bool) -> tuple[int, int]:
         if geometry:
             shape_x = max(self.detector_geometry.origin_x) + STRIPSEL_SIZE_X
             shape_y = max(self.detector_geometry.origin_y) + STRIPSEL_SIZE_Y
@@ -430,7 +434,7 @@ class JFDataHandler:
 
         return shape_y, shape_x
 
-    def get_dtype_out(self, dtype_in, *, conversion=True):
+    def get_dtype_out(self, dtype_in: np.dtype, *, conversion: bool = True) -> np.dtype:
         """Return resulting image dtype of a detector.
 
         Args:
@@ -454,7 +458,7 @@ class JFDataHandler:
 
         return dtype_out
 
-    def _get_module_coords(self, m, i, geometry, gap_pixels):
+    def _get_module_coords(self, m: int, i: int, geometry: bool, gap_pixels: bool) -> tuple:
         module_size_y = MODULE_FULL_SIZE_Y if gap_pixels else MODULE_SIZE_Y
         module_size_x = MODULE_FULL_SIZE_X if gap_pixels else MODULE_SIZE_X
 
@@ -505,7 +509,7 @@ class JFDataHandler:
 
         return oy, oy_end, ox, ox_end, mod_rot90
 
-    def _get_module_slice(self, data, m):
+    def _get_module_slice(self, data: NDArray, m: int) -> NDArray:
         if self.detector_name == "JF02T09V01":
             out = data[..., :, m * MODULE_SIZE_X : (m + 1) * MODULE_SIZE_X]
         else:
@@ -515,16 +519,16 @@ class JFDataHandler:
 
     def process(
         self,
-        images,
+        images: NDArray,
         *,
-        conversion=True,
-        mask=True,
-        gap_pixels=True,
-        double_pixels="keep",
-        geometry=True,
-        parallel=False,
-        out=None,
-    ):
+        conversion: bool = True,
+        mask: bool = True,
+        gap_pixels: bool = True,
+        double_pixels: str = "keep",
+        geometry: bool = True,
+        parallel: bool = False,
+        out: NDArray | None = None,
+    ) -> NDArray:
         """Perform jungfrau detector data processing like pedestal correction, gain conversion,
         applying pixel mask, module map, etc.
 
@@ -658,7 +662,7 @@ class JFDataHandler:
 
         return out
 
-    def can_convert(self):
+    def can_convert(self) -> bool:
         """Whether all data for gain/pedestal conversion is present.
 
         Returns:
@@ -667,7 +671,9 @@ class JFDataHandler:
         return (self.gain is not None) and (self.pedestal is not None)
 
     @lru_cache(maxsize=8)
-    def get_pixel_mask(self, *, gap_pixels=True, double_pixels="keep", geometry=True):
+    def get_pixel_mask(
+        self, *, gap_pixels: bool = True, double_pixels: str = "keep", geometry: bool = True
+    ) -> NDArray | None:
         """Return pixel mask.
 
         Args:
@@ -729,7 +735,7 @@ class JFDataHandler:
 
         return res
 
-    def get_pixel_coordinates(self):
+    def get_pixel_coordinates(self) -> tuple:
         """Return arrays (x, y, z) of final coordinates for pixels in raw data.
 
         The shape of the result is the same as the raw input data (equivalently, gap_pixels=False,
@@ -787,7 +793,15 @@ class JFDataHandler:
 
         return x_coord, y_coord, z_coord
 
-    def get_gains(self, images, *, mask=True, gap_pixels=True, double_pixels="keep", geometry=True):
+    def get_gains(
+        self,
+        images: NDArray,
+        *,
+        mask: bool = True,
+        gap_pixels: bool = True,
+        double_pixels: str = "keep",
+        geometry: bool = True,
+    ) -> NDArray:
         """Return gain values of images.
 
         Args:
@@ -822,8 +836,14 @@ class JFDataHandler:
         return gains
 
     def get_saturated_pixels(
-        self, images, *, mask=True, gap_pixels=True, double_pixels="keep", geometry=True
-    ):
+        self,
+        images: NDArray,
+        *,
+        mask: bool = True,
+        gap_pixels: bool = True,
+        double_pixels: str = "keep",
+        geometry: bool = True,
+    ) -> tuple:
         """Return coordinates of saturated pixels.
 
         Args:
@@ -866,7 +886,16 @@ class JFDataHandler:
 
 
 @njit(cache=True)
-def _adc_to_energy_jit(res, image, gain, pedestal, mask, factor, ry, rx):
+def _adc_to_energy_jit(
+    res: NDArray,
+    image: NDArray,
+    gain: NDArray | None,
+    pedestal: NDArray | None,
+    mask: NDArray | None,
+    factor: float | None,
+    ry: NDArray,
+    rx: NDArray,
+) -> None:
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
     for i1 in prange(image.shape[0]):  # pylint: disable=not-an-iterable
         for i2, ri2 in enumerate(ry):
@@ -888,7 +917,16 @@ def _adc_to_energy_jit(res, image, gain, pedestal, mask, factor, ry, rx):
 
 
 @njit(cache=True, parallel=True)
-def _adc_to_energy_par_jit(res, image, gain, pedestal, mask, factor, ry, rx):
+def _adc_to_energy_par_jit(
+    res: NDArray,
+    image: NDArray,
+    gain: NDArray | None,
+    pedestal: NDArray | None,
+    mask: NDArray | None,
+    factor: float | None,
+    ry: NDArray,
+    rx: NDArray,
+) -> None:
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
     for i1 in prange(image.shape[0]):  # pylint: disable=not-an-iterable
         for i2, ri2 in enumerate(ry):
@@ -910,7 +948,7 @@ def _adc_to_energy_par_jit(res, image, gain, pedestal, mask, factor, ry, rx):
 
 
 @njit(cache=True)
-def _reshape_stripsel_jit(res, image):
+def _reshape_stripsel_jit(res: NDArray, image: NDArray) -> None:
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
     for ind in prange(image.shape[0]):  # pylint: disable=not-an-iterable
         # first we fill the normal pixels, the gap ones will be overwritten later
@@ -944,7 +982,7 @@ def _reshape_stripsel_jit(res, image):
 
 
 @njit(cache=True, parallel=True)
-def _reshape_stripsel_par_jit(res, image):
+def _reshape_stripsel_par_jit(res: NDArray, image: NDArray) -> None:
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
     for ind in prange(image.shape[0]):  # pylint: disable=not-an-iterable
         # first we fill the normal pixels, the gap ones will be overwritten later
@@ -978,7 +1016,7 @@ def _reshape_stripsel_par_jit(res, image):
 
 
 @njit(cache=True)
-def _inplace_interp_dp_jit(res):
+def _inplace_interp_dp_jit(res: NDArray) -> None:
     for i1 in prange(res.shape[0]):  # pylint: disable=not-an-iterable
         # corner quad pixels
         for ri2 in (255, 257):
@@ -1048,7 +1086,7 @@ def _inplace_interp_dp_jit(res):
 
 
 @njit(cache=True, parallel=True)
-def _inplace_interp_dp_par_jit(res):
+def _inplace_interp_dp_par_jit(res: NDArray) -> None:
     for i1 in prange(res.shape[0]):  # pylint: disable=not-an-iterable
         # corner quad pixels
         for ri2 in (255, 257):
@@ -1118,7 +1156,7 @@ def _inplace_interp_dp_par_jit(res):
 
 
 @njit(cache=True)
-def _inplace_mask_dp_jit(res):
+def _inplace_mask_dp_jit(res: NDArray) -> None:
     # gap_pixels is always True here
     for row in (256,):
         vals = res[:, row - 1, :1030] & res[:, row + 2, :1030]

@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import warnings
+from typing import Callable
 
 import h5py
 import numpy as np
@@ -26,7 +29,14 @@ class EscapeAdapter:
         pedestal_file (str, optional): Path to pedestal file. Auto-locate if empty. Defaults to "".
     """
 
-    def __init__(self, file_path, *, detector_name="", gain_file="", pedestal_file=""):
+    def __init__(
+        self,
+        file_path: str,
+        *,
+        detector_name: str = "",
+        gain_file: str = "",
+        pedestal_file: str = "",
+    ) -> None:
         if not detector_name:
             detector_name = get_single_detector_name(file_path)
 
@@ -76,16 +86,16 @@ class EscapeAdapter:
             self.handler.highgain = daq_rec & 0b1
 
     @property
-    def process(self):
+    def process(self) -> Callable:
         """Escape represents jungfrau files as a single array and only needs the process function."""
         return self.handler.process
 
     @property
-    def gain_file(self):
+    def gain_file(self) -> str:
         """Gain file path (readonly)."""
         return self.handler.gain_file
 
     @property
-    def pedestal_file(self):
+    def pedestal_file(self) -> str:
         """Pedestal file path (readonly)."""
         return self.handler.pedestal_file

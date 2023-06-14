@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import logging
 
 import numpy as np
+from numpy.typing import NDArray
 
 from jungfrau_utils.data_handler import JFDataHandler
 
@@ -8,11 +11,11 @@ logger = logging.getLogger(__name__)
 
 
 class StreamAdapter:
-    def __init__(self):
+    def __init__(self) -> None:
         # a placeholder for jf data handler to be initiated with detector name
-        self.handler = None
+        self.handler: JFDataHandler | None = None
 
-    def process(self, image, metadata, **kwargs):
+    def process(self, image: NDArray, metadata: dict, **kwargs) -> NDArray:
         """Perform jungfrau detector data processing on an image received via stream.
 
         Args:
@@ -56,7 +59,7 @@ class StreamAdapter:
 
         return self.handler.process(image, **kwargs)
 
-    def _update_handler(self, md_dict):
+    def _update_handler(self, md_dict: dict) -> None:
         # gain file
         gain_file = md_dict.get("gain_file", "")
         try:

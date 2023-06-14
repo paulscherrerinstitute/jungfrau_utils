@@ -1,14 +1,15 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Tuple
 
 
 @dataclass
 class DetectorGeometry:
-    origin_y: Tuple[int] = (0,)
-    origin_x: Tuple[int] = (0,)
+    origin_y: tuple[int, ...] = (0,)
+    origin_x: tuple[int, ...] = (0,)
     is_stripsel: bool = False
     det_rot90: int = 0
-    mod_rot90: Tuple[int] = (0,)
+    mod_rot90: tuple[int, ...] = (0,)
 
 
 # fmt: off

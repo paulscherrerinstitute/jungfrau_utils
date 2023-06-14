@@ -1,13 +1,17 @@
+from __future__ import annotations
+
 import numbers
 import struct
 import warnings
 from itertools import islice
+from typing import Iterable
 
 import bitshuffle
 import h5py
 import numpy as np
 from bitshuffle.h5 import H5_COMPRESS_LZ4, H5FILTER  # pylint: disable=no-name-in-module
 from numba import njit, prange
+from numpy.typing import NDArray
 
 from jungfrau_utils.data_handler import JFDataHandler
 from jungfrau_utils.swissfel_helpers import (
@@ -45,17 +49,17 @@ class File:
 
     def __init__(
         self,
-        file_path,
+        file_path: str,
         *,
-        detector_name="",
-        gain_file="",
-        pedestal_file="",
-        conversion=True,
-        mask=True,
-        gap_pixels=True,
-        double_pixels="keep",
-        geometry=True,
-        parallel=True,
+        detector_name: str = "",
+        gain_file: str = "",
+        pedestal_file: str = "",
+        conversion: bool = True,
+        mask: bool = True,
+        gap_pixels: bool = True,
+        double_pixels: str = "keep",
+        geometry: bool = True,
+        parallel: bool = True,
     ):
         self.file = h5py.File(file_path, "r")
 
@@ -63,8 +67,8 @@ class File:
             detector_name = get_single_detector_name(file_path)
 
         # placeholders for processed files
-        self.handler = None
-        self._detector_name = detector_name
+        self.handler: JFDataHandler | None = None
+        self._detector_name: str = detector_name
 
         self._conversion = conversion
         self._mask = mask
@@ -115,19 +119,19 @@ class File:
         self.handler.highgain = daq_rec & 0b1
 
     @property
-    def file_path(self):
+    def file_path(self) -> str:
         warnings.warn(
             "file_path is deprecated and will be removed in jungfrau_utils/4.0", DeprecationWarning
         )
         return self.file.filename
 
     @property
-    def detector_name(self):
+    def detector_name(self) -> str:
         """Detector name (readonly)."""
         return self._detector_name
 
     @property
-    def gain_file(self):
+    def gain_file(self) -> str:
         """Gain file path (readonly)."""
         if self.handler is None:
             return ""
@@ -135,7 +139,7 @@ class File:
         return self.handler.gain_file
 
     @property
-    def pedestal_file(self):
+    def pedestal_file(self) -> str:
         """Pedestal file path (readonly)."""
         if self.handler is None:
             return ""
@@ -143,12 +147,12 @@ class File:
         return self.handler.pedestal_file
 
     @property
-    def conversion(self):
+    def conversion(self) -> bool:
         """A flag for applying pedestal correction and gain conversion."""
         return self._conversion
 
     @conversion.setter
-    def conversion(self, value):
+    def conversion(self, value: bool) -> None:
         if self._processed:
             print("The file is already processed, setting 'conversion' has no effect.")
             return
@@ -156,12 +160,12 @@ class File:
         self._conversion = value
 
     @property
-    def mask(self):
+    def mask(self) -> bool:
         """A flag for masking bad pixels."""
         return self._mask
 
     @mask.setter
-    def mask(self, value):
+    def mask(self, value: bool) -> None:
         if self._processed:
             print("The file is already processed, setting 'mask' has no effect.")
             return
@@ -169,12 +173,12 @@ class File:
         self._mask = value
 
     @property
-    def gap_pixels(self):
+    def gap_pixels(self) -> bool:
         """A flag for adding gap pixels."""
         return self._gap_pixels
 
     @gap_pixels.setter
-    def gap_pixels(self, value):
+    def gap_pixels(self, value: bool) -> None:
         if self._processed:
             print("The file is already processed, setting 'gap_pixels' has no effect.")
             return
@@ -182,12 +186,12 @@ class File:
         self._gap_pixels = value
 
     @property
-    def double_pixels(self):
+    def double_pixels(self) -> str:
         """A parameter for making modifications to double pixels."""
         return self._double_pixels
 
     @double_pixels.setter
-    def double_pixels(self, value):
+    def double_pixels(self, value: str) -> None:
         if self._processed:
             print("The file is already processed, setting 'double_pixels' has no effect.")
             return
@@ -195,12 +199,12 @@ class File:
         self._double_pixels = value
 
     @property
-    def geometry(self):
+    def geometry(self) -> bool:
         """A flag for applying geometry."""
         return self._geometry
 
     @geometry.setter
-    def geometry(self, value):
+    def geometry(self, value: bool) -> None:
         if self._processed:
             print("The file is already processed, setting 'geometry' has no effect.")
             return
@@ -208,12 +212,12 @@ class File:
         self._geometry = value
 
     @property
-    def parallel(self):
+    def parallel(self) -> bool:
         """A flag for using parallelization."""
         return self._parallel
 
     @parallel.setter
-    def parallel(self, value):
+    def parallel(self, value: bool) -> None:
         if self._processed:
             print("The file is already processed, setting 'parallel' has no effect.")
             return
@@ -221,24 +225,24 @@ class File:
         self._parallel = value
 
     @property
-    def _processed(self):
+    def _processed(self) -> bool:
         return "conversion_factor" in self._meta_group
 
     @property
-    def _data_dset(self):
+    def _data_dset(self) -> h5py.Dataset:
         return self.file[f"data/{self.detector_name}/data"]
 
     @property
-    def _data_group(self):
+    def _data_group(self) -> h5py.Group:
         return self.file[f"data/{self.detector_name}"]
 
     @property
-    def _meta_group(self):
+    def _meta_group(self) -> h5py.Group:
         if "meta" in self._data_group and isinstance(self._data_group["meta"], h5py.Group):
             return self._data_group["meta"]
         return self._data_group
 
-    def get_shape_out(self):
+    def get_shape_out(self) -> tuple[int, int]:
         """Return the final image shape of a detector, based on gap_pixel and geometry flags.
 
         Returns:
@@ -249,7 +253,7 @@ class File:
 
         return self.handler.get_shape_out(gap_pixels=self.gap_pixels, geometry=self.geometry)
 
-    def get_dtype_out(self):
+    def get_dtype_out(self) -> np.dtype:
         """Return resulting image dtype of a detector.
 
         Returns:
@@ -260,7 +264,7 @@ class File:
 
         return self.handler.get_dtype_out(self._data_dset.dtype, conversion=self.conversion)
 
-    def get_pixel_mask(self):
+    def get_pixel_mask(self) -> NDArray | None:
         """Return pixel mask, shaped according to gap_pixel and geometry flags.
 
         Returns:
@@ -275,17 +279,17 @@ class File:
 
     def export(
         self,
-        dest,
+        dest: str,
         *,
-        disabled_modules=(),
-        index=None,
-        roi=None,
-        downsample=None,
-        compression=False,
-        factor=None,
-        dtype=None,
-        batch_size=100,
-    ):
+        disabled_modules: tuple = (),
+        index: Iterable | None = None,
+        roi: tuple | dict | None = None,
+        downsample: tuple | None = None,
+        compression: bool = False,
+        factor: float | None = None,
+        dtype: np.dtype | None = None,
+        batch_size: int = 100,
+    ) -> None:
         """Export processed data into a separate hdf5 file.
 
         Args:
@@ -571,7 +575,7 @@ class File:
     def __exit__(self, *args):
         self.close()
 
-    def __getitem__(self, item):
+    def __getitem__(self, item: str | tuple | int | slice | range | list | NDArray) -> NDArray:
         if isinstance(item, str):
             # per pulse data entry (lazy)
             return self._data_group[item]
@@ -629,20 +633,20 @@ class File:
 
         return data
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         if self.file.id:
             r = f'<Jungfrau file "{self.file.filename}">'
         else:
             r = "<Closed Jungfrau file>"
         return r
 
-    def close(self):
+    def close(self) -> None:
         """Close Jungfrau file."""
         if self.file.id:
             self.file.close()
         self.handler = None  # dereference handler since it holds pedestal/gain data
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.file)
 
     def __getattr__(self, name):
@@ -650,7 +654,7 @@ class File:
 
 
 @njit(cache=True)
-def _downsample_mask_jit(mask, downsample):
+def _downsample_mask_jit(mask: NDArray, downsample: tuple[int, int]) -> tuple[NDArray, NDArray]:
     size_y, size_x = mask.shape
     ds_y, ds_x = downsample
     downsample_pix_num = ds_y * ds_x
@@ -676,7 +680,13 @@ def _downsample_mask_jit(mask, downsample):
 
 
 @njit(cache=True)
-def _downsample_image_jit(res, image, downsample, factor, good_pixels_fraction):
+def _downsample_image_jit(
+    res: NDArray,
+    image: NDArray,
+    downsample: tuple[int, int],
+    factor: float | None,
+    good_pixels_fraction: NDArray,
+) -> None:
     num, out_shape_y, out_shape_x = res.shape
     ds_y, ds_x = downsample
 
@@ -696,7 +706,13 @@ def _downsample_image_jit(res, image, downsample, factor, good_pixels_fraction):
 
 
 @njit(cache=True, parallel=True)
-def _downsample_image_par_jit(res, image, downsample, factor, good_pixels_fraction):
+def _downsample_image_par_jit(
+    res: NDArray,
+    image: NDArray,
+    downsample: tuple[int, int],
+    factor: float | None,
+    good_pixels_fraction: NDArray,
+) -> None:
     num, out_shape_y, out_shape_x = res.shape
     ds_y, ds_x = downsample
 
