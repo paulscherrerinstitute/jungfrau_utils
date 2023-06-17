@@ -367,24 +367,20 @@ class JFDataHandler:
             module_size_y = MODULE_FULL_SIZE_Y if gap_pixels else MODULE_SIZE_Y
             origin_y = self.detector_geometry.origin_y
             origin_x = self.detector_geometry.origin_x
+            mod_rot90 = self.detector_geometry.mod_rot90
 
             oy_end_all = []
             ox_end_all = []
-            for i, (oy, ox) in enumerate(zip(origin_y, origin_x)):
-                if len(self.detector_geometry.mod_rot90) == 1:
-                    mod_rot90 = self.detector_geometry.mod_rot90[0]
-                else:
-                    mod_rot90 = self.detector_geometry.mod_rot90[i]
-
-                if mod_rot90 == 1:
+            for oy, ox, mr90 in zip(origin_y, origin_x, mod_rot90):
+                if mr90 == 1:
                     oy -= module_size_x
-                elif mod_rot90 == 2:
+                elif mr90 == 2:
                     oy -= module_size_y
                     ox -= module_size_x
-                elif mod_rot90 == 3:
+                elif mr90 == 3:
                     ox -= module_size_y
 
-                if mod_rot90 % 2 == 0:
+                if mr90 % 2 == 0:
                     oy_end = oy + module_size_y
                     ox_end = ox + module_size_x
                 else:
@@ -476,11 +472,7 @@ class JFDataHandler:
                 elif det_rot90 == 3:  # (x, y) -> (-y, x)
                     ox, oy = shape_y - oy, ox
 
-            if len(self.detector_geometry.mod_rot90) == 1:
-                mod_rot90 = self.detector_geometry.mod_rot90[0]
-            else:
-                mod_rot90 = self.detector_geometry.mod_rot90[i]
-
+            mod_rot90 = self.detector_geometry.mod_rot90[i]
             mod_rot90 = (mod_rot90 + det_rot90) % 4
 
             if mod_rot90 == 1:

@@ -7,9 +7,13 @@ from dataclasses import dataclass
 class DetectorGeometry:
     origin_y: tuple[int, ...] = (0,)
     origin_x: tuple[int, ...] = (0,)
+    mod_rot90: tuple[int, ...] = (0,)
     is_stripsel: bool = False
     det_rot90: int = 0
-    mod_rot90: tuple[int, ...] = (0,)
+
+    def __post_init__(self):
+        if self.mod_rot90 == (0,) and len(self.origin_y) > 1:
+            self.mod_rot90 *= len(self.origin_y)
 
 
 # fmt: off
