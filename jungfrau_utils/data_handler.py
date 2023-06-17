@@ -312,13 +312,13 @@ class JFDataHandler:
 
     @module_map.setter
     def module_map(self, value: NDArray) -> None:
-        if np.array_equal(self._module_map, value):
-            return
-
         n_modules = self.detector.n_modules
         if value is None:
             # support legacy data by emulating 'all modules are present'
             value = np.arange(n_modules)
+
+        if np.array_equal(self._module_map, value):
+            return
 
         if len(value) != n_modules:
             raise ValueError(f"Expected module_map length {n_modules}, provided {len(value)}.")
