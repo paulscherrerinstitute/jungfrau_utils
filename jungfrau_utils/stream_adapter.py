@@ -45,8 +45,29 @@ class StreamAdapter:
         if image.dtype != np.uint16 or self.handler is None:
             return np.copy(image)
 
-        # parse metadata
-        self._update_handler(metadata)
+        # gain file
+        gain_file = metadata.get("gain_file", "")
+        try:
+            self.handler.gain_file = gain_file
+        except Exception:
+            logging.exception(f"Error loading gain file {gain_file}")
+            self.handler.gain_file = ""
+
+        # pedestal file
+        pedestal_file = metadata.get("pedestal_file", "")
+        try:
+            self.handler.pedestal_file = pedestal_file
+        except Exception:
+            logging.exception(f"Error loading pedestal file {pedestal_file}")
+            self.handler.pedestal_file = ""
+
+        # module map
+        module_map = metadata.get("module_map")
+        self.handler.module_map = None if (module_map is None) else np.array(module_map)
+
+        # highgain
+        daq_rec = metadata.get("daq_rec")
+        self.handler.highgain = False if (daq_rec is None) else bool(daq_rec & 0b1)
 
         if "conversion" not in kwargs:
             # skip conversion step if jungfrau data handler cannot do it, thus avoiding Exception
@@ -58,28 +79,3 @@ class StreamAdapter:
             kwargs["mask"] = self.handler.pixel_mask is not None
 
         return self.handler.process(image, **kwargs)
-
-    def _update_handler(self, md_dict: dict) -> None:
-        # gain file
-        gain_file = md_dict.get("gain_file", "")
-        try:
-            self.handler.gain_file = gain_file
-        except Exception:
-            logging.exception(f"Error loading gain file {gain_file}")
-            self.handler.gain_file = ""
-
-        # pedestal file
-        pedestal_file = md_dict.get("pedestal_file", "")
-        try:
-            self.handler.pedestal_file = pedestal_file
-        except Exception:
-            logging.exception(f"Error loading pedestal file {pedestal_file}")
-            self.handler.pedestal_file = ""
-
-        # module map
-        module_map = md_dict.get("module_map")
-        self.handler.module_map = None if (module_map is None) else np.array(module_map)
-
-        # highgain
-        daq_rec = md_dict.get("daq_rec")
-        self.handler.highgain = False if (daq_rec is None) else bool(daq_rec & 0b1)

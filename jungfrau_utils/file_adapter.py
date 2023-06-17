@@ -67,7 +67,7 @@ class File:
             detector_name = get_single_detector_name(file_path)
 
         # placeholders for processed files
-        self.handler: JFDataHandler | None = None
+        self.handler: JFDataHandler = JFDataHandler(detector_name)
         self._detector_name: str = detector_name
 
         self._conversion = conversion
@@ -80,8 +80,6 @@ class File:
         # No need for any further setup if the file is already processed
         if self._processed:
             return
-
-        self.handler = JFDataHandler(detector_name)
 
         # Gain file
         if not gain_file:
@@ -133,17 +131,11 @@ class File:
     @property
     def gain_file(self) -> str:
         """Gain file path (readonly)."""
-        if self.handler is None:
-            return ""
-
         return self.handler.gain_file
 
     @property
     def pedestal_file(self) -> str:
         """Pedestal file path (readonly)."""
-        if self.handler is None:
-            return ""
-
         return self.handler.pedestal_file
 
     @property
@@ -333,17 +325,17 @@ class File:
             if downsample == (1, 1):
                 downsample = None
 
-        if roi and downsample:
+        if roi is not None and downsample:
             raise ValueError("Unsupported mode: roi with downsample.")
 
-        if roi:
+        if roi is not None:
             if isinstance(roi, tuple) and len(roi) == 4 and all(isinstance(v, int) for v in roi):
                 # this is a single tuple with coordinates, so wrap it in another tuple
                 roi = (roi,)
 
             if isinstance(roi, dict):
                 roi_labels = roi.keys()
-                roi = roi.values()
+                roi = tuple(roi.values())
             else:
                 roi_labels = range(len(roi))
 
@@ -644,7 +636,7 @@ class File:
         """Close Jungfrau file."""
         if self.file.id:
             self.file.close()
-        self.handler = None  # dereference handler since it holds pedestal/gain data
+        del self.handler  # dereference handler since it holds pedestal/gain data
 
     def __len__(self) -> int:
         return len(self.file)

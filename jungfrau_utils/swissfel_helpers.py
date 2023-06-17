@@ -22,23 +22,23 @@ def locate_gain_file(file_path: str, *, detector_name: str = "", verbose: bool =
     Returns:
         str: A path to the located gain file.
     """
-    file_path = Path(file_path)
-    if file_path.parts[1] != "sf":
-        raise Exception("Gain file needs to be specified explicitly.")
+    _file_path = Path(file_path)
+    if _file_path.parts[1] != "sf":
+        raise ValueError("Gain file needs to be specified explicitly.")
 
     if not detector_name:
-        detector_name = get_single_detector_name(file_path)
+        detector_name = get_single_detector_name(str(_file_path))
 
     gain_path = Path("/sf/jungfrau/config/gainMaps/")
     gain_file = gain_path.joinpath(detector_name, "gains.h5")
 
     if not gain_file.is_file():
-        raise Exception(f"No gain file in the default location: {gain_path}")
+        raise ValueError(f"No gain file in the default location: {gain_path}")
 
     if verbose:
         print(f"Auto-located gain file: {gain_file}")
 
-    return gain_file.as_posix()
+    return str(gain_file)
 
 
 def locate_pedestal_file(file_path: str, *, detector_name: str = "", verbose: bool = True) -> str:
@@ -59,20 +59,20 @@ def locate_pedestal_file(file_path: str, *, detector_name: str = "", verbose: bo
     Returns:
         str: A path to the located pedestal file.
     """
-    file_path = Path(file_path)
-    if file_path.parts[1] != "sf":
-        raise Exception("Pedestal file needs to be specified explicitly.")
+    _file_path = Path(file_path)
+    if _file_path.parts[1] != "sf":
+        raise ValueError("Pedestal file needs to be specified explicitly.")
 
     if not detector_name:
-        detector_name = get_single_detector_name(file_path)
+        detector_name = get_single_detector_name(str(_file_path))
 
     pedestal_paths = (
-        Path(*file_path.parts[:5]).joinpath("res", "JF_pedestals"),
-        Path(*file_path.parts[:5]).joinpath("raw", "JF_pedestals"),
+        Path(*_file_path.parts[:5]).joinpath("res", "JF_pedestals"),
+        Path(*_file_path.parts[:5]).joinpath("raw", "JF_pedestals"),
     )
 
     # find a pedestal file, which was created closest in time to the jungfrau file
-    jf_file_mtime = file_path.stat().st_mtime
+    jf_file_mtime = _file_path.stat().st_mtime
     closest_pedestal_file = ""
     min_mtime_diff = float("inf")
     for pedestal_path in pedestal_paths:
@@ -86,7 +86,7 @@ def locate_pedestal_file(file_path: str, *, detector_name: str = "", verbose: bo
                         closest_pedestal_file = entry
 
     if not closest_pedestal_file:
-        raise Exception(f"No pedestal file found in default locations: {pedestal_paths}")
+        raise ValueError(f"No pedestal file found in default locations: {pedestal_paths}")
 
     if verbose:
         print(f"Auto-located pedestal file: {closest_pedestal_file}")
@@ -103,7 +103,7 @@ def locate_pedestal_file(file_path: str, *, detector_name: str = "", verbose: bo
         print(f"pedestal file: {datetime.fromtimestamp(pedestal_mtime).strftime('%H:%M %d.%m.%Y')}")
         print("    mtime difference: " + tdelta_str)
 
-    return closest_pedestal_file.as_posix()
+    return str(closest_pedestal_file)
 
 
 def get_single_detector_name(file_path: str) -> str:
@@ -124,10 +124,10 @@ def get_single_detector_name(file_path: str) -> str:
 
         # raise an exception if n_groups != 1
         if n_groups == 0:
-            raise Exception("File doesn't contain detector data.")
+            raise ValueError("File doesn't contain detector data.")
 
         if n_groups > 1:
-            raise Exception(
+            raise ValueError(
                 "Specify `detector_name` as the file contains data for multiple detectors."
             )
 
