@@ -7,8 +7,8 @@ from jungfrau_utils import JFDataHandler, StreamAdapter
 DETECTOR_NAME = "JF01T03V01"
 DATA_SHAPE = (3 * 512, 1024)
 DATA_SHAPE_WITH_GAPS = (3 * (512 + 2), 1024 + 6)
-DATA_SHAPE_WITH_GEOMETRY = (1040 + 512, 0 + 1024)
-DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY = (1040 + 512 + 2, 0 + 1024 + 6)
+DATA_SHAPE_WITH_GEOMETRY = (1102 + 512, 0 + 1024)
+DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY = (1102 + 512 + 2, 0 + 1024 + 6)
 
 image = np.arange(np.prod(DATA_SHAPE), dtype=np.uint16).reshape(DATA_SHAPE[::-1])
 image = np.ascontiguousarray(image.transpose())
