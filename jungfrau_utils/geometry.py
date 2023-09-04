@@ -19,7 +19,7 @@ class DetectorGeometry:
 # fmt: off
 detector_geometry = {
     "JF01T03V01": DetectorGeometry(
-        origin_y=(0, 551, 1102),
+        origin_y=(0, 550, 1100),
         origin_x=(0, 0, 0),
     ),
 
@@ -284,7 +284,7 @@ detector_geometry = {
     ),
 
     "JF16T03V01": DetectorGeometry(
-        origin_y=(0, 520, 1040),
+        origin_y=(0, 550, 1100),
         origin_x=(0, 0, 0),
     ),
 
