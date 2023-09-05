@@ -54,6 +54,14 @@ There are several channels (conda-forge, paulscherrerinstitute) where bitshuffle
 conda  remove bitshuffle --force              # remove bitshuffle from conda environment
 pip install bitshuffle --no-binary=bitshuffle # install bitshuffle with recompilation in the current conda environment
 ```
+To check if bitshuffle compiled with AVX512 support:
+```
+python -c "import bitshuffle; print(bitshuffle.using_AVX512())"
+```
+List of supported processors instructions can be found in /proc/cpuinfo
+```
+grep -i avx512 /proc/cpuinfo
+```
 
 # Build
 
