@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -23,8 +24,6 @@ def locate_gain_file(file_path: str, *, detector_name: str = "", verbose: bool =
         str: A path to the located gain file.
     """
     _file_path = Path(file_path)
-    if _file_path.parts[1] != "sf":
-        raise ValueError("Gain file needs to be specified explicitly.")
 
     if not detector_name:
         detector_name = get_single_detector_name(str(_file_path))
@@ -33,7 +32,9 @@ def locate_gain_file(file_path: str, *, detector_name: str = "", verbose: bool =
     gain_file = gain_path.joinpath(detector_name, "gains.h5")
 
     if not gain_file.is_file():
-        raise ValueError(f"No gain file in the default location: {gain_path}")
+        raise ValueError(
+            f"Gain file needs to be specified explicitly. No gain file in the default location: {gain_path}"
+        )
 
     if verbose:
         print(f"Auto-located gain file: {gain_file}")
@@ -45,9 +46,10 @@ def locate_pedestal_file(file_path: str, *, detector_name: str = "", verbose: bo
     """Locate pedestal file in default location at swissfel.
 
     The default pedestal file paths for a particula p-group are
-    ``/sf/<beamline>/data/<p-group>/res/JF_pedestals/`` (old daq)
+    ``<prefix_path>/sf/<beamline>/data/<p-group>/res/JF_pedestals/`` (old daq)
     or
-    ``/sf/<beamline>/data/<p-group>/raw/JF_pedestals/`` (new daq).
+    ``<prefix_path>/sf/<beamline>/data/<p-group>/raw/JF_pedestals/`` (new daq),
+    where <prefix_path> is a non-empty string in case of data retrieved from archive.
 
     Args:
         file_path (str): File path of a jungfrau data file.
@@ -60,15 +62,19 @@ def locate_pedestal_file(file_path: str, *, detector_name: str = "", verbose: bo
         str: A path to the located pedestal file.
     """
     _file_path = Path(file_path)
-    if _file_path.parts[1] != "sf":
-        raise ValueError("Pedestal file needs to be specified explicitly.")
 
     if not detector_name:
         detector_name = get_single_detector_name(str(_file_path))
 
+    match = re.search(r"/sf/([a-zA-Z]+)/data/p(\d+)/raw/", file_path)
+    if match is None:
+        raise ValueError("Pedestal file needs to be specified explicitly.")
+
+    data_path = file_path[: match.end()]
+
     pedestal_paths = (
-        Path(*_file_path.parts[:5]).joinpath("res", "JF_pedestals"),
-        Path(*_file_path.parts[:5]).joinpath("raw", "JF_pedestals"),
+        Path(data_path).joinpath("JF_pedestals"),
+        Path(data_path[:-4]).joinpath("res/JF_pedestals"),  # replace "raw/" with "res/"
     )
 
     # find a pedestal file, which was created closest in time to the jungfrau file
@@ -86,7 +92,9 @@ def locate_pedestal_file(file_path: str, *, detector_name: str = "", verbose: bo
                         closest_pedestal_file = entry
 
     if not closest_pedestal_file:
-        raise ValueError(f"No pedestal file found in default locations: {pedestal_paths}")
+        raise ValueError(
+            f"Pedestal file needs to be specified explicitly. No pedestal file found in default locations: {pedestal_paths}"
+        )
 
     if verbose:
         print(f"Auto-located pedestal file: {closest_pedestal_file}")
