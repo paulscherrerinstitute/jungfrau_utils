@@ -80,6 +80,9 @@ class File:
 
         # No need for any further setup if the file is already processed
         if self._processed:
+            if jungfrau_utils.verbose:
+                print("The file is already converted, setting processing parameters has no effect.")
+                print("No gain/pedestal files are loaded.")
             return
 
         # Gain file
