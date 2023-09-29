@@ -13,6 +13,7 @@ from bitshuffle.h5 import H5_COMPRESS_LZ4, H5FILTER  # pylint: disable=no-name-i
 from numba import njit, prange
 from numpy.typing import NDArray
 
+import jungfrau_utils
 from jungfrau_utils.data_handler import JFDataHandler
 from jungfrau_utils.swissfel_helpers import (
     get_single_detector_name,
@@ -83,13 +84,17 @@ class File:
 
         # Gain file
         if not gain_file:
-            gain_file = locate_gain_file(file_path, detector_name=detector_name)
+            gain_file = locate_gain_file(
+                file_path, detector_name=detector_name, verbose=jungfrau_utils.verbose
+            )
 
         self.handler.gain_file = gain_file
 
         # Pedestal file (with a pixel mask)
         if not pedestal_file:
-            pedestal_file = locate_pedestal_file(file_path, detector_name=detector_name)
+            pedestal_file = locate_pedestal_file(
+                file_path, detector_name=detector_name, verbose=jungfrau_utils.verbose
+            )
 
         self.handler.pedestal_file = pedestal_file
 
