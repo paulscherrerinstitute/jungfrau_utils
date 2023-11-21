@@ -308,5 +308,9 @@ detector_geometry = {
             3, 3, 3, 3,
         ),
     ),
+
+    "JF18T01V01": DetectorGeometry(
+        is_stripsel=True,
+    ),
 }
 # fmt: on

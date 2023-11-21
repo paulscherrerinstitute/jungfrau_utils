@@ -36,6 +36,10 @@ MODULE_FULL_SIZE_Y: int = MODULE_SIZE_Y + (CHIP_NUM_Y - 1) * CHIP_GAP_Y
 STRIPSEL_SIZE_X: int = 1024 * 3 + 18  # = 3090
 STRIPSEL_SIZE_Y: int = 84
 
+# a vertical stripsel detector
+STRIPSEL_JF18_SIZE_X: int = 165
+STRIPSEL_JF18_SIZE_Y: int = 1488
+
 
 class JFDataHandler:
     """A class to perform jungfrau detector data handling like pedestal correction,
@@ -423,8 +427,12 @@ class JFDataHandler:
 
     def _get_stripsel_shape_out(self, geometry: bool) -> tuple[int, int]:
         if geometry:
-            shape_x = max(self.detector_geometry.origin_x) + STRIPSEL_SIZE_X
-            shape_y = max(self.detector_geometry.origin_y) + STRIPSEL_SIZE_Y
+            if self.detector_name.startswith("JF18"):
+                shape_x = max(self.detector_geometry.origin_x) + STRIPSEL_JF18_SIZE_X
+                shape_y = max(self.detector_geometry.origin_y) + STRIPSEL_JF18_SIZE_Y
+            else:
+                shape_x = max(self.detector_geometry.origin_x) + STRIPSEL_SIZE_X
+                shape_y = max(self.detector_geometry.origin_y) + STRIPSEL_SIZE_Y
         else:
             shape_y, shape_x = self._shape_in
 
@@ -597,11 +605,17 @@ class JFDataHandler:
 
         if parallel:
             adc_to_energy = _adc_to_energy_par_jit
-            reshape_stripsel = _reshape_stripsel_par_jit
+            if self.detector_name.startswith("JF18"):
+                reshape_stripsel = _reshape_stripsel_jf18_par_jit
+            else:
+                reshape_stripsel = _reshape_stripsel_par_jit
             inplace_interp_dp = _inplace_interp_dp_par_jit
         else:
             adc_to_energy = _adc_to_energy_jit
-            reshape_stripsel = _reshape_stripsel_jit
+            if self.detector_name.startswith("JF18"):
+                reshape_stripsel = _reshape_stripsel_jf18_jit
+            else:
+                reshape_stripsel = _reshape_stripsel_jit
             inplace_interp_dp = _inplace_interp_dp_jit
 
         _mask = self._mask(double_pixels)
@@ -696,6 +710,11 @@ class JFDataHandler:
         if self._pixel_mask is None:
             return None
 
+        if self.detector_name.startswith("JF18"):
+            reshape_stripsel = _reshape_stripsel_jf18_jit
+        else:
+            reshape_stripsel = _reshape_stripsel_jit
+
         _mask = self._mask(double_pixels)[np.newaxis]
 
         res_shape = self.get_shape_out(gap_pixels=gap_pixels, geometry=geometry)
@@ -715,7 +734,7 @@ class JFDataHandler:
             oy, oy_end, ox, ox_end, rot90 = self._get_module_coords(m, i, geometry, gap_pixels)
             mod_res = res[:, oy:oy_end, ox:ox_end]
             if self.detector_geometry.is_stripsel and geometry:
-                _reshape_stripsel_jit(mod_res, mod)
+                reshape_stripsel(mod_res, mod)
             else:
                 mod_res = np.rot90(mod_res, k=-rot90, axes=(1, 2))
                 # this will just copy data to the correct place
@@ -1005,6 +1024,50 @@ def _reshape_stripsel_par_jit(res: NDArray, image: NDArray) -> None:
                 xout = igap * 774 + 765 + 11 - yin % 6
                 res[ind, yout, xout] = image[ind, yin, xin] / 2
                 res[ind, yout + 1, xout] = image[ind, yin, xin] / 2
+
+
+@njit(cache=True)
+def _reshape_stripsel_jf18_jit(res: NDArray, image: NDArray) -> None:
+    image = image[:, :, 256 : 256 * 3]
+
+    offset_y = 9
+    offset_x_r = 9
+    offset_x_l = 11
+
+    # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
+    for ind in prange(image.shape[0]):  # pylint: disable=not-an-iterable
+        for xin in range(offset_x_l, 512 - offset_x_r):
+            for yin in range(offset_y, 255):
+                yout = (xin - offset_x_l) % 3 + (yin - offset_y) * 3
+                xout = (xin - offset_x_l) // 3 + xin // 257
+                res[ind, yout, xout] = image[ind, yin, xin]
+
+            for yin in range(257, 512 - offset_y):
+                yout = 2 - (xin - offset_x_l) % 3 + (yin - offset_y) * 3 + 6
+                xout = (xin - offset_x_l) // 3 + xin // 257
+                res[ind, yout, xout] = image[ind, yin, xin]
+
+
+@njit(cache=True, parallel=True)
+def _reshape_stripsel_jf18_par_jit(res: NDArray, image: NDArray) -> None:
+    image = image[:, :, 256 : 256 * 3]
+
+    offset_y = 9
+    offset_x_r = 9
+    offset_x_l = 11
+
+    # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
+    for ind in prange(image.shape[0]):  # pylint: disable=not-an-iterable
+        for xin in range(offset_x_l, 512 - offset_x_r):
+            for yin in range(offset_y, 255):
+                yout = (xin - offset_x_l) % 3 + (yin - offset_y) * 3
+                xout = (xin - offset_x_l) // 3 + xin // 257
+                res[ind, yout, xout] = image[ind, yin, xin]
+
+            for yin in range(257, 512 - offset_y):
+                yout = 2 - (xin - offset_x_l) % 3 + (yin - offset_y) * 3 + 6
+                xout = (xin - offset_x_l) // 3 + xin // 257
+                res[ind, yout, xout] = image[ind, yin, xin]
 
 
 @njit(cache=True)
