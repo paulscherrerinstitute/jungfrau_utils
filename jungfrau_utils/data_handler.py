@@ -1036,16 +1036,19 @@ def _reshape_stripsel_jf18_jit(res: NDArray, image: NDArray) -> None:
 
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
     for ind in prange(image.shape[0]):  # pylint: disable=not-an-iterable
+        image_tmp = np.rot90(image[ind], k=2)
         for xin in range(offset_x_l, 512 - offset_x_r):
             for yin in range(offset_y, 255):
                 yout = (xin - offset_x_l) % 3 + (yin - offset_y) * 3
                 xout = (xin - offset_x_l) // 3 + xin // 257
-                res[ind, yout, xout] = image[ind, yin, xin]
+                res[ind, yout, xout] = image_tmp[yin, xin]
 
             for yin in range(257, 512 - offset_y):
                 yout = 2 - (xin - offset_x_l) % 3 + (yin - offset_y) * 3 + 6
                 xout = (xin - offset_x_l) // 3 + xin // 257
-                res[ind, yout, xout] = image[ind, yin, xin]
+                res[ind, yout, xout] = image_tmp[yin, xin]
+
+        res[ind] = np.rot90(res[ind], k=2)
 
 
 @njit(cache=True, parallel=True)
@@ -1058,16 +1061,19 @@ def _reshape_stripsel_jf18_par_jit(res: NDArray, image: NDArray) -> None:
 
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
     for ind in prange(image.shape[0]):  # pylint: disable=not-an-iterable
+        image_tmp = np.rot90(image[ind], k=2)
         for xin in range(offset_x_l, 512 - offset_x_r):
             for yin in range(offset_y, 255):
                 yout = (xin - offset_x_l) % 3 + (yin - offset_y) * 3
                 xout = (xin - offset_x_l) // 3 + xin // 257
-                res[ind, yout, xout] = image[ind, yin, xin]
+                res[ind, yout, xout] = image_tmp[yin, xin]
 
             for yin in range(257, 512 - offset_y):
                 yout = 2 - (xin - offset_x_l) % 3 + (yin - offset_y) * 3 + 6
                 xout = (xin - offset_x_l) // 3 + xin // 257
-                res[ind, yout, xout] = image[ind, yin, xin]
+                res[ind, yout, xout] = image_tmp[yin, xin]
+
+        res[ind] = np.rot90(res[ind], k=2)
 
 
 @njit(cache=True)
