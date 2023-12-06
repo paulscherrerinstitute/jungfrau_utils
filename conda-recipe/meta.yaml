@@ -19,7 +19,7 @@ requirements:
         - python >=3.8
         - h5py >=2.10,<4
         - numpy
-        - numba
+        - numba >=0.54
         - bitshuffle >=0.5
 
 test:
