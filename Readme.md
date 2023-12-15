@@ -49,7 +49,7 @@ For testing, the git repo can also be simply cloned.
 
 ## Problem with bitshuffle
 
-There are several channels (conda-forge, paulscherrerinstitute) where bitshuffle package is released. It's better to not use bitshuffle from paulscherrerinstitute channel (have compatibility problem with h5py/hdf). Starting from 3.14.4 version, bitshuffle version >0.5 is requested for jungfrau_utils. This version may have a problem on nodes, since compiled with AVX512 instructions, which are not available for processors like (Intel(R) Xeon(R) CPU E5-2697A v4) or (AMD EPYC 7453). Problem with such bitshuffle will be "Illegal instruction" message when reading or writing of compressed files via jungfrau_utils is done. To fix this problem, reinstall bitshuffle in your conda environment with the recompilation:
+There are several channels (conda-forge, paulscherrerinstitute) where bitshuffle package is released. It's better to not use bitshuffle from paulscherrerinstitute channel (have compatibility problem with h5py/hdf). Starting from 3.14.4 version, bitshuffle version >=0.5 is requested for jungfrau_utils. This version may have a problem on nodes, since compiled with AVX512 instructions, which are not available for processors like (Intel(R) Xeon(R) CPU E5-2697A v4) or (AMD EPYC 7453). Problem with such bitshuffle will be "Illegal instruction" message when reading or writing of compressed files via jungfrau_utils is done. To fix this problem, reinstall bitshuffle in your conda environment with the recompilation:
 ```
 conda  remove bitshuffle --force              # remove bitshuffle from conda environment
 pip install bitshuffle --no-binary=bitshuffle # install bitshuffle with recompilation in the current conda environment
