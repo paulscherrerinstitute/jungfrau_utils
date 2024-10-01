@@ -196,6 +196,18 @@ detector_geometry = {
         det_rot90=1,
     ),
 
+    "JF06T08V05": DetectorGeometry(
+        origin_y=(
+            68, 0, 618, 550,
+            1168, 1100, 1718, 1650,
+        ),
+        origin_x=(
+            0, 1039, 0, 1039,
+            67, 1106, 67, 1106,
+        ),
+        det_rot90=1,
+    ),
+
     "JF06T04V01": DetectorGeometry(
         origin_y=(68, 0, 618, 550),
         origin_x=(0, 1039, 67, 1106),
@@ -284,6 +296,11 @@ detector_geometry = {
     ),
 
     "JF16T03V01": DetectorGeometry(
+        origin_y=(0, 550, 1100),
+        origin_x=(0, 0, 0),
+    ),
+
+    "JF16T03V02": DetectorGeometry(
         origin_y=(0, 550, 1100),
         origin_x=(0, 0, 0),
     ),
