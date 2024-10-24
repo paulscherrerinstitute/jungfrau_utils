@@ -353,5 +353,9 @@ detector_geometry = {
     "JF18T01V01": DetectorGeometry(
         is_stripsel=True,
     ),
+
+    "JF19T01V01": DetectorGeometry(),
+
+    "JF20T01V01": DetectorGeometry(),
 }
 # fmt: on
