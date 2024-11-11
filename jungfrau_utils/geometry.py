@@ -232,6 +232,18 @@ detector_geometry = {
         det_rot90=1,
     ),
 
+    "JF06T08V06": DetectorGeometry(
+        origin_y=(
+            68, 0, 618, 550,
+            1168, 1100, 1718, 1650,
+        ),
+        origin_x=(
+            0, 1039, 0, 1039,
+            67, 1106, 67, 1106,
+        ),
+        det_rot90=1,
+    ),
+
     "JF06T04V01": DetectorGeometry(
         origin_y=(68, 0, 618, 550),
         origin_x=(0, 1039, 67, 1106),
