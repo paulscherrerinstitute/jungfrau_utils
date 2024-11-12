@@ -1,12 +1,11 @@
 name: rtd
 
 channels:
-  - defaults
   - conda-forge
 
 dependencies:
-  - python =3.7
-  - h5py >=2.9,<4
+  - python >=3.8
+  - h5py >=2.10,<4
   - numpy
-  - numba
-  - conda-forge::bitshuffle =0.3.5
+  - numba >=0.54
+  - bitshuffle >=0.5
