@@ -1,3 +1,4 @@
+![GitHub Tag](https://img.shields.io/github/v/tag/paulscherrerinstitute/jungfrau_utils)
 [![Deployment](https://github.com/paulscherrerinstitute/jungfrau_utils/actions/workflows/deployment.yaml/badge.svg)](https://github.com/paulscherrerinstitute/jungfrau_utils/actions/workflows/deployment.yaml)
 [![Documentation Status](https://readthedocs.org/projects/jungfrau-utils/badge/?version=latest)](https://jungfrau-utils.readthedocs.io/en/latest/?badge=latest)
 
