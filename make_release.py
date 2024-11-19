@@ -42,6 +42,7 @@ def main():
 
     os.system(f"git commit {version_filepath} -m 'Updating for version {new_version}'")
     os.system(f"git tag -a {new_version} -m 'Release {new_version}'")
+    os.system("git push --follow-tags")
 
 
 if __name__ == "__main__":
