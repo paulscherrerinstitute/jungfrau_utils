@@ -12,13 +12,13 @@ def main():
         print("Aborting, not on 'main' branch.")
         return
 
-    filepath = "jungfrau_utils/__init__.py"
+    version_filepath = os.path.join(os.path.basename(os.path.dirname(__file__)), "__init__.py")
 
     parser = argparse.ArgumentParser()
     parser.add_argument("level", type=str, choices=["patch", "minor", "major"])
     args = parser.parse_args()
 
-    with open(filepath) as f:
+    with open(version_filepath) as f:
         file_content = f.read()
 
     version = re.search(r'__version__ = "(.*?)"', file_content).group(1)
@@ -36,10 +36,10 @@ def main():
 
     new_version = f"{major}.{minor}.{patch}"
 
-    with open(filepath, "w") as f:
+    with open(version_filepath, "w") as f:
         f.write(re.sub(r'__version__ = "(.*?)"', f'__version__ = "{new_version}"', file_content))
 
-    os.system(f"git commit {filepath} -m 'Updating for version {new_version}'")
+    os.system(f"git commit {version_filepath} -m 'Updating for version {new_version}'")
     os.system(f"git tag -a {new_version} -m 'Release {new_version}'")
 
 
