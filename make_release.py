@@ -3,9 +3,15 @@
 import argparse
 import os
 import re
+import subprocess
 
 
 def main():
+    branch = subprocess.check_output("git rev-parse --abbrev-ref HEAD", shell=True).decode().strip()
+    if branch != "main":
+        print("Aborting, not on 'main' branch.")
+        return
+
     filepath = "jungfrau_utils/__init__.py"
 
     parser = argparse.ArgumentParser()
