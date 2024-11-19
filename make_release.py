@@ -7,9 +7,10 @@ import subprocess
 
 
 def main():
+    default_branch = "main"
     branch = subprocess.check_output("git rev-parse --abbrev-ref HEAD", shell=True).decode().strip()
-    if branch != "main":
-        print("Aborting, not on 'main' branch.")
+    if branch != default_branch:
+        print(f"Aborting, not on '{default_branch}' branch.")
         return
 
     version_filepath = os.path.join(os.path.basename(os.path.dirname(__file__)), "__init__.py")
