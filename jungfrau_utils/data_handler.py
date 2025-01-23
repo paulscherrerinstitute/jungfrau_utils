@@ -50,12 +50,21 @@ class JFDataHandler:
     """
 
     def __init__(self, detector_name: str) -> None:
-        # detector_name needs to be a valid name
+        # detector_name needs to be a valid string
+        if not (isinstance(detector_name, str) and re.match(r"^JF\d+T\d+V\d+$", detector_name)):
+            raise ValueError("detector_name must be a string in the form 'JF<id>T<nmod>V<version>'")
+
+        detector_name_noVer = detector_name.split("V")[0]
+        # Search for a direct match between a detector_name and one of the detector_geometry keys
         if detector_name in detector_geometry:
-            self._detector_name = detector_name
             self._detector_geometry = detector_geometry[detector_name]
+        # If no direct match, search for a detector_name without the version number
+        elif detector_name_noVer in detector_geometry:
+            self._detector_geometry = detector_geometry[detector_name_noVer]
         else:
-            raise KeyError(f"Geometry for '{detector_name}' detector is not present.")
+            raise ValueError(f"Geometry for '{detector_name}' detector is not present.")
+
+        self._detector_name = detector_name
 
         self._gain_file: str = ""
         self._pedestal_file: str = ""

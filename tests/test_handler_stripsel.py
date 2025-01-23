@@ -61,9 +61,11 @@ def _handler_no_mask(empty_handler):
     yield prepared_handler
 
 
-@pytest.mark.parametrize("detector_name", ["unknown_detector_name", 1, None, ""])
+@pytest.mark.parametrize(
+    "detector_name", ["unknown_detector_name", 1, None, "", "JF00T00", "JF00T00V01"]
+)
 def test_handler_init_fail(detector_name):
-    with pytest.raises(KeyError):
+    with pytest.raises(ValueError):
         JFDataHandler(detector_name)
 
 
