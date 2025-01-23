@@ -434,7 +434,7 @@ class File:
 
             # this also sets detector group (channel) as processed
             if self.conversion or self.mask or self.gap_pixels or self.geometry or roi or factor:
-                meta_group["conversion_factor"] = factor or np.NaN
+                meta_group["conversion_factor"] = factor or np.nan
 
             # now process the raw data
             dset = self._data_dset
