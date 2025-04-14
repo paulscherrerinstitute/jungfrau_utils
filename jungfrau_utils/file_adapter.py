@@ -303,8 +303,9 @@ class File:
                 a corresponding value is a tuple with ROI coordinates. Export whole images if None.
                 Defaults to None.
             downsample (tuple, optional): A tuple of 2 integers (N, M). Reduce image size in NxM
-                pixel blocks, resulting in a sum of corresponding pixels. Effectively no
-                downsampling is happening in case of (1, 1) or None. Defaults to None.
+                pixel blocks, resulting in an average of valid pixel values within a block.
+                Effectively no downsampling is happening in case of (1, 1) or None. Defaults to
+                None.
             compression (bool, optional): Apply bitshuffle+lz4 compression. Defaults to False.
             factor (float, optional): If conversion is True, use this factor to divide converted
                 values. The output values are also rounded and casted to np.int32 dtype. Keep the
