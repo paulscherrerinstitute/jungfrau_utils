@@ -327,6 +327,16 @@ class File:
             )
             downsample = (2, 2) if downsample else None
 
+        # Deprecated support for dtype parameter (to be removed in ju/4.0)
+        if dtype is not None:
+            warnings.warn(
+                "Passing a `dtype` parameter is deprecated and it will be removed in "
+                "jungfrau_utils/4.0. This parameter should not be used anymore as it may cause "
+                "issues with hdf5 direct chunk writing with certain `dtype` values. "
+                "Setting `dtype` to None.",
+                DeprecationWarning,
+            )
+
         if downsample:
             if len(downsample) != 2:
                 raise ValueError("Parameter `downsample` must have lenght of 2.")
@@ -456,7 +466,7 @@ class File:
                 good_pixels_fraction = pixel_mask.astype(np.float64)
 
             args = {}
-            args["dtype"] = out_dtype if dtype is None else dtype
+            args["dtype"] = out_dtype
             if compression:
                 args.update(compargs)
 
