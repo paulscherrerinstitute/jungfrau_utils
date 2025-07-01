@@ -534,7 +534,7 @@ class File:
                     ) = _prepare_downsample(
                         out_shape,
                         pixel_mask,
-                        downsample[0],
+                        downsample,
                         None,
                         None,
                         out_dtype,
