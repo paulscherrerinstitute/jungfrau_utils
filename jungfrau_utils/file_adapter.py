@@ -445,11 +445,31 @@ class File:
             if isinstance(good_pixels_fraction, np.ndarray):
                 h5_dest[f"{pth_pref}/meta/good_pixels_fraction"] = good_pixels_fraction
 
+        def _check_downsample(downsample, out_shape):
+            if downsample[0] is None:
+                downsample = (out_shape[0], downsample[1])
+            if downsample[1] is None:
+                downsample = (downsample[0], out_shape[1])
+
+            if downsample[0] > out_shape[0]:
+                if jungfrau_utils.verbose:  # or always print?
+                    print(
+                        f"downsample y: {downsample[0]} was bigger than image size {out_shape[0]}"
+                    )
+                downsample = (out_shape[0], downsample[1])
+            if downsample[1] > out_shape[1]:
+                if jungfrau_utils.verbose:  # or always print?
+                    print(
+                        f"downsample x: {downsample[1]} was bigger than image size {out_shape[1]}"
+                    )
+            return downsample
+
         def _prepare_downsample(out_shape, pixel_mask, downsample, label, rois, out_dtype):
             if downsample is None:
                 print("there is no downsampling")
                 return
 
+            downsample = _check_downsample(downsample, out_shape)
             pixel_mask, good_pixels_fraction = _downsample_mask_jit(pixel_mask, downsample)
             out_shape = tuple((shape + ds - 1) // ds for shape, ds in zip(out_shape, downsample))
             ds_buffer = np.zeros((batch_size, *out_shape), dtype=out_dtype)
