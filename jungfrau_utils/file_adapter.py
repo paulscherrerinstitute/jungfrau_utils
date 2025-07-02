@@ -318,7 +318,11 @@ class File:
         if self._processed:
             raise RuntimeError("Can not export already processed file.")
 
-        if roi is not None:
+        out_shape = self.get_shape_out()
+
+        if roi is None:
+            roi_shape = [out_shape]
+        else:
             if isinstance(roi, tuple) and len(roi) == 4 and all(isinstance(v, int) for v in roi):
                 # this is a single tuple with coordinates, so wrap it in another tuple
                 roi = (roi,)
@@ -329,12 +333,13 @@ class File:
             else:
                 roi_labels = range(len(roi))
 
-            out_shape = self.get_shape_out()
+            roi_shape = []
             for roi_y1, roi_y2, roi_x1, roi_x2 in roi:
                 if roi_y1 >= roi_y2 or roi_x1 >= roi_x2:
                     raise ValueError("ROI must have corresponding coordinates in ascending order.")
                 if roi_y1 < 0 or roi_y2 >= out_shape[0] or roi_x1 < 0 or roi_x2 >= out_shape[1]:
                     raise ValueError(f"ROI is outside of resulting image size {out_shape}.")
+                roi_shape.append((roi_y2 - roi_y1, roi_x2 - roi_x1))
 
         # Deprecated support for boolean downsample parameter (to be removed in ju/4.0)
         if isinstance(downsample, bool):
@@ -369,11 +374,13 @@ class File:
             index = np.array(index)  # convert iterable into numpy array
 
         _mask = self.mask
+
         if downsample and not _mask:
             warnings.warn("Only masked data can be downsampled, `mask` is set to True")
             self.mask = True
 
         _factor = self.handler.factor
+
         if downsample:
             # factor division and rounding should occur after downsampling, so we do it not via
             # JFDataHandler
@@ -425,7 +432,7 @@ class File:
             for key, value in self.file[name].attrs.items():
                 h5_dest[name].attrs[key] = value
 
-        def _create_data_group(shape, good_pixels_fraction, pixel_mask, lb):
+        def _create_data_group(shape, good_pixels_fraction, pixel_mask, lb, downsample):
             if lb is None:
                 pth_pref = f"/data/{self.detector_name}"
             else:
@@ -436,7 +443,6 @@ class File:
                     dest=h5_dest["/data"],
                     name=pth_pref,
                 )
-
             args["shape"] = (n_images, *shape)
             args["chunks"] = (1, *shape)
             h5_dest[pth_pref].create_dataset("data", **args)
@@ -444,8 +450,11 @@ class File:
                 h5_dest[f"{pth_pref}/meta/pixel_mask"] = pixel_mask
             if isinstance(good_pixels_fraction, np.ndarray):
                 h5_dest[f"{pth_pref}/meta/good_pixels_fraction"] = good_pixels_fraction
+            h5_dest[f"{pth_pref}/meta/downsample"] = downsample if downsample else (1, 1)
 
         def _check_downsample(downsample, out_shape):
+            # 'inner' downsample used here
+
             if downsample[0] is None:
                 downsample = (out_shape[0], downsample[1])
             if downsample[1] is None:
@@ -462,6 +471,7 @@ class File:
                     print(
                         f"downsample x: {downsample[1]} was bigger than image size {out_shape[1]}"
                     )
+                downsample = (downsample[0], out_shape[1])
             return downsample
 
         def _prepare_downsample(out_shape, pixel_mask, downsample, label, rois, out_dtype):
@@ -506,8 +516,7 @@ class File:
 
             if downsample and factor is not None:
                 out_dtype = np.dtype(np.int32)
-            if downsample is None:
-                good_pixels_fraction = pixel_mask.astype(np.float64)
+            gpr = pixel_mask.astype(np.float64)
 
             args = {}
             args["dtype"] = out_dtype
@@ -523,6 +532,9 @@ class File:
             out_buffer = np.zeros((batch_size, *self.get_shape_out()), dtype=out_buffer_dtype)
 
             if roi is None:
+
+                good_pixels_fraction = gpr
+
                 if downsample:
 
                     (
@@ -541,9 +553,8 @@ class File:
                     )
                     downsample = (downsample,)
 
-                _create_data_group(out_shape, good_pixels_fraction, pixel_mask, None)
+                _create_data_group(out_shape, good_pixels_fraction, pixel_mask, None, downsample)
                 meta_pef = f"/data/{self.detector_name}/meta"
-                h5_dest[f"{meta_pef}/downsample"] = downsample if downsample else (1, 1)
 
             else:
 
@@ -553,15 +564,12 @@ class File:
                 for i, lb in enumerate(roi_labels):
 
                     roi_y1, roi_y2, roi_x1, roi_x2 = roi[i]
-
-                    out_shape[lb] = (roi_y2 - roi_y1, roi_x2 - roi_x1)
+                    out_shape[lb] = roi_shape[i]
                     pixel_mask_r[lb] = pixel_mask[slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)]
-
-                    _create_data_group(out_shape[lb], None, pixel_mask_r[lb], lb)
+                    _create_data_group(out_shape[lb], None, pixel_mask_r[lb], lb, None)
 
                     meta_pref = f"/data/{self.detector_name}:ROI_{lb}/meta/"
                     h5_dest[f"{meta_pref}/roi"] = [(roi_y1, roi_y2), (roi_x1, roi_x2)]
-                    h5_dest[f"{meta_pref}/downsample"] = (1, 1)
 
                 del h5_dest[f"/data/{self.detector_name}"]
 
@@ -571,14 +579,11 @@ class File:
             else:
                 downsample_image = _downsample_image_jit
 
-            if compression:
-                if isinstance(out_shape, dict):
-                    header = None
-                else:
-                    dtype_size = out_dtype.itemsize
-                    bytes_num_elem = struct.pack(">q", np.prod(out_shape) * dtype_size)
-                    bytes_block_size = struct.pack(">i", BLOCK_SIZE * dtype_size)
-                    header = bytes_num_elem + bytes_block_size
+            if compression and not isinstance(out_shape, dict):
+                dtype_size = out_dtype.itemsize
+                bytes_num_elem = struct.pack(">q", np.prod(out_shape) * dtype_size)
+                bytes_block_size = struct.pack(">i", BLOCK_SIZE * dtype_size)
+                header = bytes_num_elem + bytes_block_size
 
             # process and write data in batches
             for batch_start in range(0, n_images, batch_size):
