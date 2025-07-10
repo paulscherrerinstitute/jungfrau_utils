@@ -325,7 +325,7 @@ def test_file_export_factor_n_downsample(file_adapter, tmpdir_factory, roi, down
 
     with h5py.File(exported_file, "r") as h5f:
         for i in range(rang):
-            ds = calc_downsample(downsample, roi[i]) * 1
+            ds = calc_downsample(downsample, roi[i])
             if factor:
                 ds = np.round(ds / factor).astype(np.int32)
             res = h5f[loc(i)]
