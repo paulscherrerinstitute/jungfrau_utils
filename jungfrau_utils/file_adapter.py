@@ -707,9 +707,9 @@ class File:
                 if roi is None:
 
                     if func:
-                        buffer_view = func_buffer[: len(batch_ind)]
-                        func[0][0](buffer_view, out_buffer_view, factor, good_pixels_fraction)
-                        out_buffer_view = buffer_view
+                        func_buffer_view = func_buffer[: len(batch_ind)]
+                        func[0][0](func_buffer_view, out_buffer_view, factor, good_pixels_fraction)
+                        out_buffer_view = func_buffer_view
 
                     for pos, im in zip(batch_range, out_buffer_view):
                         if compression:
@@ -722,9 +722,9 @@ class File:
                         roi_y1, roi_y2, roi_x1, roi_x2 = roi[i]
                         roi_data = out_buffer_view[:, slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)]
                         if func and func[i]:
-                            buffer_view = func_buffer[lb][: len(batch_ind)]
-                            func[i][0](buffer_view, roi_data, factor, good_pixels_fraction[lb])
-                            roi_data = buffer_view
+                            func_buffer_view = func_buffer[lb][: len(batch_ind)]
+                            func[i][0](func_buffer_view, roi_data, factor, good_pixels_fraction[lb])
+                            roi_data = func_buffer_view
                         h5_dest[f"/data/{self.detector_name}:ROI_{lb}/data"][batch_range] = roi_data
 
         # restore original values
