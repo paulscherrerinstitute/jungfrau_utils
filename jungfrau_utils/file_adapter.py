@@ -385,7 +385,7 @@ class File:
                 if len(func) != (len(roi_labels) if roi else 1):
                     exp_fun = len(roi_labels) if roi else 1
                     raise ValueError(
-                        f"number of func parameter groups do not match expected {exp_fun}"
+                        f"Number of func parameter groups do not match expected {exp_fun}"
                     )
             if isinstance(func, dict):
                 func = tuple(func.get(k) for k in roi_labels)
@@ -405,17 +405,13 @@ class File:
                 downsample = (downsample[0], out_shape[1])
 
             if downsample[0] > out_shape[0]:
-                if jungfrau_utils.verbose:  # or always print?
-                    print(
-                        f"downsample y: {downsample[0]} was bigger than image size {out_shape[0]}"
+                raise ValueError(
+                    f"Downsample y: {downsample[0]} was bigger than image size {out_shape[0]}. Use None for full height downsample"
                     )
-                downsample = (out_shape[0], downsample[1])
             if downsample[1] > out_shape[1]:
-                if jungfrau_utils.verbose:  # or always print?
-                    print(
-                        f"downsample x: {downsample[1]} was bigger than image size {out_shape[1]}"
+                raise ValueError(
+                    f"Downsample x: {downsample[1]} was bigger than image size {out_shape[1]}. Use None for full width downsample"
                     )
-                downsample = (downsample[0], out_shape[1])
             return downsample
 
         def _downsample_image(downsample, shape):
