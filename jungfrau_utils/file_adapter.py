@@ -382,8 +382,9 @@ class File:
                     else:
                         func = (func,) * len(roi_labels)
 
-                if len(func) != (len(roi_labels) if roi else 1):
-                    exp_fun = len(roi_labels) if roi else 1
+                tmp_len = len(roi_labels) if roi else 1
+                if len(func) != tmp_len:
+                    exp_fun = tmp_len
                     raise ValueError(
                         f"Number of func parameter groups do not match expected {exp_fun}"
                     )
@@ -407,11 +408,11 @@ class File:
             if downsample[0] > out_shape[0]:
                 raise ValueError(
                     f"Downsample y: {downsample[0]} was bigger than image size {out_shape[0]}. Use None for full height downsample"
-                    )
+                )
             if downsample[1] > out_shape[1]:
                 raise ValueError(
                     f"Downsample x: {downsample[1]} was bigger than image size {out_shape[1]}. Use None for full width downsample"
-                    )
+                )
             return downsample
 
         def _downsample_image(downsample, shape):
@@ -445,8 +446,9 @@ class File:
                     else:
                         downsample = (downsample,) * len(roi_labels)
 
-                if len(downsample) != (len(roi_labels) if roi else 1):
-                    exp_down = len(roi_labels) if roi else 1
+                tmp_len = len(roi_labels) if roi else 1
+                if len(downsample) != tmp_len:
+                    exp_down = tmp_len
                     raise ValueError(
                         f"number of downsample parameter groups do not match expected {exp_down}"
                     )
@@ -645,7 +647,7 @@ class File:
                     pixel_mask_r[lb] = pixel_mask[slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)]
                     good_pixels_fraction[lb] = gpr[slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)]
                     gpf = None
-                    if func[i] if func else func:
+                    if func and func[i]:
                         (
                             out_shape[lb],
                             pixel_mask_r[lb],
@@ -719,7 +721,7 @@ class File:
                     for i, lb in enumerate(roi_labels):
                         roi_y1, roi_y2, roi_x1, roi_x2 = roi[i]
                         roi_data = out_buffer_view[:, slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)]
-                        if (func[i] if func else func):
+                        if func and func[i]:
                             buffer_view = func_buffer[lb][: len(batch_ind)]
                             func[i][0](buffer_view, roi_data, factor, good_pixels_fraction[lb])
                             roi_data = buffer_view
