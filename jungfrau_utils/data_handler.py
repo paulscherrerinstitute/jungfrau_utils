@@ -770,6 +770,11 @@ class JFDataHandler:
         geometry=False), but the coordinates represent pixel positions after gap_pixel and geometry
         corrections (gap_pixels=True, double_pixels="keep", geometry=True).
         """
+        warnings.warn(
+            "get_pixel_coordinates() is deprecated and will be removed in jungfrau_utils/4.0",
+            DeprecationWarning,
+        )
+
         if self.detector_geometry.is_stripsel:
             raise RuntimeError("Stripsel detectors are currently unsupported.")
 
