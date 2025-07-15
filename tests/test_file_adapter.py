@@ -9,14 +9,18 @@ DATA_SHAPE = (3 * 512, 1024)
 STACK_SHAPE = (10, *DATA_SHAPE)
 
 DATA_SHAPE_WITH_GAPS = (3 * (512 + 2), 1024 + 6)
-DATA_SHAPE_WITH_GEOMETRY = (1100 + 512, 0 + 1024)
-DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY = (1100 + 512 + 2, 0 + 1024 + 6)
+DATA_SHAPE_WITH_GEOMETRY = (1100 + 512, 0 + 1024)  # 3rd corner pos + module size
+DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY = (
+    1100 + 512 + 2,
+    0 + 1024 + 6,
+)  # 3rd corner + module + chip gaps
 
 IMAGE_SHAPE = DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY
 STACK_IMAGE_SHAPE = (3, *DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY)
 
 pixel_mask_orig = np.random.randint(2, size=DATA_SHAPE, dtype=np.uint32)
 pixel_mask = pixel_mask_orig.astype(bool, copy=True)
+inv_pixel_mask = np.invert(pixel_mask)
 
 image_stack = np.arange(np.prod(STACK_SHAPE), dtype=np.uint16).reshape(STACK_SHAPE[::-1])
 image_stack = np.ascontiguousarray(image_stack.transpose(2, 1, 0))
@@ -74,265 +78,258 @@ def _file_adapter(jungfrau_file, gain_file, pedestal_file):
     yield file_adapter
 
 
+def calc_downsample(downsample, roi):
+    if roi is None:
+        roi = (0, DATA_SHAPE[0], 0, DATA_SHAPE[1])
+
+    ds_shape = (
+        (roi[1] - roi[0] + downsample[0] - 1) // downsample[0],
+        (roi[3] - roi[2] + downsample[1] - 1) // downsample[1],
+    )
+    ds = np.zeros((STACK_SHAPE[0], *ds_shape), dtype=np.float32)
+
+    if downsample == (DATA_SHAPE[0], DATA_SHAPE[1]):
+        ds_px_count = IMAGE_SHAPE[0] * IMAGE_SHAPE[1]
+    else:
+        ds_px_count = downsample[0] * downsample[1]
+    for j in range(ds_shape[0]):
+        i_y = downsample[0] * j + roi[0]
+        rng_y = slice(i_y, min(i_y + downsample[0], roi[1]))
+        for k in range(ds_shape[1]):
+            i_x = downsample[1] * k + roi[2]
+            rng_x = slice(i_x, min(i_x + downsample[1], roi[3]))
+            gpr = np.count_nonzero(inv_pixel_mask[rng_y, rng_x]) / ds_px_count
+            ds[:, j, k] = (
+                np.sum(converted_image_stack_mask[:, rng_y, rng_x], axis=(1, 2)) / gpr if gpr else 0
+            )
+    return ds
+
+
 def test_file_adapter(file_adapter, gain_file, pedestal_file):
     assert file_adapter.gain_file == gain_file
     assert file_adapter.pedestal_file == pedestal_file
 
 
-def test_file_get_index_image(file_adapter):
-    res = file_adapter[0]
+@pytest.mark.parametrize(
+    "idx,dim,shape",
+    [
+        ((0,), (2, 2, 2), (IMAGE_SHAPE, IMAGE_SHAPE, IMAGE_SHAPE)),
+        ((slice(None, 3),), (3, 3, 3), (STACK_IMAGE_SHAPE, STACK_IMAGE_SHAPE, STACK_IMAGE_SHAPE)),
+        (([0, 2, 4],), (3, 3, 3), (STACK_IMAGE_SHAPE, STACK_IMAGE_SHAPE, STACK_IMAGE_SHAPE)),
+        (((0, 2, 4),), (3, 3, 3), (STACK_IMAGE_SHAPE, STACK_IMAGE_SHAPE, STACK_IMAGE_SHAPE)),
+        ((0, 2, 4), (0,), ((),)),  # a special case, but has the same behaviour as h5py
+        ((range(0, 5, 2),), (3, 3, 3), (STACK_IMAGE_SHAPE, STACK_IMAGE_SHAPE, STACK_IMAGE_SHAPE)),
+    ],
+)
+def test_file_get_part_image(file_adapter, idx, dim, shape):
+    for i in range(len(dim)):
+        res = file_adapter[idx + (slice(None),) * i]
 
-    assert res.dtype == np.dtype(np.float32)
-    assert res.ndim == 2
-    assert res.shape == IMAGE_SHAPE
+        assert res.dtype == np.dtype(np.float32)
+        assert res.ndim == dim[i]
+        assert res.shape == shape[i]
 
-    assert np.allclose(res[:256, :256], converted_image_single_mask[:256, :256])
-    assert np.allclose(res[:256, -256:], converted_image_single_mask[:256, -256:])
-    assert np.allclose(res[-256:, :256], converted_image_single_mask[-256:, :256])
-    assert np.allclose(res[-256:, -256:], converted_image_single_mask[-256:, -256:])
+        if dim[i] == 0:
+            continue
 
-    res = file_adapter[0, :]
-
-    assert res.dtype == np.dtype(np.float32)
-    assert res.ndim == 2
-    assert res.shape == IMAGE_SHAPE
-
-    assert np.allclose(res[:256, :256], converted_image_single_mask[:256, :256])
-    assert np.allclose(res[:256, -256:], converted_image_single_mask[:256, -256:])
-    assert np.allclose(res[-256:, :256], converted_image_single_mask[-256:, :256])
-    assert np.allclose(res[-256:, -256:], converted_image_single_mask[-256:, -256:])
-
-    res = file_adapter[0, :, :]
-
-    assert res.dtype == np.dtype(np.float32)
-    assert res.ndim == 2
-    assert res.shape == IMAGE_SHAPE
-
-    assert np.allclose(res[:256, :256], converted_image_single_mask[:256, :256])
-    assert np.allclose(res[:256, -256:], converted_image_single_mask[:256, -256:])
-    assert np.allclose(res[-256:, :256], converted_image_single_mask[-256:, :256])
-    assert np.allclose(res[-256:, -256:], converted_image_single_mask[-256:, -256:])
-
-
-def test_file_get_slice_image(file_adapter):
-    res = file_adapter[:3]
-
-    assert res.dtype == np.dtype(np.float32)
-    assert res.ndim == 3
-    assert res.shape == STACK_IMAGE_SHAPE
-
-    assert np.allclose(res[:, :256, :256], converted_image_stack_mask[:3, :256, :256])
-    assert np.allclose(res[:, :256, -256:], converted_image_stack_mask[:3, :256, -256:])
-    assert np.allclose(res[:, -256:, :256], converted_image_stack_mask[:3, -256:, :256])
-    assert np.allclose(res[:, -256:, -256:], converted_image_stack_mask[:3, -256:, -256:])
-
-    res = file_adapter[:3, :]
-
-    assert res.dtype == np.dtype(np.float32)
-    assert res.ndim == 3
-    assert res.shape == STACK_IMAGE_SHAPE
-
-    assert np.allclose(res[:, :256, :256], converted_image_stack_mask[:3, :256, :256])
-    assert np.allclose(res[:, :256, -256:], converted_image_stack_mask[:3, :256, -256:])
-    assert np.allclose(res[:, -256:, :256], converted_image_stack_mask[:3, -256:, :256])
-    assert np.allclose(res[:, -256:, -256:], converted_image_stack_mask[:3, -256:, -256:])
-
-    res = file_adapter[:3, :, :]
-
-    assert res.dtype == np.dtype(np.float32)
-    assert res.ndim == 3
-    assert res.shape == STACK_IMAGE_SHAPE
-
-    assert np.allclose(res[:, :256, :256], converted_image_stack_mask[:3, :256, :256])
-    assert np.allclose(res[:, :256, -256:], converted_image_stack_mask[:3, :256, -256:])
-    assert np.allclose(res[:, -256:, :256], converted_image_stack_mask[:3, -256:, :256])
-    assert np.allclose(res[:, -256:, -256:], converted_image_stack_mask[:3, -256:, -256:])
+        # only corners tested as there is no geom/gap correction
+        for sub_idx in [
+            (slice(None, 256), slice(None, 256)),
+            (slice(None, 256), slice(-256, None)),
+            (slice(-256, None), slice(None, 256)),
+            (slice(-256, None), slice(-256, None)),
+        ]:
+            idx_res = (slice(None),) * (dim[i] - 2) + sub_idx
+            idx_mask = idx * (dim[i] - 2) + sub_idx
+            test_res = (
+                converted_image_single_mask[idx_mask]
+                if dim[i] == 2
+                else converted_image_stack_mask[idx_mask]
+            )
+            assert np.allclose(res[idx_res], test_res)
 
 
-def test_file_get_fancy_index_list_image(file_adapter):
-    indices = [0, 2, 4]
-
-    res = file_adapter[indices]
-
-    assert res.dtype == np.dtype(np.float32)
-    assert res.ndim == 3
-    assert res.shape == STACK_IMAGE_SHAPE
-
-    assert np.allclose(res[:, :256, :256], converted_image_stack_mask[indices, :256, :256])
-    assert np.allclose(res[:, :256, -256:], converted_image_stack_mask[indices, :256, -256:])
-    assert np.allclose(res[:, -256:, :256], converted_image_stack_mask[indices, -256:, :256])
-    assert np.allclose(res[:, -256:, -256:], converted_image_stack_mask[indices, -256:, -256:])
-
-    res = file_adapter[indices, :]
-
-    assert res.dtype == np.dtype(np.float32)
-    assert res.ndim == 3
-    assert res.shape == STACK_IMAGE_SHAPE
-
-    assert np.allclose(res[:, :256, :256], converted_image_stack_mask[indices, :256, :256])
-    assert np.allclose(res[:, :256, -256:], converted_image_stack_mask[indices, :256, -256:])
-    assert np.allclose(res[:, -256:, :256], converted_image_stack_mask[indices, -256:, :256])
-    assert np.allclose(res[:, -256:, -256:], converted_image_stack_mask[indices, -256:, -256:])
-
-    res = file_adapter[indices, :, :]
-
-    assert res.dtype == np.dtype(np.float32)
-    assert res.ndim == 3
-    assert res.shape == STACK_IMAGE_SHAPE
-
-    assert np.allclose(res[:, :256, :256], converted_image_stack_mask[indices, :256, :256])
-    assert np.allclose(res[:, :256, -256:], converted_image_stack_mask[indices, :256, -256:])
-    assert np.allclose(res[:, -256:, :256], converted_image_stack_mask[indices, -256:, :256])
-    assert np.allclose(res[:, -256:, -256:], converted_image_stack_mask[indices, -256:, -256:])
-
-
-def test_file_get_fancy_index_tuple_image(file_adapter):
-    indices = (0, 2, 4)
-
-    # this is a special case, but has the same behaviour as h5py
-    res = file_adapter[indices]
-    assert res.dtype == np.dtype(np.float32)
-    assert res.ndim == 0
-    assert res.shape == ()
-
-    res = file_adapter[indices, :]
-
-    assert res.dtype == np.dtype(np.float32)
-    assert res.ndim == 3
-    assert res.shape == STACK_IMAGE_SHAPE
-
-    assert np.allclose(res[:, :256, :256], converted_image_stack_mask[indices, :256, :256])
-    assert np.allclose(res[:, :256, -256:], converted_image_stack_mask[indices, :256, -256:])
-    assert np.allclose(res[:, -256:, :256], converted_image_stack_mask[indices, -256:, :256])
-    assert np.allclose(res[:, -256:, -256:], converted_image_stack_mask[indices, -256:, -256:])
-
-    res = file_adapter[indices, :, :]
-
-    assert res.dtype == np.dtype(np.float32)
-    assert res.ndim == 3
-    assert res.shape == STACK_IMAGE_SHAPE
-
-    assert np.allclose(res[:, :256, :256], converted_image_stack_mask[indices, :256, :256])
-    assert np.allclose(res[:, :256, -256:], converted_image_stack_mask[indices, :256, -256:])
-    assert np.allclose(res[:, -256:, :256], converted_image_stack_mask[indices, -256:, :256])
-    assert np.allclose(res[:, -256:, -256:], converted_image_stack_mask[indices, -256:, -256:])
-
-
-def test_file_get_fancy_index_range_image(file_adapter):
-    indices = range(0, 5, 2)
-    res = file_adapter[indices]
-
-    assert res.dtype == np.dtype(np.float32)
-    assert res.ndim == 3
-    assert res.shape == STACK_IMAGE_SHAPE
-
-    assert np.allclose(res[:, :256, :256], converted_image_stack_mask[indices, :256, :256])
-    assert np.allclose(res[:, :256, -256:], converted_image_stack_mask[indices, :256, -256:])
-    assert np.allclose(res[:, -256:, :256], converted_image_stack_mask[indices, -256:, :256])
-    assert np.allclose(res[:, -256:, -256:], converted_image_stack_mask[indices, -256:, -256:])
-
-    res = file_adapter[indices, :]
-
-    assert res.dtype == np.dtype(np.float32)
-    assert res.ndim == 3
-    assert res.shape == STACK_IMAGE_SHAPE
-
-    assert np.allclose(res[:, :256, :256], converted_image_stack_mask[indices, :256, :256])
-    assert np.allclose(res[:, :256, -256:], converted_image_stack_mask[indices, :256, -256:])
-    assert np.allclose(res[:, -256:, :256], converted_image_stack_mask[indices, -256:, :256])
-    assert np.allclose(res[:, -256:, -256:], converted_image_stack_mask[indices, -256:, -256:])
-
-    res = file_adapter[indices, :, :]
-
-    assert res.dtype == np.dtype(np.float32)
-    assert res.ndim == 3
-    assert res.shape == STACK_IMAGE_SHAPE
-
-    assert np.allclose(res[:, :256, :256], converted_image_stack_mask[indices, :256, :256])
-    assert np.allclose(res[:, :256, -256:], converted_image_stack_mask[indices, :256, -256:])
-    assert np.allclose(res[:, -256:, :256], converted_image_stack_mask[indices, -256:, :256])
-    assert np.allclose(res[:, -256:, -256:], converted_image_stack_mask[indices, -256:, -256:])
-
-
-def test_file_export(file_adapter, tmpdir_factory):
+@pytest.mark.parametrize(
+    "idx",
+    [
+        slice(None),
+        [0, 2, 4],
+        (0, 2, 4),
+        range(0, 5, 2),
+    ],
+)
+def test_file_export(file_adapter, tmpdir_factory, idx):
     exported_file = tmpdir_factory.mktemp("export").join("test.h5")
-    file_adapter.export(exported_file)
+    if idx == slice(None):
+        file_adapter.export(exported_file)
+    else:
+        file_adapter.export(exported_file, index=idx)
 
     with h5py.File(exported_file, "r") as h5f:
         res = h5f[f"/data/{DETECTOR_NAME}/data"]
-        assert np.allclose(res[:, :256, :256], converted_image_stack_mask[:, :256, :256])
-        assert np.allclose(res[:, :256, -256:], converted_image_stack_mask[:, :256, -256:])
-        assert np.allclose(res[:, -256:, :256], converted_image_stack_mask[:, -256:, :256])
-        assert np.allclose(res[:, -256:, -256:], converted_image_stack_mask[:, -256:, -256:])
+
+        # only corners tested as there is no geom/gap correction
+        for sub_idx in [
+            (slice(None, 256), slice(None, 256)),
+            (slice(None, 256), slice(-256, None)),
+            (slice(-256, None), slice(None, 256)),
+            (slice(-256, None), slice(-256, None)),
+        ]:
+            idx_res = (slice(None),) + sub_idx
+            idx_mask = (idx,) + sub_idx
+            assert np.allclose(res[idx_res], converted_image_stack_mask[idx_mask])
 
 
-def test_file_export_index1(file_adapter, tmpdir_factory):
-    indices = [0, 2, 4]
-    exported_file = tmpdir_factory.mktemp("export").join("test.h5")
-    file_adapter.export(exported_file, index=indices)
-
-    with h5py.File(exported_file, "r") as h5f:
-        res = h5f[f"/data/{DETECTOR_NAME}/data"]
-        assert np.allclose(res[:, :256, :256], converted_image_stack_mask[indices, :256, :256])
-        assert np.allclose(res[:, :256, -256:], converted_image_stack_mask[indices, :256, -256:])
-        assert np.allclose(res[:, -256:, :256], converted_image_stack_mask[indices, -256:, :256])
-        assert np.allclose(res[:, -256:, -256:], converted_image_stack_mask[indices, -256:, -256:])
-
-
-def test_file_export_index2(file_adapter, tmpdir_factory):
-    indices = (0, 2, 4)
-    exported_file = tmpdir_factory.mktemp("export").join("test.h5")
-    file_adapter.export(exported_file, index=indices)
-
-    with h5py.File(exported_file, "r") as h5f:
-        res = h5f[f"/data/{DETECTOR_NAME}/data"]
-        assert np.allclose(res[:, :256, :256], converted_image_stack_mask[indices, :256, :256])
-        assert np.allclose(res[:, :256, -256:], converted_image_stack_mask[indices, :256, -256:])
-        assert np.allclose(res[:, -256:, :256], converted_image_stack_mask[indices, -256:, :256])
-        assert np.allclose(res[:, -256:, -256:], converted_image_stack_mask[indices, -256:, -256:])
-
-
-def test_file_export_index3(file_adapter, tmpdir_factory):
-    indices = range(0, 5, 2)
-    exported_file = tmpdir_factory.mktemp("export").join("test.h5")
-    file_adapter.export(exported_file, index=indices)
-
-    with h5py.File(exported_file, "r") as h5f:
-        res = h5f[f"/data/{DETECTOR_NAME}/data"]
-        assert np.allclose(res[:, :256, :256], converted_image_stack_mask[indices, :256, :256])
-        assert np.allclose(res[:, :256, -256:], converted_image_stack_mask[indices, :256, -256:])
-        assert np.allclose(res[:, -256:, :256], converted_image_stack_mask[indices, -256:, :256])
-        assert np.allclose(res[:, -256:, -256:], converted_image_stack_mask[indices, -256:, -256:])
-
-
-def test_file_export_roi1(file_adapter, tmpdir_factory):
-    roi = (0, 256, 0, 256)
+@pytest.mark.parametrize(
+    "roi",
+    [
+        (0, 256, 0, 256),
+        ((0, 256, 0, 256),),
+        ((0, 256, 0, 256), (16, 32, 64, 128)),
+    ],
+)
+def test_file_export_roi(file_adapter, tmpdir_factory, roi):
     exported_file = tmpdir_factory.mktemp("export").join("test.h5")
     file_adapter.export(exported_file, roi=roi)
+    if isinstance(roi[0], int):
+        roi = (roi,)
 
     with h5py.File(exported_file, "r") as h5f:
-        res = h5f[f"/data/{DETECTOR_NAME}:ROI_0/data"]
-        assert np.allclose(res[:], converted_image_stack_mask[:, :256, :256])
+        for i in range(len(roi)):
+            roi_idx = (slice(None), slice(roi[i][0], roi[i][1]), slice(roi[i][2], roi[i][3]))
+            res = h5f[f"/data/{DETECTOR_NAME}:ROI_{i}/data"]
+            assert np.allclose(res[:], converted_image_stack_mask[roi_idx])
 
 
-def test_file_export_roi2(file_adapter, tmpdir_factory):
-    roi = ((0, 256, 0, 256),)
+@pytest.mark.parametrize(
+    "downsample",
+    [
+        None,
+        (4, 4),
+        ((4, 4),),
+    ],
+)
+def test_downsample(file_adapter, tmpdir_factory, downsample):
     exported_file = tmpdir_factory.mktemp("export").join("test.h5")
-    file_adapter.export(exported_file, roi=roi)
+    file_adapter.export(exported_file, downsample=downsample)
+
+    if downsample is None:
+        downsample = ((1, 1),)
+    if isinstance(downsample[0], int):
+        downsample = (downsample,)
 
     with h5py.File(exported_file, "r") as h5f:
-        res = h5f[f"/data/{DETECTOR_NAME}:ROI_0/data"]
-        assert np.allclose(res[:], converted_image_stack_mask[:, :256, :256])
+        res = h5f[f"/data/{DETECTOR_NAME}/data"]
+        ds = calc_downsample(downsample[0], None)
+        # only corner tested as there is no geom/gap correction
+        corner_y = 250 // downsample[0][0] + 1
+        corner_x = 250 // downsample[0][1] + 1
+        idx = (slice(None), slice(None, corner_y), slice(None, corner_x))
+        assert np.allclose(res[idx], ds[idx])
 
 
-def test_file_export_roi3(file_adapter, tmpdir_factory):
-    roi = ((0, 256, 0, 256), (16, 32, 64, 128))
+@pytest.mark.parametrize(
+    "roi,downsample",
+    [
+        (((0, 256, 0, 256),), (4, 8)),
+        (((0, 256, 0, 256), (16, 32, 64, 128)), (4, 8)),
+        (((0, 256, 0, 256), (16, 32, 64, 128)), ((4, 8), (5, 2))),
+    ],
+)
+def test_downsample_n_roi(file_adapter, tmpdir_factory, roi, downsample):
+
     exported_file = tmpdir_factory.mktemp("export").join("test.h5")
-    file_adapter.export(exported_file, roi=roi)
+    file_adapter.export(exported_file, roi=roi, downsample=downsample)
+    if isinstance(downsample[0], int):
+        downsample = (downsample,) * len(roi)
+    with h5py.File(exported_file, "r") as h5f:
+        for i in range(len(roi)):
+            res = h5f[f"/data/{DETECTOR_NAME}:ROI_{i}/data"]
+            ds = calc_downsample(downsample[i], roi[i])
+            assert np.allclose(res[:], ds)
+
+
+@pytest.mark.parametrize(
+    "roi,skip",
+    [
+        (None, 1),
+        (((0, 256, 0, 256),), 1),
+        (((0, 256, 0, 256), (16, 32, 64, 128)), 1),
+        (None, 5),
+        (((0, 256, 0, 256),), 5),
+        (((0, 256, 0, 256), (16, 32, 64, 128)), 5),
+    ],
+)
+def test_file_export_func(file_adapter, tmpdir_factory, roi, skip):
+    exported_file = tmpdir_factory.mktemp("export").join("test.h5")
+
+    def func_data(buf, data, factor, gpr):
+        if factor is None:
+            buf[:, :, :] = data[:, ::skip, ::skip]
+        else:
+            buf[:, :, :] = np.round(data[:, ::skip, ::skip] / factor)
+
+    def func_gpr(gpr):
+        gpr = gpr[::skip, ::skip]
+        px_mask = gpr == 1
+        return px_mask, gpr
+
+    file_adapter.geometry = False
+    file_adapter.gap_pixels = False
+    file_adapter.export(exported_file, roi=roi, func=(func_data, func_gpr))
+
+    if roi:
+        rang = len(roi)
+        loc = lambda i: f"/data/{DETECTOR_NAME}:ROI_{i}/data"
+        roi_idx = lambda i: (
+            slice(None),
+            slice(roi[i][0], roi[i][1], skip),
+            slice(roi[i][2], roi[i][3], skip),
+        )
+    else:
+        rang = 1
+        loc = lambda i: f"/data/{DETECTOR_NAME}/data"
+        roi_idx = lambda i: (slice(None), slice(None, None, skip), slice(None, None, skip))
 
     with h5py.File(exported_file, "r") as h5f:
-        res = h5f[f"/data/{DETECTOR_NAME}:ROI_0/data"]
-        assert np.allclose(res[:], converted_image_stack_mask[:, :256, :256])
+        for i in range(rang):
+            res = h5f[loc(i)]
+            assert np.allclose(res[:], converted_image_stack_mask[roi_idx(i)])
 
-        res = h5f[f"/data/{DETECTOR_NAME}:ROI_1/data"]
-        assert np.allclose(res[:], converted_image_stack_mask[:, 16:32, 64:128])
+
+@pytest.mark.parametrize(
+    "roi,downsample,factor",
+    [
+        (None, (5, 2), None),
+        (((0, 256, 0, 256),), (5, 2), None),
+        (((0, 256, 0, 256), (16, 32, 64, 128)), (5, 2), None),
+        (None, (5, 2), 10),
+        (((0, 256, 0, 256),), (5, 2), 10),
+        (((0, 256, 0, 256), (16, 32, 64, 128)), (5, 2), 10),
+    ],
+)
+def test_file_export_factor_n_downsample(file_adapter, tmpdir_factory, roi, downsample, factor):
+    exported_file = tmpdir_factory.mktemp("export").join("test.h5")
+
+    file_adapter.geometry = False
+    file_adapter.gap_pixels = False
+    file_adapter.export(exported_file, roi=roi, downsample=downsample, factor=factor)
+
+    if roi:
+        rang = len(roi)
+        loc = lambda i: f"/data/{DETECTOR_NAME}:ROI_{i}/data"
+    else:
+        rang = 1
+        loc = lambda i: f"/data/{DETECTOR_NAME}/data"
+        roi = (roi,)
+
+    with h5py.File(exported_file, "r") as h5f:
+        for i in range(rang):
+            ds = calc_downsample(downsample, roi[i])
+            if factor:
+                ds = np.round(ds / factor).astype(np.int32)
+            res = h5f[loc(i)]
+            if factor:
+                assert np.allclose(res[:], ds, atol=1)
+            else:
+                assert np.allclose(res[:], ds)

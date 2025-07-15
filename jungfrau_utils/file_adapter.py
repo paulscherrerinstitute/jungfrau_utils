@@ -284,7 +284,8 @@ class File:
         disabled_modules: tuple = (),
         index: Iterable | None = None,
         roi: tuple | dict | None = None,
-        downsample: tuple | None = None,
+        func: tuple | dict | None = None,
+        downsample: tuple | dict | None = None,
         compression: bool = False,
         factor: float | None = None,
         dtype: np.dtype | None = None,
@@ -302,10 +303,20 @@ class File:
                 a form (bottom, top, left, right), or a dict where each key is a ROI label and
                 a corresponding value is a tuple with ROI coordinates. Export whole images if None.
                 Defaults to None.
-            downsample (tuple, optional): A tuple of 2 integers (N, M). Reduce image size in NxM
-                pixel blocks, resulting in an average of valid pixel values within a block.
-                Effectively no downsampling is happening in case of (1, 1) or None. Defaults to
-                None.
+            func (tuple or dict, optional): A single tuple, or a tuple of tuples with 2 functions:
+                applied to data, applied to good pixel fraction, or a dict where each key is a ROI
+                label and a corresponding value is a tuple with 2 functions.
+                Data function will be passed buffer, images, factor and good pixel fraction. Function
+                should write result in to the buffer variable. If factor is not None result should be
+                divided by it and rounded.
+                Good pixel fraction function will be passed good pixel fraction and should return
+                boolean pixel mask and processed good pixel fraction. Shape of output should match
+                shape of a required buffer for data function.
+            downsample (tuple or dict, optional): A single tuple, or a tuple of tuples with 2 integers
+                (N, M), or a dict where each key is a ROI label and a corresponding value is a tuple
+                (N,M). Reduce image size in NxM pixel blocks, resulting in an average of valid pixel
+                values within a block.Effectively no downsampling is happening in case of (1, 1) or
+                None. Defaults to None.
             compression (bool, optional): Apply bitshuffle+lz4 compression. Defaults to False.
             factor (float, optional): If conversion is True, use this factor to divide converted
                 values. The output values are also rounded and casted to np.int32 dtype. Keep the
@@ -318,6 +329,29 @@ class File:
         if self._processed:
             raise RuntimeError("Can not export already processed file.")
 
+        out_shape = self.get_shape_out()
+
+        if roi is None:
+            roi_shape = [out_shape]
+        else:
+            if isinstance(roi, tuple) and len(roi) == 4 and all(isinstance(v, int) for v in roi):
+                # this is a single tuple with coordinates, so wrap it in another tuple
+                roi = (roi,)
+
+            if isinstance(roi, dict):
+                roi_labels = roi.keys()
+                roi = tuple(roi.values())
+            else:
+                roi_labels = range(len(roi))
+
+            roi_shape = []
+            for roi_y1, roi_y2, roi_x1, roi_x2 in roi:
+                if roi_y1 >= roi_y2 or roi_x1 >= roi_x2:
+                    raise ValueError("ROI must have corresponding coordinates in ascending order.")
+                if roi_y1 < 0 or roi_y2 >= out_shape[0] or roi_x1 < 0 or roi_x2 >= out_shape[1]:
+                    raise ValueError(f"ROI is outside of resulting image size {out_shape}.")
+                roi_shape.append((roi_y2 - roi_y1, roi_x2 - roi_x1))
+
         # Deprecated support for boolean downsample parameter (to be removed in ju/4.0)
         if isinstance(downsample, bool):
             warnings.warn(
@@ -325,7 +359,10 @@ class File:
                 "jungfrau_utils/4.0. Use `(2, 2)` instead of True and `None` instead of False.",
                 DeprecationWarning,
             )
-            downsample = (2, 2) if downsample else None
+            if roi is None:
+                downsample = ((2, 2),) if downsample else None
+            else:
+                downsample = ((2, 2),) * len(roi_labels) if downsample else None
 
         # Deprecated support for dtype parameter (to be removed in ju/4.0)
         if dtype is not None:
@@ -337,46 +374,125 @@ class File:
                 DeprecationWarning,
             )
 
+        if func:
+            if isinstance(func, tuple):
+                if len(func) == 2 and not any(isinstance(v, tuple) for v in func):
+                    if roi is None:
+                        func = (func,)
+                    else:
+                        func = (func,) * len(roi_labels)
+
+                tmp_len = len(roi_labels) if roi else 1
+                if len(func) != tmp_len:
+                    exp_fun = tmp_len
+                    raise ValueError(
+                        f"Number of func parameter groups do not match expected {exp_fun}"
+                    )
+            if isinstance(func, dict):
+                func = tuple(func.get(k) for k in roi_labels)
+
+            for f in func:
+                if f is None:
+                    continue
+                if len(f) != 2:
+                    raise ValueError("Inner parameter of `func` must have length of 2.")
+
+        def _check_downsample(downsample, out_shape):
+            # 'inner' downsample used here
+
+            if downsample[0] is None:
+                downsample = (out_shape[0], downsample[1])
+            if downsample[1] is None:
+                downsample = (downsample[0], out_shape[1])
+
+            if downsample[0] > out_shape[0]:
+                raise ValueError(
+                    f"Downsample y: {downsample[0]} was bigger than image size {out_shape[0]}. Use None for full height downsample"
+                )
+            if downsample[1] > out_shape[1]:
+                raise ValueError(
+                    f"Downsample x: {downsample[1]} was bigger than image size {out_shape[1]}. Use None for full width downsample"
+                )
+            return downsample
+
+        def _downsample_image(downsample, shape):
+            # 'inner' downsample used here
+            downsample = _check_downsample(downsample, shape)
+
+            def downsample_image(res, image, factor, good_pixels_fraction):
+                if self.parallel:
+                    return _downsample_image_par_jit(
+                        res, image, downsample, factor, good_pixels_fraction
+                    )
+                else:
+                    return _downsample_image_jit(
+                        res, image, downsample, factor, good_pixels_fraction
+                    )
+
+            return downsample_image
+
+        def _downsample_mask(downsample):
+            def downsample_mask(good_pixels_fraction):
+                return _downsample_mask_jit(good_pixels_fraction, downsample)
+
+            return downsample_mask
+
         if downsample:
-            if len(downsample) != 2:
-                raise ValueError("Parameter `downsample` must have lenght of 2.")
 
-            if downsample == (1, 1):
-                downsample = None
+            if isinstance(downsample, tuple):
+                if len(downsample) == 2 and all(isinstance(v, int) for v in downsample):
+                    if roi is None:
+                        downsample = (downsample,)
+                    else:
+                        downsample = (downsample,) * len(roi_labels)
 
-        if roi is not None and downsample:
-            raise ValueError("Unsupported mode: roi with downsample.")
+                tmp_len = len(roi_labels) if roi else 1
+                if len(downsample) != tmp_len:
+                    exp_down = tmp_len
+                    raise ValueError(
+                        f"number of downsample parameter groups do not match expected {exp_down}"
+                    )
+            if isinstance(downsample, dict):
+                downsample = tuple(downsample.get(k) for k in roi_labels)
 
-        if roi is not None:
-            if isinstance(roi, tuple) and len(roi) == 4 and all(isinstance(v, int) for v in roi):
-                # this is a single tuple with coordinates, so wrap it in another tuple
-                roi = (roi,)
+            tmp_func = list(func) if func else [None] * (len(roi_labels) if roi else 1)
 
-            if isinstance(roi, dict):
-                roi_labels = roi.keys()
-                roi = tuple(roi.values())
-            else:
-                roi_labels = range(len(roi))
+            for i, d in enumerate(downsample):
+                if d is None:
+                    continue
+                if len(d) != 2:
+                    raise ValueError("Inner parameter of `downsample` must have length of 2.")
 
-            out_shape = self.get_shape_out()
-            for roi_y1, roi_y2, roi_x1, roi_x2 in roi:
-                if roi_y1 >= roi_y2 or roi_x1 >= roi_x2:
-                    raise ValueError("ROI must have corresponding coordinates in ascending order.")
-                if roi_y1 < 0 or roi_y2 >= out_shape[0] or roi_x1 < 0 or roi_x2 >= out_shape[1]:
-                    raise ValueError(f"ROI is outside of resulting image size {out_shape}.")
+                if d == (1, 1):
+                    downsample = list(downsample)
+                    downsample[i] = None
+                    downsample = tuple(downsample)
+                    continue
+                if tmp_func[i]:
+                    raise ValueError("Unsupported mode: func with downsample.")
+                else:
+                    tmp_func[i] = (
+                        _downsample_image(downsample[i], roi_shape[i]),
+                        _downsample_mask(downsample[i]),
+                    )
+            func = tuple(tmp_func) if not all(v is None for v in tmp_func) else None
 
         if index is not None:
             index = np.array(index)  # convert iterable into numpy array
 
         _mask = self.mask
-        if downsample and not _mask:
-            warnings.warn("Only masked data can be downsampled, `mask` is set to True")
+
+        if func and not _mask:
+            warnings.warn(
+                "Only masked data can be downsampled or have function applied, `mask` is set to True"
+            )
             self.mask = True
 
         _factor = self.handler.factor
-        if downsample:
-            # factor division and rounding should occur after downsampling, so we do it not via
-            # JFDataHandler
+
+        if func:
+            # factor division and rounding should occur after downsampling or func, so we do it
+            # not via JFDataHandler
             self.handler.factor = None
         else:
             self.handler.factor = factor
@@ -425,6 +541,33 @@ class File:
             for key, value in self.file[name].attrs.items():
                 h5_dest[name].attrs[key] = value
 
+        def _create_data_group(shape, good_pixels_fraction, pixel_mask, lb, downsample):
+            if lb is None:
+                pth_pref = f"/data/{self.detector_name}"
+            else:
+                pth_pref = f"/data/{self.detector_name}:ROI_{lb}"
+
+                h5_dest.copy(
+                    source=h5_dest[f"/data/{self.detector_name}"],
+                    dest=h5_dest["/data"],
+                    name=pth_pref,
+                )
+            args["shape"] = (n_images, *shape)
+            args["chunks"] = (1, *shape)
+            h5_dest[pth_pref].create_dataset("data", **args)
+            if isinstance(pixel_mask, np.ndarray):
+                h5_dest[f"{pth_pref}/meta/pixel_mask"] = pixel_mask
+            if isinstance(good_pixels_fraction, np.ndarray):
+                h5_dest[f"{pth_pref}/meta/good_pixels_fraction"] = good_pixels_fraction
+            h5_dest[f"{pth_pref}/meta/downsample"] = downsample if downsample else (1, 1)
+
+        def _prepare_fnc(good_pixels_fraction, func):
+            # inner func used here
+            px_mask, gpf = func[1](good_pixels_fraction)
+            shape = px_mask.shape
+            func_buffer = np.zeros((batch_size, *shape), dtype=out_dtype)
+            return shape, px_mask, gpf, func_buffer
+
         with h5py.File(dest, "w") as h5_dest:
             # traverse the source file and copy/index all datasets, except the raw data
             self.file.visititems(_visititems)
@@ -441,8 +584,6 @@ class File:
             meta_group["double_pixels"] = self.double_pixels
             meta_group["geometry"] = self.geometry
 
-            meta_group["downsample"] = downsample if downsample else (1, 1)
-
             # this also sets detector group (channel) as processed
             if self.conversion or self.mask or self.gap_pixels or self.geometry or roi or factor:
                 meta_group["conversion_factor"] = factor or np.nan
@@ -455,73 +596,81 @@ class File:
             out_shape = self.get_shape_out()
             out_dtype = self.get_dtype_out()
 
-            if downsample:
-                pixel_mask, good_pixels_fraction = _downsample_mask_jit(pixel_mask, downsample)
-                out_shape = tuple(
-                    (shape + ds - 1) // ds for shape, ds in zip(out_shape, downsample)
-                )
-                if factor is not None:
-                    out_dtype = np.dtype(np.int32)
-            else:
-                good_pixels_fraction = pixel_mask.astype(np.float64)
+            if func and factor is not None:
+                out_dtype = np.dtype(np.int32)
+            gpr = pixel_mask.astype(np.float64)
 
             args = {}
             args["dtype"] = out_dtype
             if compression:
                 args.update(compargs)
 
-            if roi is None:
-                meta_group["pixel_mask"] = pixel_mask
-                meta_group["good_pixels_fraction"] = good_pixels_fraction
-
-                args["shape"] = (n_images, *out_shape)
-                args["chunks"] = (1, *out_shape)
-
-                h5_dest.create_dataset(dset.name, **args)
-
-            else:
-                # replace the full detector data group with per ROI data groups
-                for l, (roi_y1, roi_y2, roi_x1, roi_x2) in zip(roi_labels, roi):
-                    h5_dest.copy(
-                        source=h5_dest[f"/data/{self.detector_name}"],
-                        dest=h5_dest["/data"],
-                        name=f"/data/{self.detector_name}:ROI_{l}",
-                    )
-
-                    roi_data_group = h5_dest[f"/data/{self.detector_name}:ROI_{l}"]
-                    roi_meta_group = roi_data_group["meta"]
-
-                    roi_meta_group["roi"] = [(roi_y1, roi_y2), (roi_x1, roi_x2)]
-                    roi_meta_group["pixel_mask"] = pixel_mask[
-                        slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)
-                    ]
-
-                    roi_shape = (roi_y2 - roi_y1, roi_x2 - roi_x1)
-
-                    args["shape"] = (n_images, *roi_shape)
-                    args["chunks"] = (1, *roi_shape)
-
-                    roi_data_group.create_dataset("data", **args)
-
-                del h5_dest[f"/data/{self.detector_name}"]
-
             # prepare buffers to be reused for every batch
             read_buffer = np.empty((batch_size, *dset.shape[-2:]), dtype=dset.dtype)
             # in case of downsample with a factor, the intermediate out_buffer should have
             # np.float32 dtype
-            out_buffer_dtype = np.float32 if downsample and factor is not None else out_dtype
+            out_buffer_dtype = np.float32 if func and factor is not None else out_dtype
             # shape_out is changed if downsample != (1, 1), so use get_shape_out() once again
             out_buffer = np.zeros((batch_size, *self.get_shape_out()), dtype=out_buffer_dtype)
-            if downsample:
-                ds_buffer = np.zeros((batch_size, *out_shape), dtype=out_dtype)
 
-            # prepare utility vars
-            if downsample and self.parallel:
-                downsample_image = _downsample_image_par_jit
+            if roi is None:
+
+                good_pixels_fraction = gpr
+
+                if func:
+                    out_shape, pixel_mask, good_pixels_fraction, func_buffer = _prepare_fnc(
+                        good_pixels_fraction, func[0]
+                    )
+
+                _create_data_group(
+                    out_shape,
+                    good_pixels_fraction,
+                    pixel_mask,
+                    None,
+                    downsample[0] if downsample else None,
+                )
+                meta_pef = f"/data/{self.detector_name}/meta"
+                h5_dest[f"{meta_pef}/func"] = func is not None
+
             else:
-                downsample_image = _downsample_image_jit
 
-            if compression:
+                pixel_mask_r = {}
+                good_pixels_fraction = {}
+                out_shape = {}
+                if func:
+                    func_buffer = {}
+
+                for i, lb in enumerate(roi_labels):
+
+                    roi_y1, roi_y2, roi_x1, roi_x2 = roi[i]
+                    out_shape[lb] = roi_shape[i]
+                    pixel_mask_r[lb] = pixel_mask[slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)]
+                    good_pixels_fraction[lb] = gpr[slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)]
+                    gpf = None
+                    if func and func[i]:
+                        (
+                            out_shape[lb],
+                            pixel_mask_r[lb],
+                            good_pixels_fraction[lb],
+                            func_buffer[lb],
+                        ) = _prepare_fnc(good_pixels_fraction[lb], func[i])
+                        gpf = good_pixels_fraction[lb]
+
+                    _create_data_group(
+                        out_shape[lb],
+                        gpf,
+                        pixel_mask_r[lb],
+                        lb,
+                        downsample[i] if downsample else None,
+                    )
+
+                    meta_pref = f"/data/{self.detector_name}:ROI_{lb}/meta/"
+                    h5_dest[f"{meta_pref}/roi"] = [(roi_y1, roi_y2), (roi_x1, roi_x2)]
+                    h5_dest[f"{meta_pref}/func"] = func[i] is not None if func else False
+
+                del h5_dest[f"/data/{self.detector_name}"]
+
+            if compression and not isinstance(out_shape, dict):
                 dtype_size = out_dtype.itemsize
                 bytes_num_elem = struct.pack(">q", np.prod(out_shape) * dtype_size)
                 bytes_block_size = struct.pack(">i", BLOCK_SIZE * dtype_size)
@@ -534,8 +683,6 @@ class File:
 
                 read_buffer_view = read_buffer[: len(batch_ind)]
                 out_buffer_view = out_buffer[: len(batch_ind)]
-                if downsample:
-                    ds_buffer_view = ds_buffer[: len(batch_ind)]
 
                 # Avoid a stride-bottleneck, see https://github.com/h5py/h5py/issues/977
                 if np.sum(np.diff(batch_ind)) == len(batch_ind) - 1:
@@ -557,13 +704,13 @@ class File:
                     out=out_buffer_view,
                 )
 
-                if downsample:
-                    downsample_image(
-                        ds_buffer_view, out_buffer_view, downsample, factor, good_pixels_fraction
-                    )
-                    out_buffer_view = ds_buffer_view
-
                 if roi is None:
+
+                    if func:
+                        func_buffer_view = func_buffer[: len(batch_ind)]
+                        func[0][0](func_buffer_view, out_buffer_view, factor, good_pixels_fraction)
+                        out_buffer_view = func_buffer_view
+
                     for pos, im in zip(batch_range, out_buffer_view):
                         if compression:
                             im = header + bitshuffle.compress_lz4(im, BLOCK_SIZE).tobytes()
@@ -571,9 +718,14 @@ class File:
                         h5_dest[dset.name].id.write_direct_chunk((pos, 0, 0), im)
 
                 else:
-                    for l, (roi_y1, roi_y2, roi_x1, roi_x2) in zip(roi_labels, roi):
+                    for i, lb in enumerate(roi_labels):
+                        roi_y1, roi_y2, roi_x1, roi_x2 = roi[i]
                         roi_data = out_buffer_view[:, slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)]
-                        h5_dest[f"/data/{self.detector_name}:ROI_{l}/data"][batch_range] = roi_data
+                        if func and func[i]:
+                            func_buffer_view = func_buffer[lb][: len(batch_ind)]
+                            func[i][0](func_buffer_view, roi_data, factor, good_pixels_fraction[lb])
+                            roi_data = func_buffer_view
+                        h5_dest[f"/data/{self.detector_name}:ROI_{lb}/data"][batch_range] = roi_data
 
         # restore original values
         self.mask = _mask
