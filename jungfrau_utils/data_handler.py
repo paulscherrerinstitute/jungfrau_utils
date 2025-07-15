@@ -472,7 +472,7 @@ class JFDataHandler:
         return dtype_out
 
     def _get_module_coords(self, m: int, i: int, geometry: bool, gap_pixels: bool) -> tuple:
-        if self.detector_geometry.is_stripsel:
+        if self.detector_geometry.is_stripsel and geometry:
             if self.detector_name.startswith("JF18"):
                 module_size_y = STRIPSEL_JF18_SIZE_Y
                 module_size_x = STRIPSEL_JF18_SIZE_X
