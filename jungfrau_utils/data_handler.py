@@ -54,6 +54,12 @@ class JFDataHandler:
         if not (isinstance(detector_name, str) and re.match(r"^JF\d+T\d+V\d+$", detector_name)):
             raise ValueError("detector_name must be a string in the form 'JF<id>T<nmod>V<version>'")
 
+        if detector_name == "JF02T09V01":
+            warnings.warn(
+                "Support for JF02T09V01 is deprecated and will be removed in jungfrau_utils/4.0",
+                DeprecationWarning,
+            )
+
         detector_name_noVer = detector_name.split("V")[0]
         # Search for a direct match between a detector_name and one of the detector_geometry keys
         if detector_name in detector_geometry:
