@@ -575,6 +575,249 @@ class File:
                         roi_data = out_buffer_view[:, slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)]
                         h5_dest[f"/data/{self.detector_name}:ROI_{l}/data"][batch_range] = roi_data
 
+    def _export_v2(
+        self,
+        dest: str,
+        *,
+        disabled_modules: tuple = (),
+        index: Iterable | None = None,
+        compression: bool = False,
+        factor: float | None = None,
+        batch_size: int = 100,
+        func=None,
+    ) -> None:
+        """Export processed data into a separate hdf5 file.
+
+        Args:
+            dest (str): Destination hdf5 file path.
+            disabled_modules (iterable, optional): Exclude data of provided module indices from
+                processing. Defaults to ().
+            index (iterable, optional): An iterable with indexes of images to be exported.
+                Export all images if None. Defaults to None.
+            compression (bool, optional): Apply bitshuffle+lz4 compression. Defaults to False.
+            factor (float, optional): If conversion is True, use this factor to divide converted
+                values. The output values are also rounded and casted to np.int32 dtype. Keep the
+                original values if None. Defaults to None.
+            batch_size (int, optional): Process images in batches of that size in order to avoid
+                running out of memory. Defaults to 100.
+            func: TODO
+        """
+        if self._processed:
+            raise RuntimeError("Can not export already processed file.")
+
+        if index is not None:
+            index = np.array(index)  # convert iterable into numpy array
+
+        _mask = self.mask
+
+        dic_file = {"": {}}
+
+        _factor = self.handler.factor
+        if factor:
+            if func:
+                # factor division and rounding should occur after function, so we do it not via
+                # JFDataHandler
+                self.handler.factor = None
+                out_dtype = np.dtype(np.int32)
+                dic_file[""]["conversion_factor"] = factor or np.nan
+            else:
+                self.handler.factor = factor
+
+        _module_map = self.handler.module_map
+        if disabled_modules:
+            if -1 in self.handler.module_map:
+                raise ValueError("Can not disable modules when file contains disabled modules.")
+
+            n_modules = self.handler.detector.n_modules
+            if min(disabled_modules) < 0 or max(disabled_modules) >= n_modules:
+                raise ValueError(f"Disabled modules must be within 0 {n_modules-1} range.")
+
+            module_map = np.arange(n_modules)
+            for ind in sorted(disabled_modules):
+                module_map[ind] = -1
+                module_map[ind + 1 :] -= 1
+
+            self.handler.module_map = module_map
+
+        # a function for 'visititems' should have the args (name, object)
+        def _visititems(name, obj):
+            if isinstance(obj, h5py.Dataset):
+                if (
+                    name == f"data/{self.detector_name}/data"
+                    or name.endswith("frame_index")
+                    or name == f"data/{self.detector_name}/module_map"
+                    or name == f"data/{self.detector_name}/pixel_mask"
+                ):
+                    return
+
+            if isinstance(obj, h5py.Group):
+                h5_dest.create_group(name)
+
+            else:  # isinstance(obj, h5py.Dataset)
+                dset_source = self.file[name]
+
+                if name.startswith("data") and not name.endswith("pixel_mask"):
+                    # datasets with data per image, so indexing should be applied
+                    data = dset_source[:] if index is None else dset_source[index, :]
+                    h5_dest.create_dataset(name, data=data)
+                else:
+                    h5_dest.create_dataset(name, data=dset_source)
+
+            # copy group/dataset attributes (if it's not a dataset with the actual data)
+            for key, value in self.file[name].attrs.items():
+                h5_dest[name].attrs[key] = value
+
+        with h5py.File(dest, "w") as h5_dest:
+            # traverse the source file and copy/index all datasets, except the raw data
+            self.file.visititems(_visititems)
+
+            # create `meta` group
+            meta_path = f"/data/{self.detector_name}/meta"
+            meta_group = h5_dest.create_group(meta_path)
+
+            # save processing parameters in `meta`
+            meta_group["module_map"] = self.handler.module_map
+            meta_group["conversion"] = self.conversion
+            meta_group["mask"] = self.mask
+            meta_group["gap_pixels"] = self.gap_pixels
+            meta_group["double_pixels"] = self.double_pixels
+            meta_group["geometry"] = self.geometry
+
+            dset = self._data_dset
+            n_images = dset.shape[0] if index is None else len(index)
+
+            pixel_mask = self.get_pixel_mask()
+            out_dtype = self.get_dtype_out()
+
+            if func and factor is not None:
+                out_dtype = np.dtype(np.int32)
+
+            args = {}
+            args["dtype"] = out_dtype
+            if compression:
+                args.update(compargs)
+                header = {}
+
+            dic_file[""]["pixel_mask"] = pixel_mask
+            dic_file[""]["downsample"] = (1, 1)
+
+            # prepare buffers to be reused for every batch
+            read_buffer = np.empty((batch_size, *dset.shape[-2:]), dtype=dset.dtype)
+            out_buffer_dtype = np.float32 if func and factor is not None else out_dtype
+            # shape_out is changed if downsample != (1, 1), so use get_shape_out() once again
+            out_buffer = np.zeros((batch_size, *self.get_shape_out()), dtype=out_buffer_dtype)
+
+            # process and write data in batches
+            for batch_start in range(0, n_images, batch_size):
+                batch_range = np.arange(batch_start, min(batch_start + batch_size, n_images))
+                batch_ind = batch_range if index is None else index[batch_range]
+
+                read_buffer_view = read_buffer[: len(batch_ind)]
+                out_buffer_view = out_buffer[: len(batch_ind)]
+
+                # Avoid a stride-bottleneck, see https://github.com/h5py/h5py/issues/977
+                if np.sum(np.diff(batch_ind)) == len(batch_ind) - 1:
+                    # consecutive index values
+                    dset.read_direct(read_buffer_view, source_sel=np.s_[batch_ind])
+                else:
+                    for i, j in enumerate(batch_ind):
+                        dset.read_direct(read_buffer_view, dest_sel=np.s_[i], source_sel=np.s_[j])
+
+                # Process data (`out_buffer_view` is modified in-place)
+                self.handler.process(
+                    read_buffer_view,
+                    conversion=self.conversion,
+                    mask=self.mask,
+                    gap_pixels=self.gap_pixels,
+                    double_pixels=self.double_pixels,
+                    geometry=self.geometry,
+                    parallel=self.parallel,
+                    out=out_buffer_view,
+                )
+
+                # here? compression bit if rois also like this?, 1st batch if needed
+                if batch_range[0] == 0:
+                    out_shape = {}
+                    buf_shape = {}
+                    if func:
+                        st_frame = func(self, out_buffer_view[0:1, :, :], dic_file, None)
+                        func_buffer = {}
+                        func_buffer_view = {}
+                    else:
+                        st_frame = {"": out_buffer_view[0:1, :, :]}
+                        dic_file[""]["data"] = out_buffer_view[0:1, :, :]
+
+                    for key in st_frame:
+                        if key[0:5] != ":ROI_":
+                            continue
+
+                        h5_dest.copy(
+                            source=h5_dest[f"/data/{self.detector_name}"],
+                            dest=h5_dest["/data"],
+                            name=f"/data/{self.detector_name}{key}",
+                        )
+                    if "" not in st_frame:
+                        del h5_dest[f"/data/{self.detector_name}"]
+
+                    for key in st_frame:
+                        if not (key == "" or key[0:5] == ":ROI_"):
+                            print("Unknown key({key}) for data in buffer, skipped.")
+                        tmp = np.shape(dic_file[key]["data"])
+                        out_shape[key] = tmp[1:] if len(tmp) > 1 else (1,)
+                        tmp = np.shape(st_frame[key])
+                        buf_shape[key] = tmp[1:] if len(tmp) > 1 else (1,)
+                        if func:
+                            func_buffer[key] = np.zeros(
+                                (batch_size, *buf_shape[key]), dtype=out_dtype
+                            )
+
+                        args["shape"] = (n_images, *out_shape[key])
+                        args["chunks"] = (1, *out_shape[key])
+                        dset_name = f"data/{self.detector_name}{key}/data"
+                        h5_dest.create_dataset(dset_name, **args)
+                        if compression:
+                            dtype_size = out_dtype.itemsize
+                            bytes_num_elem = struct.pack(">q", np.prod(out_shape[key]) * dtype_size)
+                            bytes_block_size = struct.pack(">i", BLOCK_SIZE * dtype_size)
+                            header[key] = bytes_num_elem + bytes_block_size
+
+                if func:
+                    for key in func_buffer:
+                        func_buffer_view[key] = func_buffer[key][: len(batch_ind)]
+                    func(self, out_buffer_view, dic_file, func_buffer_view)
+                    keys_write = func_buffer_view.keys()
+                else:
+                    dic_file[""]["data"] = out_buffer_view
+                    keys_write = [""]
+                for label, dic in dic_file.items():
+                    if label not in keys_write:
+                        continue
+                    for key, value in dic.items():
+                        if key == "data":
+                            if value.dtype != out_dtype:
+                                raise TypeError(
+                                    f"Data type ({value.dtype}) does not match expected {out_dtype}"
+                                )
+                            for pos, im in zip(batch_range, value):
+                                if len(out_shape[label]) == 2:
+                                    loc = (pos, 0, 0)
+                                elif len(out_shape[label]) == 1:
+                                    loc = (pos, 0)
+                                else:
+                                    print(
+                                        "Unexpected dimensions of data:{len(out_shape[label])}, accepted 1 or 2"
+                                    )
+                                if compression:
+                                    im = (
+                                        header[key]
+                                        + bitshuffle.compress_lz4(im, BLOCK_SIZE).tobytes()
+                                    )
+                                dset_name = f"data/{self.detector_name}{label}/data"
+                                h5_dest[dset_name].id.write_direct_chunk(loc, im)
+
+                        elif value is not None:
+                            h5_dest[f"data/{self.detector_name}{label}/meta/{key}"] = value
+
         # restore original values
         self.mask = _mask
         self.handler.factor = _factor
