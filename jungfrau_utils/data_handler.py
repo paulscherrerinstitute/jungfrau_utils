@@ -7,8 +7,8 @@ from functools import lru_cache
 from typing import NamedTuple
 
 import h5py
+import numba
 import numpy as np
-from numba import njit, prange
 from numpy.typing import NDArray
 
 from jungfrau_utils.geometry import DetectorGeometry, detector_geometry
@@ -924,7 +924,7 @@ class JFDataHandler:
         return saturated_pixels_coordinates
 
 
-@njit(cache=True)
+@numba.njit(cache=True)
 def _adc_to_energy_jit(
     res: NDArray,
     image: NDArray,
@@ -936,7 +936,7 @@ def _adc_to_energy_jit(
     rx: NDArray,
 ) -> None:
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
-    for i1 in prange(image.shape[0]):  # pylint: disable=not-an-iterable
+    for i1 in numba.prange(image.shape[0]):  # pylint: disable=not-an-iterable
         for i2, ri2 in enumerate(ry):
             for i3, ri3 in enumerate(rx):
                 if mask is not None and not mask[i2, i3]:
@@ -955,7 +955,7 @@ def _adc_to_energy_jit(
                         res[i1, ri2, ri3] = round(tmp_res)
 
 
-@njit(cache=True, parallel=True)
+@numba.njit(cache=True, parallel=True)
 def _adc_to_energy_par_jit(
     res: NDArray,
     image: NDArray,
@@ -967,7 +967,7 @@ def _adc_to_energy_par_jit(
     rx: NDArray,
 ) -> None:
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
-    for i1 in prange(image.shape[0]):  # pylint: disable=not-an-iterable
+    for i1 in numba.prange(image.shape[0]):  # pylint: disable=not-an-iterable
         for i2, ri2 in enumerate(ry):
             for i3, ri3 in enumerate(rx):
                 if mask is not None and not mask[i2, i3]:
@@ -986,10 +986,10 @@ def _adc_to_energy_par_jit(
                         res[i1, ri2, ri3] = round(tmp_res)
 
 
-@njit(cache=True)
+@numba.njit(cache=True)
 def _reshape_stripsel_jit(res: NDArray, image: NDArray) -> None:
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
-    for ind in prange(image.shape[0]):  # pylint: disable=not-an-iterable
+    for ind in numba.prange(image.shape[0]):  # pylint: disable=not-an-iterable
         # first we fill the normal pixels, the gap ones will be overwritten later
         for yin in range(252):
             for xin in range(1024):
@@ -1020,10 +1020,10 @@ def _reshape_stripsel_jit(res: NDArray, image: NDArray) -> None:
                 res[ind, yout + 1, xout] = image[ind, yin, xin] / 2
 
 
-@njit(cache=True, parallel=True)
+@numba.njit(cache=True, parallel=True)
 def _reshape_stripsel_par_jit(res: NDArray, image: NDArray) -> None:
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
-    for ind in prange(image.shape[0]):  # pylint: disable=not-an-iterable
+    for ind in numba.prange(image.shape[0]):  # pylint: disable=not-an-iterable
         # first we fill the normal pixels, the gap ones will be overwritten later
         for yin in range(252):
             for xin in range(1024):
@@ -1054,7 +1054,7 @@ def _reshape_stripsel_par_jit(res: NDArray, image: NDArray) -> None:
                 res[ind, yout + 1, xout] = image[ind, yin, xin] / 2
 
 
-@njit(cache=True)
+@numba.njit(cache=True)
 def _reshape_stripsel_jf18_jit(res: NDArray, image: NDArray) -> None:
     image = image[:, :, 256 : 256 * 3]
 
@@ -1063,7 +1063,7 @@ def _reshape_stripsel_jf18_jit(res: NDArray, image: NDArray) -> None:
     offset_x_l = 11
 
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
-    for ind in prange(image.shape[0]):  # pylint: disable=not-an-iterable
+    for ind in numba.prange(image.shape[0]):  # pylint: disable=not-an-iterable
         image_tmp = np.rot90(image[ind], k=2)
         for xin in range(offset_x_l, 512 - offset_x_r):
             for yin in range(offset_y, 255):
@@ -1079,7 +1079,7 @@ def _reshape_stripsel_jf18_jit(res: NDArray, image: NDArray) -> None:
         res[ind] = np.rot90(res[ind], k=2)
 
 
-@njit(cache=True, parallel=True)
+@numba.njit(cache=True, parallel=True)
 def _reshape_stripsel_jf18_par_jit(res: NDArray, image: NDArray) -> None:
     image = image[:, :, 256 : 256 * 3]
 
@@ -1088,7 +1088,7 @@ def _reshape_stripsel_jf18_par_jit(res: NDArray, image: NDArray) -> None:
     offset_x_l = 11
 
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
-    for ind in prange(image.shape[0]):  # pylint: disable=not-an-iterable
+    for ind in numba.prange(image.shape[0]):  # pylint: disable=not-an-iterable
         image_tmp = np.rot90(image[ind], k=2)
         for xin in range(offset_x_l, 512 - offset_x_r):
             for yin in range(offset_y, 255):
@@ -1104,9 +1104,9 @@ def _reshape_stripsel_jf18_par_jit(res: NDArray, image: NDArray) -> None:
         res[ind] = np.rot90(res[ind], k=2)
 
 
-@njit(cache=True)
+@numba.njit(cache=True)
 def _inplace_interp_dp_jit(res: NDArray) -> None:
-    for i1 in prange(res.shape[0]):  # pylint: disable=not-an-iterable
+    for i1 in numba.prange(res.shape[0]):  # pylint: disable=not-an-iterable
         # corner quad pixels
         for ri2 in (255, 257):
             for ri3 in (255, 257, 513, 515, 771, 773):
@@ -1174,9 +1174,9 @@ def _inplace_interp_dp_jit(res: NDArray) -> None:
                         res[i1, ri2, ri3 + 2] = v3 - res[i1, ri2, ri3 + 3]
 
 
-@njit(cache=True, parallel=True)
+@numba.njit(cache=True, parallel=True)
 def _inplace_interp_dp_par_jit(res: NDArray) -> None:
-    for i1 in prange(res.shape[0]):  # pylint: disable=not-an-iterable
+    for i1 in numba.prange(res.shape[0]):  # pylint: disable=not-an-iterable
         # corner quad pixels
         for ri2 in (255, 257):
             for ri3 in (255, 257, 513, 515, 771, 773):
@@ -1244,7 +1244,7 @@ def _inplace_interp_dp_par_jit(res: NDArray) -> None:
                         res[i1, ri2, ri3 + 2] = v3 - res[i1, ri2, ri3 + 3]
 
 
-@njit(cache=True)
+@numba.njit(cache=True)
 def _inplace_mask_dp_jit(res: NDArray) -> None:
     # gap_pixels is always True here
     for row in (256,):

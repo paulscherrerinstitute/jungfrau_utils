@@ -8,9 +8,8 @@ from typing import Iterable
 
 import bitshuffle
 import h5py
+import numba
 import numpy as np
-from bitshuffle.h5 import H5_COMPRESS_LZ4, H5FILTER  # pylint: disable=no-name-in-module
-from numba import njit, prange
 from numpy.typing import NDArray
 
 import jungfrau_utils
@@ -25,7 +24,10 @@ warnings.filterwarnings("default", category=DeprecationWarning)
 
 # bitshuffle hdf5 filter params
 BLOCK_SIZE = 32768
-compargs = {"compression": H5FILTER, "compression_opts": (BLOCK_SIZE, H5_COMPRESS_LZ4)}
+compargs = {
+    "compression": bitshuffle.h5.H5FILTER,
+    "compression_opts": (BLOCK_SIZE, bitshuffle.h5.H5_COMPRESS_LZ4),
+}
 
 
 class File:
@@ -664,7 +666,7 @@ class File:
         return getattr(self.file, name)
 
 
-@njit(cache=True)
+@numba.njit(cache=True)
 def _downsample_mask_jit(mask: NDArray, downsample: tuple[int, int]) -> tuple[NDArray, NDArray]:
     size_y, size_x = mask.shape
     ds_y, ds_x = downsample
@@ -690,7 +692,7 @@ def _downsample_mask_jit(mask: NDArray, downsample: tuple[int, int]) -> tuple[ND
     return downsampled_mask, good_pixels_fraction
 
 
-@njit(cache=True)
+@numba.njit(cache=True)
 def _downsample_image_jit(
     res: NDArray,
     image: NDArray,
@@ -701,7 +703,7 @@ def _downsample_image_jit(
     num, out_shape_y, out_shape_x = res.shape
     ds_y, ds_x = downsample
 
-    for i1 in prange(num):  # pylint: disable=not-an-iterable
+    for i1 in numba.prange(num):  # pylint: disable=not-an-iterable
         for i2 in range(out_shape_y):
             i_y = ds_y * i2
             for i3 in range(out_shape_x):
@@ -716,7 +718,7 @@ def _downsample_image_jit(
                     res[i1, i2, i3] = round(tmp_res / factor)
 
 
-@njit(cache=True, parallel=True)
+@numba.njit(cache=True, parallel=True)
 def _downsample_image_par_jit(
     res: NDArray,
     image: NDArray,
@@ -727,7 +729,7 @@ def _downsample_image_par_jit(
     num, out_shape_y, out_shape_x = res.shape
     ds_y, ds_x = downsample
 
-    for i1 in prange(num):  # pylint: disable=not-an-iterable
+    for i1 in numba.prange(num):  # pylint: disable=not-an-iterable
         for i2 in range(out_shape_y):
             i_y = ds_y * i2
             for i3 in range(out_shape_x):
