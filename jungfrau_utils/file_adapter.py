@@ -224,6 +224,11 @@ class File:
             print("The file is already processed, setting 'parallel' has no effect.")
             return
 
+        if value:
+            numba.set_num_threads(numba.config.NUMBA_NUM_THREADS)
+        else:
+            numba.set_num_threads(1)
+
         self._parallel = value
 
     @property
@@ -458,7 +463,7 @@ class File:
             out_dtype = self.get_dtype_out()
 
             if downsample:
-                pixel_mask, good_pixels_fraction = _downsample_mask_jit(pixel_mask, downsample)
+                pixel_mask, good_pixels_fraction = _downsample_mask(pixel_mask, downsample)
                 out_shape = tuple(
                     (shape + ds - 1) // ds for shape, ds in zip(out_shape, downsample)
                 )
@@ -518,11 +523,6 @@ class File:
                 ds_buffer = np.zeros((batch_size, *out_shape), dtype=out_dtype)
 
             # prepare utility vars
-            if downsample and self.parallel:
-                downsample_image = _downsample_image_par_jit
-            else:
-                downsample_image = _downsample_image_jit
-
             if compression:
                 dtype_size = out_dtype.itemsize
                 bytes_num_elem = struct.pack(">q", np.prod(out_shape) * dtype_size)
@@ -560,7 +560,7 @@ class File:
                 )
 
                 if downsample:
-                    downsample_image(
+                    _downsample_image(
                         ds_buffer_view, out_buffer_view, downsample, factor, good_pixels_fraction
                     )
                     out_buffer_view = ds_buffer_view
@@ -667,7 +667,7 @@ class File:
 
 
 @numba.njit(cache=True)
-def _downsample_mask_jit(mask: NDArray, downsample: tuple[int, int]) -> tuple[NDArray, NDArray]:
+def _downsample_mask(mask: NDArray, downsample: tuple[int, int]) -> tuple[NDArray, NDArray]:
     size_y, size_x = mask.shape
     ds_y, ds_x = downsample
     downsample_pix_num = ds_y * ds_x
@@ -692,34 +692,8 @@ def _downsample_mask_jit(mask: NDArray, downsample: tuple[int, int]) -> tuple[ND
     return downsampled_mask, good_pixels_fraction
 
 
-@numba.njit(cache=True)
-def _downsample_image_jit(
-    res: NDArray,
-    image: NDArray,
-    downsample: tuple[int, int],
-    factor: float | None,
-    good_pixels_fraction: NDArray,
-) -> None:
-    num, out_shape_y, out_shape_x = res.shape
-    ds_y, ds_x = downsample
-
-    for i1 in numba.prange(num):  # pylint: disable=not-an-iterable
-        for i2 in range(out_shape_y):
-            i_y = ds_y * i2
-            for i3 in range(out_shape_x):
-                i_x = ds_x * i3
-
-                gpr = good_pixels_fraction[i2, i3]
-                tmp_res = np.sum(image[i1, i_y : i_y + ds_y, i_x : i_x + ds_x]) / gpr if gpr else 0
-
-                if factor is None:
-                    res[i1, i2, i3] = tmp_res
-                else:
-                    res[i1, i2, i3] = round(tmp_res / factor)
-
-
 @numba.njit(cache=True, parallel=True)
-def _downsample_image_par_jit(
+def _downsample_image(
     res: NDArray,
     image: NDArray,
     downsample: tuple[int, int],
