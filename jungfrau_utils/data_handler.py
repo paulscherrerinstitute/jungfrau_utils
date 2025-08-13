@@ -924,8 +924,7 @@ class JFDataHandler:
         return saturated_pixels_coordinates
 
 
-@njit(cache=True)
-def _adc_to_energy_jit(
+def _adc_to_energy(
     res: NDArray,
     image: NDArray,
     gain: NDArray | None,
@@ -955,39 +954,11 @@ def _adc_to_energy_jit(
                         res[i1, ri2, ri3] = round(tmp_res)
 
 
-@njit(cache=True, parallel=True)
-def _adc_to_energy_par_jit(
-    res: NDArray,
-    image: NDArray,
-    gain: NDArray | None,
-    pedestal: NDArray | None,
-    mask: NDArray | None,
-    factor: float | None,
-    ry: NDArray,
-    rx: NDArray,
-) -> None:
-    # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
-    for i1 in prange(image.shape[0]):  # pylint: disable=not-an-iterable
-        for i2, ri2 in enumerate(ry):
-            for i3, ri3 in enumerate(rx):
-                if mask is not None and not mask[i2, i3]:
-                    continue
-
-                if gain is None or pedestal is None:
-                    res[i1, ri2, ri3] = image[i1, i2, i3]
-                else:
-                    gm = np.uint32(np.right_shift(image[i1, i2, i3], 14))
-                    val = np.float32(image[i1, i2, i3] & 0x3FFF)
-                    tmp_res = (val - pedestal[gm, i2, i3]) * gain[gm, i2, i3]
-
-                    if factor is None:
-                        res[i1, ri2, ri3] = tmp_res
-                    else:
-                        res[i1, ri2, ri3] = round(tmp_res)
+_adc_to_energy_jit = njit()(_adc_to_energy)
+_adc_to_energy_par_jit = njit(parallel=True)(_adc_to_energy)
 
 
-@njit(cache=True)
-def _reshape_stripsel_jit(res: NDArray, image: NDArray) -> None:
+def _reshape_stripsel(res: NDArray, image: NDArray) -> None:
     # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
     for ind in prange(image.shape[0]):  # pylint: disable=not-an-iterable
         # first we fill the normal pixels, the gap ones will be overwritten later
@@ -1020,42 +991,11 @@ def _reshape_stripsel_jit(res: NDArray, image: NDArray) -> None:
                 res[ind, yout + 1, xout] = image[ind, yin, xin] / 2
 
 
-@njit(cache=True, parallel=True)
-def _reshape_stripsel_par_jit(res: NDArray, image: NDArray) -> None:
-    # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
-    for ind in prange(image.shape[0]):  # pylint: disable=not-an-iterable
-        # first we fill the normal pixels, the gap ones will be overwritten later
-        for yin in range(252):
-            for xin in range(1024):
-                ichip = xin // 256
-                xout = (ichip * 774) + (xin % 256) * 3 + yin % 3
-                # 774 is the chip period, 256*3+6
-                yout = yin // 3
-                res[ind, yout, xout] = image[ind, yin, xin]
-
-        # now the gap pixels
-        for igap in range(3):
-            for yin in range(252):
-                yout = (yin // 6) * 2
-
-                # if we want a proper normalization (the area of those pixels is double,
-                # so they see 2x the signal)
-
-                # first the left side of gap
-                xin = igap * 256 + 255
-                xout = igap * 774 + 765 + yin % 6
-                res[ind, yout, xout] = image[ind, yin, xin] / 2
-                res[ind, yout + 1, xout] = image[ind, yin, xin] / 2
-
-                # then the right side is mirrored
-                xin = igap * 256 + 255 + 1
-                xout = igap * 774 + 765 + 11 - yin % 6
-                res[ind, yout, xout] = image[ind, yin, xin] / 2
-                res[ind, yout + 1, xout] = image[ind, yin, xin] / 2
+_reshape_stripsel_jit = njit()(_reshape_stripsel)
+_reshape_stripsel_par_jit = njit(parallel=True)(_reshape_stripsel)
 
 
-@njit(cache=True)
-def _reshape_stripsel_jf18_jit(res: NDArray, image: NDArray) -> None:
+def _reshape_stripsel_jf18(res: NDArray, image: NDArray) -> None:
     image = image[:, :, 256 : 256 * 3]
 
     offset_y = 9
@@ -1079,33 +1019,11 @@ def _reshape_stripsel_jf18_jit(res: NDArray, image: NDArray) -> None:
         res[ind] = np.rot90(res[ind], k=2)
 
 
-@njit(cache=True, parallel=True)
-def _reshape_stripsel_jf18_par_jit(res: NDArray, image: NDArray) -> None:
-    image = image[:, :, 256 : 256 * 3]
-
-    offset_y = 9
-    offset_x_r = 9
-    offset_x_l = 11
-
-    # TODO: remove after issue is fixed: https://github.com/PyCQA/pylint/issues/2910
-    for ind in prange(image.shape[0]):  # pylint: disable=not-an-iterable
-        image_tmp = np.rot90(image[ind], k=2)
-        for xin in range(offset_x_l, 512 - offset_x_r):
-            for yin in range(offset_y, 255):
-                yout = (xin - offset_x_l) % 3 + (yin - offset_y) * 3
-                xout = (xin - offset_x_l) // 3 + xin // 257
-                res[ind, yout, xout] = image_tmp[yin, xin]
-
-            for yin in range(257, 512 - offset_y):
-                yout = 2 - (xin - offset_x_l) % 3 + (yin - offset_y) * 3 + 6
-                xout = (xin - offset_x_l) // 3 + xin // 257
-                res[ind, yout, xout] = image_tmp[yin, xin]
-
-        res[ind] = np.rot90(res[ind], k=2)
+_reshape_stripsel_jf18_jit = njit()(_reshape_stripsel_jf18)
+_reshape_stripsel_jf18_par_jit = njit(parallel=True)(_reshape_stripsel_jf18)
 
 
-@njit(cache=True)
-def _inplace_interp_dp_jit(res: NDArray) -> None:
+def _inplace_interp_dp(res: NDArray) -> None:
     for i1 in prange(res.shape[0]):  # pylint: disable=not-an-iterable
         # corner quad pixels
         for ri2 in (255, 257):
@@ -1174,77 +1092,11 @@ def _inplace_interp_dp_jit(res: NDArray) -> None:
                         res[i1, ri2, ri3 + 2] = v3 - res[i1, ri2, ri3 + 3]
 
 
-@njit(cache=True, parallel=True)
-def _inplace_interp_dp_par_jit(res: NDArray) -> None:
-    for i1 in prange(res.shape[0]):  # pylint: disable=not-an-iterable
-        # corner quad pixels
-        for ri2 in (255, 257):
-            for ri3 in (255, 257, 513, 515, 771, 773):
-                shift_y = 0 if ri2 == 255 else 1
-                shift_x = 0 if ri3 == 255 or ri3 == 513 or ri3 == 771 else 1
-
-                shared_val = res[i1, ri2 + shift_y, ri3 + shift_x] / 4
-                res[i1, ri2, ri3] = shared_val
-                res[i1, ri2 + 1, ri3] = shared_val
-                res[i1, ri2, ri3 + 1] = shared_val
-                res[i1, ri2 + 1, ri3 + 1] = shared_val
-
-        # rows of double pixels
-        ri2 = 255
-        for x_start, x_end in ((0, 255), (259, 513), (517, 771), (775, 1030)):
-            for ri3 in range(x_start, x_end):
-                v1 = res[i1, ri2 - 1, ri3]
-                v2 = res[i1, ri2, ri3]
-                v3 = res[i1, ri2 + 3, ri3]
-                v4 = res[i1, ri2 + 4, ri3]
-
-                div = 6 * v1 + 3 * v3
-                if div == 0:
-                    shared_val = v2 / 2
-                    res[i1, ri2, ri3] = shared_val
-                    res[i1, ri2 + 1, ri3] = shared_val
-                else:
-                    res[i1, ri2, ri3] *= (4 * v1 + v3) / div
-                    res[i1, ri2 + 1, ri3] = v2 - res[i1, ri2, ri3]
-
-                div = 6 * v4 + 3 * v2
-                if div == 0:
-                    shared_val = v3 / 2
-                    res[i1, ri2 + 3, ri3] = shared_val
-                    res[i1, ri2 + 2, ri3] = shared_val
-                else:
-                    res[i1, ri2 + 3, ri3] *= (4 * v4 + v2) / div
-                    res[i1, ri2 + 2, ri3] = v3 - res[i1, ri2 + 3, ri3]
-
-        # columns of double pixels
-        for ri3 in (255, 513, 771):
-            for y_start, y_end in ((0, 255), (259, 514)):
-                for ri2 in range(y_start, y_end):
-                    v1 = res[i1, ri2, ri3 - 1]
-                    v2 = res[i1, ri2, ri3]
-                    v3 = res[i1, ri2, ri3 + 3]
-                    v4 = res[i1, ri2, ri3 + 4]
-
-                    div = 6 * v1 + 3 * v3
-                    if div == 0:
-                        shared_val = v2 / 2
-                        res[i1, ri2, ri3] = shared_val
-                        res[i1, ri2, ri3 + 1] = shared_val
-                    else:
-                        res[i1, ri2, ri3] *= (4 * v1 + v3) / div
-                        res[i1, ri2, ri3 + 1] = v2 - res[i1, ri2, ri3]
-
-                    div = 6 * v4 + 3 * v2
-                    if div == 0:
-                        shared_val = v3 / 2
-                        res[i1, ri2, ri3 + 3] = shared_val
-                        res[i1, ri2, ri3 + 2] = shared_val
-                    else:
-                        res[i1, ri2, ri3 + 3] *= (4 * v4 + v2) / div
-                        res[i1, ri2, ri3 + 2] = v3 - res[i1, ri2, ri3 + 3]
+_inplace_interp_dp_jit = njit()(_inplace_interp_dp)
+_inplace_interp_dp_par_jit = njit(parallel=True)(_inplace_interp_dp)
 
 
-@njit(cache=True)
+@njit
 def _inplace_mask_dp_jit(res: NDArray) -> None:
     # gap_pixels is always True here
     for row in (256,):

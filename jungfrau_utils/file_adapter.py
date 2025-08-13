@@ -664,7 +664,7 @@ class File:
         return getattr(self.file, name)
 
 
-@njit(cache=True)
+@njit
 def _downsample_mask_jit(mask: NDArray, downsample: tuple[int, int]) -> tuple[NDArray, NDArray]:
     size_y, size_x = mask.shape
     ds_y, ds_x = downsample
@@ -690,8 +690,7 @@ def _downsample_mask_jit(mask: NDArray, downsample: tuple[int, int]) -> tuple[ND
     return downsampled_mask, good_pixels_fraction
 
 
-@njit(cache=True)
-def _downsample_image_jit(
+def _downsample_image(
     res: NDArray,
     image: NDArray,
     downsample: tuple[int, int],
@@ -716,27 +715,5 @@ def _downsample_image_jit(
                     res[i1, i2, i3] = round(tmp_res / factor)
 
 
-@njit(cache=True, parallel=True)
-def _downsample_image_par_jit(
-    res: NDArray,
-    image: NDArray,
-    downsample: tuple[int, int],
-    factor: float | None,
-    good_pixels_fraction: NDArray,
-) -> None:
-    num, out_shape_y, out_shape_x = res.shape
-    ds_y, ds_x = downsample
-
-    for i1 in prange(num):  # pylint: disable=not-an-iterable
-        for i2 in range(out_shape_y):
-            i_y = ds_y * i2
-            for i3 in range(out_shape_x):
-                i_x = ds_x * i3
-
-                gpr = good_pixels_fraction[i2, i3]
-                tmp_res = np.sum(image[i1, i_y : i_y + ds_y, i_x : i_x + ds_x]) / gpr if gpr else 0
-
-                if factor is None:
-                    res[i1, i2, i3] = tmp_res
-                else:
-                    res[i1, i2, i3] = round(tmp_res / factor)
+_downsample_image_jit = njit(_downsample_image)
+_downsample_image_par_jit = njit(parallel=True)(_downsample_image)
