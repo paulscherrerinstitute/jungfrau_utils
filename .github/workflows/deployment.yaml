@@ -12,10 +12,15 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Prepare
+    - uses: conda-incubator/setup-miniconda@v3
+      with:
+        miniforge-version: latest
+        channels: conda-forge
+        conda-remove-defaults: true
+        activate-environment: ""
+
+    - name: Install required conda packages
       run: |
-        $CONDA/bin/conda config --system --remove channels defaults
-        $CONDA/bin/conda config --append channels conda-forge
         $CONDA/bin/conda install --quiet --yes conda-build anaconda-client
 
     - name: Build
