@@ -18,10 +18,13 @@ jobs:
         $CONDA/bin/conda config --append channels conda-forge
         $CONDA/bin/conda install --quiet --yes conda-build anaconda-client conda-libmamba-solver
         $CONDA/bin/conda config --set solver libmamba
-        $CONDA/bin/conda config --set anaconda_upload yes
 
-    - name: Build and upload
+    - name: Build
+      run: |
+        $CONDA/bin/conda build --no-anaconda-upload conda-recipe
+
+    - name: Upload
       env:
         ANACONDA_TOKEN: ${{ secrets.ANACONDA_TOKEN }}
       run: |
-        $CONDA/bin/conda build --token $ANACONDA_TOKEN conda-recipe
+        $CONDA/bin/anaconda --token $ANACONDA_TOKEN upload $($CONDA/bin/conda build ./conda-recipe --output)
