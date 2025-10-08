@@ -3,25 +3,19 @@ import numpy as np
 import pytest
 
 from jungfrau_utils import JFDataHandler, StreamAdapter
-
-DETECTOR_NAME = "JF01T03V01"
-DATA_SHAPE = (3 * 512, 1024)
-DATA_SHAPE_WITH_GAPS = (3 * (512 + 2), 1024 + 6)
-DATA_SHAPE_WITH_GEOMETRY = (1100 + 512, 0 + 1024)
-DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY = (1100 + 512 + 2, 0 + 1024 + 6)
+from tests.const_JF01T03V01 import (
+    DATA_SHAPE,
+    DATA_SHAPE_WITH_GAPS,
+    DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY,
+    DATA_SHAPE_WITH_GEOMETRY,
+    DETECTOR_NAME,
+    gain,
+    pedestal,
+    pixel_mask_orig,
+)
 
 image = np.arange(np.prod(DATA_SHAPE), dtype=np.uint16).reshape(DATA_SHAPE[::-1])
 image = np.ascontiguousarray(image.transpose())
-
-
-@pytest.fixture(name="gain_file", scope="module")
-def _gain_file(tmpdir_factory):
-    gain_filename = tmpdir_factory.mktemp("data").join("gains.h5")
-
-    with h5py.File(gain_filename, "w") as h5f:
-        h5f["/gains"] = 10 * np.ones((4, *DATA_SHAPE))
-
-    return gain_filename
 
 
 @pytest.fixture(name="bad_gain_file", scope="module")
@@ -32,17 +26,6 @@ def _bad_gain_file(tmpdir_factory):
         h5f["/gains"] = 10 * np.ones((4, 2 * 512, 1024))
 
     return gain_filename
-
-
-@pytest.fixture(name="pedestal_file", scope="module")
-def _pedestal_file(tmpdir_factory):
-    pedestal_filename = tmpdir_factory.mktemp("data").join("gains.h5")
-
-    with h5py.File(pedestal_filename, "w") as h5f:
-        h5f["/gains"] = np.ones((4, *DATA_SHAPE))
-        h5f["/pixel_mask"] = np.random.randint(2, size=DATA_SHAPE, dtype=bool)
-
-    return pedestal_filename
 
 
 @pytest.fixture(name="bad_pedestal_file", scope="module")
