@@ -2,15 +2,18 @@ import h5py
 import numpy as np
 import pytest
 
+from custom_func.downsample_n_roi import downsample_n_roi
 from jungfrau_utils import File
 from tests.const_JF01T03V01 import *
 
 
-def calc_downsample(downsample):
+def calc_downsample(downsample, roi=None):
+    if roi is None:
+        roi = (0, DATA_SHAPE[0], 0, DATA_SHAPE[1])
 
     ds_shape = (
-        (DATA_SHAPE[0] + downsample[0] - 1) // downsample[0],
-        (DATA_SHAPE[1] + downsample[1] - 1) // downsample[1],
+        (roi[1] - roi[0] + downsample[0] - 1) // downsample[0],
+        (roi[3] - roi[2] + downsample[1] - 1) // downsample[1],
     )
     ds = np.zeros((STACK_SHAPE[0], *ds_shape), dtype=np.float32)
 
@@ -19,11 +22,11 @@ def calc_downsample(downsample):
     else:
         ds_px_count = downsample[0] * downsample[1]
     for j in range(ds_shape[0]):
-        i_y = downsample[0] * j
-        rng_y = slice(i_y, min(i_y + downsample[0], DATA_SHAPE[0]))
+        i_y = downsample[0] * j + roi[0]
+        rng_y = slice(i_y, min(i_y + downsample[0], roi[1]))
         for k in range(ds_shape[1]):
-            i_x = downsample[1] * k
-            rng_x = slice(i_x, min(i_x + downsample[1], DATA_SHAPE[1]))
+            i_x = downsample[1] * k + roi[2]
+            rng_x = slice(i_x, min(i_x + downsample[1], roi[3]))
             gpr = np.count_nonzero(inv_pixel_mask[rng_y, rng_x]) / ds_px_count
             ds[:, j, k] = (
                 np.sum(converted_image_stack_mask[:, rng_y, rng_x], axis=(1, 2)) / gpr if gpr else 0
@@ -127,13 +130,7 @@ def test_file_export_roi(file_adapter, tmpdir_factory, roi):
             assert np.allclose(res[:], converted_image_stack_mask[roi_idx])
 
 
-@pytest.mark.parametrize(
-    "downsample",
-    [
-        None,
-        (4, 4),
-    ],
-)
+@pytest.mark.parametrize("downsample", [None, (5, 2), (4, 4)])
 def test_downsample(file_adapter, tmpdir_factory, downsample):
     exported_file = tmpdir_factory.mktemp("export").join("test.h5")
     file_adapter.export(exported_file, downsample=downsample)
@@ -151,13 +148,8 @@ def test_downsample(file_adapter, tmpdir_factory, downsample):
         assert np.allclose(res[idx], ds[idx])
 
 
-@pytest.mark.parametrize(
-    "downsample,factor",
-    [
-        ((5, 2), None),
-        ((5, 2), 10),
-    ],
-)
+@pytest.mark.parametrize("downsample", [(5, 2), (4, 4)])
+@pytest.mark.parametrize("factor", [None, 10])
 def test_file_export_factor_n_downsample(file_adapter, tmpdir_factory, downsample, factor):
     exported_file = tmpdir_factory.mktemp("export").join("test.h5")
 
@@ -176,3 +168,144 @@ def test_file_export_factor_n_downsample(file_adapter, tmpdir_factory, downsampl
             assert np.allclose(res[:], ds, atol=1)
         else:
             assert np.allclose(res[:], ds)
+
+
+@pytest.mark.parametrize(
+    "idx",
+    [
+        slice(None),
+        [0, 2, 4],
+        (0, 2, 4),
+        range(0, 5, 2),
+    ],
+)
+def test_file_export_v2(file_adapter, tmpdir_factory, idx):
+    exported_file = tmpdir_factory.mktemp("export").join("test.h5")
+    if idx == slice(None):
+        file_adapter._export_v2(exported_file)
+    else:
+        file_adapter._export_v2(exported_file, index=idx)
+
+    with h5py.File(exported_file, "r") as h5f:
+        res = h5f[f"/data/{DETECTOR_NAME}/data"]
+
+        # only corners tested as there is no geom/gap correction
+        for sub_idx in [
+            (slice(None, 256), slice(None, 256)),
+            (slice(None, 256), slice(-256, None)),
+            (slice(-256, None), slice(None, 256)),
+            (slice(-256, None), slice(-256, None)),
+        ]:
+            idx_res = (slice(None),) + sub_idx
+            idx_mask = (idx,) + sub_idx
+            assert np.allclose(res[idx_res], converted_image_stack_mask[idx_mask])
+
+
+@pytest.mark.parametrize(
+    "roi",
+    [
+        (0, 256, 0, 256),
+        ((0, 256, 0, 256),),
+        ((0, 256, 0, 256), (16, 32, 64, 128)),
+    ],
+)
+def test_file_export_roi_v2(file_adapter, tmpdir_factory, roi):
+    exported_file = tmpdir_factory.mktemp("export").join("test.h5")
+    func = downsample_n_roi(None, roi)
+    file_adapter._export_v2(exported_file, func=func)
+    if isinstance(roi[0], int):
+        roi = (roi,)
+
+    with h5py.File(exported_file, "r") as h5f:
+        for i in range(len(roi)):
+            roi_idx = (slice(None), slice(roi[i][0], roi[i][1]), slice(roi[i][2], roi[i][3]))
+            res = h5f[f"/data/{DETECTOR_NAME}:ROI_{i}/data"]
+            assert np.allclose(res[:], converted_image_stack_mask[roi_idx])
+
+
+@pytest.mark.parametrize(
+    "downsample",
+    [
+        None,
+        (4, 4),
+        ((4, 4),),
+    ],
+)
+def test_downsample_v2(file_adapter, tmpdir_factory, downsample):
+    exported_file = tmpdir_factory.mktemp("export").join("test.h5")
+    func = downsample_n_roi(downsample, None)
+    file_adapter._export_v2(exported_file, func=func)
+
+    if downsample is None:
+        downsample = ((1, 1),)
+    if isinstance(downsample[0], int):
+        downsample = (downsample,)
+
+    with h5py.File(exported_file, "r") as h5f:
+        res = h5f[f"/data/{DETECTOR_NAME}/data"]
+        ds = calc_downsample(downsample[0], None)
+        # only corner tested as there is no geom/gap correction
+        corner_y = 250 // downsample[0][0] + 1
+        corner_x = 250 // downsample[0][1] + 1
+        idx = (slice(None), slice(None, corner_y), slice(None, corner_x))
+        assert np.allclose(res[idx], ds[idx])
+
+
+@pytest.mark.parametrize(
+    "roi,downsample",
+    [
+        (((0, 256, 0, 256),), (4, 8)),
+        (((0, 256, 0, 256), (16, 32, 64, 128)), (4, 8)),
+        (((0, 256, 0, 256), (16, 32, 64, 128)), ((4, 8), (5, 2))),
+    ],
+)
+def test_downsample_n_roi_v2(file_adapter, tmpdir_factory, roi, downsample):
+
+    exported_file = tmpdir_factory.mktemp("export").join("test.h5")
+    func = downsample_n_roi(downsample, roi)
+    file_adapter._export_v2(exported_file, func=func)
+    if isinstance(downsample[0], int):
+        downsample = (downsample,) * len(roi)
+    with h5py.File(exported_file, "r") as h5f:
+        for i in range(len(roi)):
+            res = h5f[f"/data/{DETECTOR_NAME}:ROI_{i}/data"]
+            ds = calc_downsample(downsample[i], roi[i])
+            assert np.allclose(res[:], ds)
+
+
+@pytest.mark.parametrize(
+    "roi",
+    [
+        (None),
+        ((0, 256, 0, 256),),
+        ((0, 256, 0, 256), (16, 32, 64, 128)),
+    ],
+)
+@pytest.mark.parametrize("downsample", [(5, 2), (4, 4)])
+@pytest.mark.parametrize("factor", [None, 10])
+def test_file_export_factor_n_downsample_v2(file_adapter, tmpdir_factory, roi, downsample, factor):
+    exported_file = tmpdir_factory.mktemp("export").join("test.h5")
+
+    file_adapter.geometry = False
+    file_adapter.gap_pixels = False
+    func = downsample_n_roi(downsample, roi)
+    file_adapter._export_v2(exported_file, func=func, factor=factor)
+
+    if roi:
+        rang = len(roi)
+        loc = lambda i: f"/data/{DETECTOR_NAME}:ROI_{i}/data"
+    else:
+        rang = 1
+        loc = lambda i: f"/data/{DETECTOR_NAME}/data"
+        roi = (roi,)
+
+    with h5py.File(exported_file, "r") as h5f:
+        for i in range(rang):
+            ds = calc_downsample(downsample, roi[i])
+            if factor:
+                ds = np.round(ds / factor).astype(np.int32)
+            res = h5f[loc(i)]
+            if factor:
+                assert np.allclose(res[:], ds, atol=1)
+            else:
+                assert np.allclose(res[:], ds)
