@@ -6,13 +6,6 @@ from jungfrau_utils import File
 from tests.const_JF01T03V01 import *
 
 
-@pytest.fixture(name="file_adapter", scope="module")
-def _file_adapter(jungfrau_file, gain_file, pedestal_file):
-    file_adapter = File(jungfrau_file, gain_file=gain_file, pedestal_file=pedestal_file)
-
-    yield file_adapter
-
-
 def calc_downsample(downsample):
 
     ds_shape = (
