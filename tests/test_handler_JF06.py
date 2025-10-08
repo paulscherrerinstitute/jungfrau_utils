@@ -15,39 +15,12 @@ DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY = (1106 + 1024 + 6, 618 + 512 + 2)
 pedestal = np.ones((4, *DATA_SHAPE)).astype(np.float32)
 gain = 10 * np.ones((4, *DATA_SHAPE)).astype(np.float32)
 pixel_mask = np.random.randint(2, size=DATA_SHAPE, dtype=bool)
+pixel_mask_orig = pixel_mask
 
 image_stack = np.arange(np.prod(STACK_SHAPE), dtype=np.uint16).reshape(STACK_SHAPE[::-1])
 image_stack = np.ascontiguousarray(image_stack.transpose(2, 1, 0))
 
 image_single = image_stack[0]
-
-
-@pytest.fixture(name="empty_handler", scope="function")
-def _empty_handler():
-    empty_handler = JFDataHandler(DETECTOR_NAME)
-
-    yield empty_handler
-
-
-@pytest.fixture(name="handler", scope="function")
-def _handler(empty_handler):
-    empty_handler.gain = gain
-    empty_handler.pedestal = pedestal
-    empty_handler.pixel_mask = pixel_mask
-
-    prepared_handler = empty_handler
-
-    yield prepared_handler
-
-
-@pytest.fixture(name="handler_no_mask", scope="function")
-def _handler_no_mask(empty_handler):
-    empty_handler.gain = gain
-    empty_handler.pedestal = pedestal
-
-    prepared_handler = empty_handler
-
-    yield prepared_handler
 
 
 @pytest.mark.parametrize(
