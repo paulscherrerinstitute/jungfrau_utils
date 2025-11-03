@@ -1,36 +1,36 @@
 {% set data = load_setup_py_data() %}
 
 package:
-    name: jungfrau_utils
-    version: {{ data['version'] }}
+  name: jungfrau_utils
+  version: {{ data['version'] }}
 
 source:
-    path: ..
+  path: ..
 
 build:
-    script: python setup.py install --single-version-externally-managed --record=record.txt
-    noarch: python
-    number: 0
+  script: python setup.py install --single-version-externally-managed --record=record.txt
+  noarch: python
+  number: 0
 
 requirements:
-    build:
-        - python >=3.8
-        - setuptools
-    run:
-        - python >=3.8
-        - h5py >=2.10,<4
-        - numpy
-        - numba >=0.54
-        - bitshuffle >=0.5
+  build:
+    - python >=3.8
+    - setuptools
+  run:
+    - python >=3.8
+    - h5py >=2.10,<4
+    - numpy
+    - numba >=0.54
+    - bitshuffle >=0.5
 
 test:
-    source_files:
-        - tests
-    requires:
-        - pytest
-    commands:
-        - pytest tests
+  source_files:
+    - tests
+  requires:
+    - pytest
+  commands:
+    - pytest tests
 
 about:
-    home: https://github.com/paulscherrerinstitute/jungfrau_utils
-    summary: {{ data['description'] }}
+  home: https://github.com/paulscherrerinstitute/jungfrau_utils
+  summary: {{ data['description'] }}
