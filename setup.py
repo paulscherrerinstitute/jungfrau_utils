@@ -11,6 +11,6 @@ setup(
     description="",
     author="Paul Scherrer Institute",
     license="GNU GPLv3",
-    packages=find_packages(),
+    packages=find_packages(exclude=["tests"]),
     zip_safe=False,
 )
