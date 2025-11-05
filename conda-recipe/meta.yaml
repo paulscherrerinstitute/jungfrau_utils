@@ -34,3 +34,5 @@ test:
 about:
   home: https://github.com/paulscherrerinstitute/jungfrau_utils
   summary: {{ data['description'] }}
+  license: GNU GPLv3
+  license_file: LICENSE
