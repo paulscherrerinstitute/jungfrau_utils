@@ -1,0 +1,33 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "jungfrau_utils"
+dynamic = ["version"]  # version will be read from __init__.py
+requires-python = ">=3.8"
+dependencies = [
+    "h5py >=2.10,<4",
+    "numpy",
+    "numba >=0.54",
+    "bitshuffle >=0.5",
+]
+authors = [
+  {name = "Paul Scherrer Institute"}
+]
+maintainers = [
+  {name = "Ivan Usov", email = "ivan.usov@psi.ch"}
+]
+description = "Utilities for reading and processing data from Jungfrau detectors."
+readme = "README.md"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
+
+[project.urls]
+Homepage = "https://github.com/paulscherrerinstitute/jungfrau_utils"
+
+[tool.hatch.build.targets.wheel]
+include = ["jungfrau_utils"]
+
+[tool.hatch.version]
+path = "jungfrau_utils/__init__.py"

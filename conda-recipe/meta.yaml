@@ -1,8 +1,10 @@
-{% set data = load_setup_py_data() %}
+{% set version_match = load_file_regex(load_file="jungfrau_utils/__init__.py", regex_pattern='__version__ = "(.+)"') %}
+{% set version = version_match[1] %}
+{% set pyproject = load_file_data('pyproject.toml') %}
 
 package:
-  name: jungfrau_utils
-  version: {{ data['version'] }}
+  name: {{ pyproject['project']['name'] }}
+  version: {{ version }}
 
 source:
   path: ..
@@ -10,18 +12,16 @@ source:
 build:
   script: python -m pip install .
   noarch: python
-  number: 0
 
 requirements:
-  build:
+  host:
     - python >=3.8
-    - setuptools
+    - hatchling
   run:
     - python >=3.8
-    - h5py >=2.10,<4
-    - numpy
-    - numba >=0.54
-    - bitshuffle >=0.5
+    {% for dep in pyproject['project']['dependencies'] %}
+    - {{ dep }}
+    {% endfor %}
 
 test:
   source_files:
@@ -32,7 +32,10 @@ test:
     - pytest tests
 
 about:
-  home: https://github.com/paulscherrerinstitute/jungfrau_utils
-  summary: {{ data['description'] }}
-  license: GNU GPLv3
-  license_file: LICENSE
+  home: {{ pyproject['project']['urls']['Homepage'] }}
+  summary: {{ pyproject['project']['description'] }}
+  license: {{ pyproject['project']['license'] }}
+  license_file:
+  {% for lf in pyproject['project']['license-files'] %}
+    - {{ lf }}
+  {% endfor %}
