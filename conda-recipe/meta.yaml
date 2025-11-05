@@ -8,7 +8,7 @@ source:
   path: ..
 
 build:
-  script: python setup.py install --single-version-externally-managed --record=record.txt
+  script: python -m pip install .
   noarch: python
   number: 0
 
