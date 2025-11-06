@@ -22,7 +22,7 @@ def main():
     with open(version_filepath) as f:
         file_content = f.read()
 
-    version = re.search(r'__version__ = "(.*?)"', file_content).group(1)
+    version = re.search(r'__version__ = "(.+?)"', file_content).group(1)
     major, minor, patch = map(int, version.split(sep="."))
 
     if args.level == "patch":
@@ -38,7 +38,7 @@ def main():
     new_version = f"{major}.{minor}.{patch}"
 
     with open(version_filepath, "w") as f:
-        f.write(re.sub(r'__version__ = "(.*?)"', f'__version__ = "{new_version}"', file_content))
+        f.write(re.sub(r'__version__ = "(.+?)"', f'__version__ = "{new_version}"', file_content))
 
     os.system(f"git commit {version_filepath} -m 'Updating for version {new_version}'")
     os.system(f"git tag -a {new_version} -m 'Release {new_version}'")

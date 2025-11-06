@@ -1,4 +1,4 @@
-{% set version_match = load_file_regex(load_file="jungfrau_utils/__init__.py", regex_pattern='__version__ = "(.+)"') %}
+{% set version_match = load_file_regex(load_file="jungfrau_utils/__init__.py", regex_pattern='__version__ = "(.+?)"') %}
 {% set version = version_match[1] %}
 {% set pyproject = load_file_data('pyproject.toml') %}
 
