@@ -7,4 +7,4 @@ from jungfrau_utils.stream_adapter import StreamAdapter
 
 verbose = True
 
-__version__ = "3.16.0"
+__version__ = "3.17.0"
