@@ -36,6 +36,6 @@ about:
   summary: {{ pyproject['project']['description'] }}
   license: {{ pyproject['project']['license'] }}
   license_file:
-  {% for lf in pyproject['project']['license-files'] %}
+    {% for lf in pyproject['project']['license-files'] %}
     - {{ lf }}
-  {% endfor %}
+    {% endfor %}
