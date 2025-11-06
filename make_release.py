@@ -4,6 +4,7 @@ import argparse
 import os
 import re
 import subprocess
+from pathlib import Path
 
 
 def main():
@@ -13,7 +14,8 @@ def main():
         print(f"Aborting, not on '{default_branch}' branch.")
         return
 
-    version_filepath = os.path.join(os.path.basename(os.path.dirname(__file__)), "__init__.py")
+    project_path = Path(__file__).resolve().parent
+    version_filepath = project_path / project_path.name / "__init__.py"
 
     parser = argparse.ArgumentParser()
     parser.add_argument("level", type=str, choices=["patch", "minor", "major"])
