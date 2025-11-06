@@ -33,6 +33,14 @@ jungfrau\_utils.escape\_adapter module
    :undoc-members:
    :show-inheritance:
 
+jungfrau\_utils.helpers module
+----------------------------------------
+
+.. automodule:: jungfrau_utils.helpers
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 jungfrau\_utils.swissfel\_helpers module
 ----------------------------------------
 
