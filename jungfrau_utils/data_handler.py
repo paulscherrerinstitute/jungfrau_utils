@@ -89,8 +89,6 @@ class JFDataHandler:
 
         self._module_map: NDArray = np.arange(self.detector.n_modules)
 
-        self._mask_all: dict[bool, NDArray | None] = {True: None, False: None}
-
     @property
     def detector_name(self) -> str:
         """Detector name (readonly)."""
@@ -249,27 +247,26 @@ class JFDataHandler:
 
     @pixel_mask.setter
     def pixel_mask(self, value: NDArray | None) -> None:
-        if value is None:
-            self._pixel_mask = None
-            self.get_pixel_mask.cache_clear()
-            return
+        if value is not None:
+            if value.ndim != 2:
+                raise ValueError(f"Expected pixel_mask dimensions 2, provided {value.ndim}.")
 
-        if value.ndim != 2:
-            raise ValueError(f"Expected pixel_mask dimensions 2, provided {value.ndim}.")
-
-        pm_shape = self._shape_in_full
-        if value.shape != pm_shape:
-            raise ValueError(f"Expected pixel_mask shape {pm_shape}, provided {value.shape}.")
+            pm_shape = self._shape_in_full
+            if value.shape != pm_shape:
+                raise ValueError(f"Expected pixel_mask shape {pm_shape}, provided {value.shape}.")
 
         self._pixel_mask = value
         self.get_pixel_mask.cache_clear()
+        self._mask.cache_clear()
 
-        # original mask -> self._mask_all[False]
-        mask = np.invert(value.astype(bool, copy=True))
-        self._mask_all[False] = mask.copy()
+    @lru_cache(maxsize=8)
+    def _mask(self, double_pixels: str) -> NDArray | None:
+        if self.pixel_mask is None:
+            return None
 
-        # original + double pixels mask -> self._mask_all[True]
-        if not self.detector_geometry.is_stripsel:
+        mask = np.invert(self.pixel_mask.astype(bool))
+
+        if double_pixels == "mask":
             for m in range(self.detector.n_modules):
                 module_mask = self._get_module_slice(mask, m)
                 for n in range(1, CHIP_NUM_X):
@@ -280,15 +277,7 @@ class JFDataHandler:
                     module_mask[CHIP_SIZE_Y * n - 1, :] = False
                     module_mask[CHIP_SIZE_Y * n, :] = False
 
-        self._mask_all[True] = mask
-
-    def _mask(self, double_pixels: str) -> NDArray | None:
-        if double_pixels in ("keep", "interp"):
-            return self._mask_all[False]
-        elif double_pixels == "mask":
-            return self._mask_all[True]
-        else:
-            raise ValueError("'double_pixels' can only be 'keep', 'mask', or 'interp'")
+        return mask
 
     @property
     def factor(self) -> float | None:
