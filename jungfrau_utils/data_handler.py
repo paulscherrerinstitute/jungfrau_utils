@@ -260,7 +260,7 @@ class JFDataHandler:
         self._mask.cache_clear()
 
     @lru_cache(maxsize=8)
-    def _mask(self, double_pixels: str) -> NDArray | None:
+    def _mask(self, double_pixels: str, module_edge_pixels: str) -> NDArray | None:
         if self.pixel_mask is None:
             return None
 
@@ -276,6 +276,14 @@ class JFDataHandler:
                 for n in range(1, CHIP_NUM_Y):
                     module_mask[CHIP_SIZE_Y * n - 1, :] = False
                     module_mask[CHIP_SIZE_Y * n, :] = False
+
+        if module_edge_pixels == "mask":
+            for m in range(self.detector.n_modules):
+                module_mask = self._get_module_slice(mask, m)
+                module_mask[0, :] = False
+                module_mask[-1, :] = False
+                module_mask[:, 0] = False
+                module_mask[:, -1] = False
 
         return mask
 
@@ -537,6 +545,7 @@ class JFDataHandler:
         mask: bool = True,
         gap_pixels: bool = True,
         double_pixels: str = "keep",
+        module_edge_pixels: str = "keep",
         geometry: bool = True,
         parallel: bool = False,
         out: NDArray | None = None,
@@ -553,6 +562,8 @@ class JFDataHandler:
             gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
             double_pixels (str, optional): A method to handle double pixels in-between ASICs. Can be
                 "keep", "mask", or "interp". Defaults to "keep".
+            module_edge_pixels (str, optional): A method to handle pixels at the module edges. Can
+                be "keep" or "mask". Defaults to "keep".
             geometry (bool, optional): Apply detector geometry corrections. Defaults to True.
             parallel (bool, optional): Parallelize image stack processing. Defaults to False.
             out (ndarray, optional): If provided, the destination to place the result. The shape
@@ -606,6 +617,14 @@ class JFDataHandler:
             )
             double_pixels = "keep"
 
+        if module_edge_pixels not in ("keep", "mask"):
+            raise ValueError("'module_edge_pixels' can only be 'keep' or 'mask'")
+
+        if not mask and module_edge_pixels == "mask":
+            warnings.warn(
+                '\'module_edge_pixels="mask"\' has no effect when "mask"=False', RuntimeWarning
+            )
+
         out_shape = self.get_shape_out(gap_pixels=gap_pixels, geometry=geometry)
         stack_out_shape = (n_images, *out_shape)
         if out is None:
@@ -630,7 +649,7 @@ class JFDataHandler:
                 reshape_stripsel = _reshape_stripsel_jit
             inplace_interp_dp = _inplace_interp_dp_jit
 
-        _mask = self._mask(double_pixels)
+        _mask = self._mask(double_pixels, module_edge_pixels)
 
         ry = np.arange(MODULE_SIZE_Y, dtype=np.uint32)
         ry += ry // CHIP_SIZE_Y * CHIP_GAP_Y * gap_pixels
@@ -690,7 +709,12 @@ class JFDataHandler:
 
     @lru_cache(maxsize=8)
     def get_pixel_mask(
-        self, *, gap_pixels: bool = True, double_pixels: str = "keep", geometry: bool = True
+        self,
+        *,
+        gap_pixels: bool = True,
+        double_pixels: str = "keep",
+        module_edge_pixels: str = "keep",
+        geometry: bool = True,
     ) -> NDArray | None:
         """Return pixel mask.
 
@@ -719,6 +743,9 @@ class JFDataHandler:
             )
             double_pixels = "keep"
 
+        if module_edge_pixels not in ("keep", "mask"):
+            raise ValueError("'module_edge_pixels' can only be 'keep' or 'mask'")
+
         if self._pixel_mask is None:
             return None
 
@@ -727,7 +754,7 @@ class JFDataHandler:
         else:
             reshape_stripsel = _reshape_stripsel_jit
 
-        _mask = self._mask(double_pixels)[np.newaxis]
+        _mask = self._mask(double_pixels, module_edge_pixels)[np.newaxis]
 
         res_shape = self.get_shape_out(gap_pixels=gap_pixels, geometry=geometry)
         res = np.zeros((1, *res_shape), dtype=bool)
@@ -828,6 +855,7 @@ class JFDataHandler:
         mask: bool = True,
         gap_pixels: bool = True,
         double_pixels: str = "keep",
+        module_edge_pixels: str = "keep",
         geometry: bool = True,
     ) -> NDArray:
         """Return gain values of images.
@@ -858,6 +886,7 @@ class JFDataHandler:
             mask=mask,
             gap_pixels=gap_pixels,
             double_pixels=double_pixels,
+            module_edge_pixels=module_edge_pixels,
             geometry=geometry,
         )
 
@@ -870,6 +899,7 @@ class JFDataHandler:
         mask: bool = True,
         gap_pixels: bool = True,
         double_pixels: str = "keep",
+        module_edge_pixels: str = "keep",
         geometry: bool = True,
     ) -> tuple:
         """Return coordinates of saturated pixels.
@@ -905,6 +935,7 @@ class JFDataHandler:
             mask=mask,
             gap_pixels=gap_pixels,
             double_pixels=double_pixels,
+            module_edge_pixels=module_edge_pixels,
             geometry=geometry,
         )
 
