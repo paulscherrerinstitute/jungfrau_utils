@@ -44,6 +44,8 @@ class File:
         gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
         double_pixels (str, optional): A method to handle double pixels in-between ASICs. Can be
             "keep", "mask", or "interp". Defaults to "keep".
+        module_edge_pixels (str, optional): A method to handle pixels at the module edges. Can be
+            "keep" or "mask". Defaults to "keep".
         geometry (bool, optional): Apply geometry correction. Defaults to True.
         parallel (bool, optional): Use parallelized processing. Defaults to True.
     """
@@ -59,6 +61,7 @@ class File:
         mask: bool = True,
         gap_pixels: bool = True,
         double_pixels: str = "keep",
+        module_edge_pixels: str = "keep",
         geometry: bool = True,
         parallel: bool = True,
     ):
@@ -75,6 +78,7 @@ class File:
         self._mask = mask
         self._gap_pixels = gap_pixels
         self._double_pixels = double_pixels
+        self._module_edge_pixels = module_edge_pixels
         self._geometry = geometry
         self._parallel = parallel
 
@@ -199,6 +203,19 @@ class File:
         self._double_pixels = value
 
     @property
+    def module_edge_pixels(self) -> str:
+        """A parameter for making modifications to module edge pixels."""
+        return self._module_edge_pixels
+
+    @module_edge_pixels.setter
+    def module_edge_pixels(self, value: str) -> None:
+        if self._processed:
+            print("The file is already processed, setting 'module_edge_pixels' has no effect.")
+            return
+
+        self._module_edge_pixels = value
+
+    @property
     def geometry(self) -> bool:
         """A flag for applying geometry."""
         return self._geometry
@@ -274,7 +291,10 @@ class File:
             return self._meta_group["pixel_mask"][:]
 
         return self.handler.get_pixel_mask(
-            gap_pixels=self.gap_pixels, double_pixels=self.double_pixels, geometry=self.geometry
+            gap_pixels=self.gap_pixels,
+            double_pixels=self.double_pixels,
+            module_edge_pixels=self.module_edge_pixels,
+            geometry=self.geometry,
         )
 
     def export(
@@ -439,6 +459,7 @@ class File:
             meta_group["mask"] = self.mask
             meta_group["gap_pixels"] = self.gap_pixels
             meta_group["double_pixels"] = self.double_pixels
+            meta_group["module_edge_pixels"] = self.module_edge_pixels
             meta_group["geometry"] = self.geometry
 
             meta_group["downsample"] = downsample if downsample else (1, 1)
@@ -552,6 +573,7 @@ class File:
                     mask=self.mask,
                     gap_pixels=self.gap_pixels,
                     double_pixels=self.double_pixels,
+                    module_edge_pixels=self.module_edge_pixels,
                     geometry=self.geometry,
                     parallel=self.parallel,
                     out=out_buffer_view,
@@ -633,6 +655,7 @@ class File:
                 mask=self.mask,
                 gap_pixels=self.gap_pixels,
                 double_pixels=self.double_pixels,
+                module_edge_pixels=self.module_edge_pixels,
                 geometry=self.geometry,
                 parallel=self.parallel,
             )
