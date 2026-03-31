@@ -177,5 +177,11 @@ detector_geometry = {
     "JF19T01": DetectorGeometry(),
 
     "JF20T01": DetectorGeometry(),
+
+    "JF21T01": DetectorGeometry(),
+
+    "JF22T01": DetectorGeometry(
+        det_rot90=3,
+    ),
 }
 # fmt: on
