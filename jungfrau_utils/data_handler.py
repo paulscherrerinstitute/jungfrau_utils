@@ -722,6 +722,8 @@ class JFDataHandler:
             gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
             double_pixels (str, optional): A method to handle double pixels in-between ASICs. Can be
                 "keep", "mask", or "interp". Defaults to "keep".
+            module_edge_pixels (str, optional): A method to handle pixels at the module edges. Can
+                be "keep" or "mask". Defaults to "keep".
             geometry (bool, optional): Apply detector geometry corrections. Defaults to True.
 
         Returns:
@@ -867,6 +869,8 @@ class JFDataHandler:
             gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
             double_pixels (str, optional): A method to handle double pixels in-between ASICs. Can be
                 "keep", "mask", or "interp" (resolves into "keep"). Defaults to "keep".
+            module_edge_pixels (str, optional): A method to handle pixels at the module edges. Can
+                be "keep" or "mask". Defaults to "keep".
             geometry (bool, optional): Apply detector geometry corrections. Defaults to True.
 
         Returns:
@@ -911,6 +915,8 @@ class JFDataHandler:
             gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
             double_pixels (str, optional): A method to handle double pixels in-between ASICs. Can be
                 "keep", "mask", or "interp" (resolves into "keep"). Defaults to "keep".
+            module_edge_pixels (str, optional): A method to handle pixels at the module edges. Can
+                be "keep" or "mask". Defaults to "keep".
             geometry (bool, optional): Apply detector geometry corrections. Defaults to True.
 
         Returns:
