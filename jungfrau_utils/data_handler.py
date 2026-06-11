@@ -261,10 +261,10 @@ class JFDataHandler:
 
     @lru_cache(maxsize=8)
     def _mask(self, double_pixels: str, module_edge_pixels: str) -> NDArray | None:
-        if self.pixel_mask is None:
+        if self._pixel_mask is None:
             return None
 
-        mask = np.invert(self.pixel_mask.astype(bool))
+        mask = np.invert(self._pixel_mask.astype(bool))
 
         if double_pixels == "mask":
             for m in range(self.detector.n_modules):
