@@ -83,10 +83,6 @@ class JFDataHandler:
         self._factor: float | None = None
         self._highgain: bool = False
 
-        # gain and pedestal arrays with better memory layout for the actual data conversion
-        self._g_all: dict[bool, NDArray | None] = {True: None, False: None}
-        self._p_all: dict[bool, NDArray | None] = {True: None, False: None}
-
         self._module_map: NDArray = np.arange(self.detector.n_modules)
 
     @property
@@ -143,6 +139,7 @@ class JFDataHandler:
     def gain(self, value: NDArray | None) -> None:
         if value is None:
             self._gain = None
+            self._g.cache_clear()
             return
 
         if value.ndim != 3:
@@ -157,27 +154,25 @@ class JFDataHandler:
 
         # convert _gain values to float32
         self._gain = value.astype(np.float32, copy=False)
-        self._update_g_all()
+        self._g.cache_clear()
 
-    def _update_g_all(self) -> None:
-        if self.factor is None:
+    @lru_cache(maxsize=8)
+    def _g(self, highgain: bool, factor: float) -> NDArray | None:
+        if factor is None:
             _g = 1 / self._gain
         else:
-            # self.factor is one number and self.gain is a large array, so this order of division
+            # factor is one number and self.gain is a large array, so this order of division
             # will avoid double broadcasting
-            _g = 1 / self.factor / self._gain
+            _g = 1 / factor / self._gain
 
-        self._g_all[False] = np.stack((_g[0], _g[1], _g[2], _g[2]))
-
-        g_shape = (4, *self._shape_in_full)  # g_shape_v2 = (6, *self._shape_in_full)
-        if _g.shape == g_shape:
-            self._g_all[True] = np.stack((_g[3], _g[3], _g[3], _g[3]))
-        else:  # _g.shape == g_shape_v2
-            self._g_all[True] = np.stack((_g[3], _g[4], _g[5], _g[5]))
-
-    @property
-    def _g(self) -> NDArray | None:
-        return self._g_all[self.highgain]
+        if highgain:
+            g_shape = (4, *self._shape_in_full)  # g_shape_v2 = (6, *self._shape_in_full)
+            if _g.shape == g_shape:
+                return np.stack((_g[3], _g[3], _g[3], _g[3]))
+            else:  # _g.shape == g_shape_v2
+                return np.stack((_g[3], _g[4], _g[5], _g[5]))
+        else:
+            return np.stack((_g[0], _g[1], _g[2], _g[2]))
 
     @property
     def pedestal_file(self) -> str:
@@ -212,6 +207,7 @@ class JFDataHandler:
     def pedestal(self, value: NDArray | None) -> None:
         if value is None:
             self._pedestal = None
+            self._p.cache_clear()
             return
 
         if value.ndim != 3:
@@ -226,19 +222,20 @@ class JFDataHandler:
 
         # convert _pedestal values to float32
         self._pedestal = value.astype(np.float32, copy=False)
+        self._p.cache_clear()
 
+    @lru_cache(maxsize=8)
+    def _p(self, highgain: bool) -> NDArray | None:
         _p = self._pedestal
 
-        self._p_all[False] = np.stack((_p[0], _p[1], _p[2], _p[2]))
-
-        if _p.shape == p_shape:
-            self._p_all[True] = np.stack((_p[3], _p[3], _p[3], _p[3]))
-        else:  # _p.shape == p_shape_v2
-            self._p_all[True] = np.stack((_p[0], _p[1], _p[2], _p[2]))
-
-    @property
-    def _p(self) -> NDArray | None:
-        return self._p_all[self.highgain]
+        if highgain:
+            p_shape = (4, *self._shape_in_full)  # p_shape_v2 = (3, *self._shape_in_full)
+            if _p.shape == p_shape:
+                return np.stack((_p[3], _p[3], _p[3], _p[3]))
+            else:  # _p.shape == p_shape_v2
+                return np.stack((_p[0], _p[1], _p[2], _p[2]))
+        else:
+            return np.stack((_p[0], _p[1], _p[2], _p[2]))
 
     @property
     def pixel_mask(self) -> NDArray | None:
@@ -305,9 +302,7 @@ class JFDataHandler:
             return
 
         self._factor = value
-
-        if self.gain is not None:
-            self._update_g_all()
+        self._g.cache_clear()
 
     @property
     def highgain(self) -> bool:
@@ -666,8 +661,8 @@ class JFDataHandler:
                 mod = self._get_module_slice(images, m)
 
             if conversion:
-                mod_g = self._get_module_slice(self._g, i)
-                mod_p = self._get_module_slice(self._p, i)
+                mod_g = self._get_module_slice(self._g(self.highgain, self.factor), i)
+                mod_p = self._get_module_slice(self._p(self.highgain), i)
             else:
                 mod_g = None
                 mod_p = None
