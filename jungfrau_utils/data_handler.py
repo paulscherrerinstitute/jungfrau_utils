@@ -38,6 +38,9 @@ STRIPSEL_SIZE_Y: int = 84
 STRIPSEL_JF18_SIZE_X: int = 165
 STRIPSEL_JF18_SIZE_Y: int = 1488
 
+DOUBLE_PIXELS_BIT: np.int64 = np.int64(1 << 21)
+MODULE_EDGE_PIXELS_BIT: np.int64 = np.int64(1 << 22)
+
 
 class JFDataHandler:
     """A class to perform jungfrau detector data handling like pedestal correction,
@@ -255,6 +258,22 @@ class JFDataHandler:
             if value.shape != pm_shape:
                 raise ValueError(f"Expected pixel_mask shape {pm_shape}, provided {value.shape}.")
 
+            if value.dtype == np.int64:
+                for m in range(self.detector.n_modules):
+                    module_slice = self._get_module_slice(value, m)
+                    for n in range(1, CHIP_NUM_X):
+                        module_slice[:, CHIP_SIZE_X * n - 1] |= DOUBLE_PIXELS_BIT
+                        module_slice[:, CHIP_SIZE_X * n] |= DOUBLE_PIXELS_BIT
+
+                    for n in range(1, CHIP_NUM_Y):
+                        module_slice[CHIP_SIZE_Y * n - 1, :] |= DOUBLE_PIXELS_BIT
+                        module_slice[CHIP_SIZE_Y * n, :] |= DOUBLE_PIXELS_BIT
+
+                    module_slice[0, :] |= MODULE_EDGE_PIXELS_BIT
+                    module_slice[-1, :] |= MODULE_EDGE_PIXELS_BIT
+                    module_slice[:, 0] |= MODULE_EDGE_PIXELS_BIT
+                    module_slice[:, -1] |= MODULE_EDGE_PIXELS_BIT
+
         self._pixel_mask = value
         self.get_pixel_mask.cache_clear()
         self._mask.cache_clear()
@@ -264,28 +283,16 @@ class JFDataHandler:
         if self._pixel_mask is None:
             return None
 
-        mask = np.invert(self._pixel_mask.astype(bool))
+        mask = self._pixel_mask
+        if mask.dtype == np.int64:
+            ignore_bits = np.int64(0)
+            if double_pixels != "mask":
+                ignore_bits |= DOUBLE_PIXELS_BIT
+            if module_edge_pixels != "mask":
+                ignore_bits |= MODULE_EDGE_PIXELS_BIT
+            mask = (mask & ~ignore_bits).astype(bool)
 
-        if double_pixels == "mask":
-            for m in range(self.detector.n_modules):
-                module_mask = self._get_module_slice(mask, m)
-                for n in range(1, CHIP_NUM_X):
-                    module_mask[:, CHIP_SIZE_X * n - 1] = False
-                    module_mask[:, CHIP_SIZE_X * n] = False
-
-                for n in range(1, CHIP_NUM_Y):
-                    module_mask[CHIP_SIZE_Y * n - 1, :] = False
-                    module_mask[CHIP_SIZE_Y * n, :] = False
-
-        if module_edge_pixels == "mask":
-            for m in range(self.detector.n_modules):
-                module_mask = self._get_module_slice(mask, m)
-                module_mask[0, :] = False
-                module_mask[-1, :] = False
-                module_mask[:, 0] = False
-                module_mask[:, -1] = False
-
-        return mask
+        return np.invert(mask)
 
     @property
     def factor(self) -> float | None:
