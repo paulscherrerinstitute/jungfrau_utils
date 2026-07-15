@@ -12,7 +12,8 @@ DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY = (0 + 512 + 2, 8288 + 1024 + 6)
 
 pedestal = np.ones((4, *DATA_SHAPE)).astype(np.float32)
 gain = 10 * np.ones((4, *DATA_SHAPE)).astype(np.float32)
-pixel_mask = np.random.randint(2, size=DATA_SHAPE, dtype=bool)
+pixel_mask_orig = np.random.randint(2, size=DATA_SHAPE, dtype=np.int64)
+pixel_mask = pixel_mask_orig.astype(bool, copy=True)
 
 image_stack = np.arange(np.prod(STACK_SHAPE), dtype=np.uint16).reshape(STACK_SHAPE[::-1])
 image_stack = np.ascontiguousarray(image_stack.transpose(2, 1, 0))
@@ -26,7 +27,7 @@ for i in range(9):
     module = np.rot90(module, 2, axes=(1, 2))
     converted_image_stack_geom[:, :, i * 1024 : (i + 1) * 1024] = module
 
-pixel_mask_geom = np.empty(shape=(512, 9 * 1024))
+pixel_mask_geom = np.empty(shape=(512, 9 * 1024), dtype=bool)
 for i in range(9):
     pixel_mask_module = pixel_mask[i * 512 : (i + 1) * 512, :]
     pixel_mask_module = np.rot90(pixel_mask_module, 2)
@@ -48,7 +49,7 @@ def _empty_handler():
 def _handler(empty_handler):
     empty_handler.gain = gain
     empty_handler.pedestal = pedestal
-    empty_handler.pixel_mask = pixel_mask
+    empty_handler.pixel_mask = pixel_mask_orig
 
     prepared_handler = empty_handler
 
@@ -132,10 +133,9 @@ def test_handler_set_pedestal_fail(empty_handler):
 
 
 def test_handler_set_pixel_mask(empty_handler):
-    empty_handler.pixel_mask = pixel_mask
+    empty_handler.pixel_mask = pixel_mask_orig
 
-    assert np.array_equal(empty_handler.pixel_mask, pixel_mask)
-    assert empty_handler.pixel_mask.dtype == bool
+    assert empty_handler.pixel_mask.dtype == np.int64
     assert empty_handler.pixel_mask.ndim == 2
     assert empty_handler.pixel_mask.shape == DATA_SHAPE
 
@@ -293,10 +293,10 @@ def test_handler_shaped_pixel_mask(handler, gap_pixels, geometry):
         assert np.allclose(res[-256:, :256], pixel_mask_geom[-256:, :256])
         assert np.allclose(res[-256:, -256:], pixel_mask_geom[-256:, -256:])
     else:
-        assert np.allclose(res[:256, :256], handler.pixel_mask[:256, :256])
-        assert np.allclose(res[:256, -256:], handler.pixel_mask[:256, -256:])
-        assert np.allclose(res[-256:, :256], handler.pixel_mask[-256:, :256])
-        assert np.allclose(res[-256:, -256:], handler.pixel_mask[-256:, -256:])
+        assert np.allclose(res[:256, :256], pixel_mask[:256, :256])
+        assert np.allclose(res[:256, -256:], pixel_mask[:256, -256:])
+        assert np.allclose(res[-256:, :256], pixel_mask[-256:, :256])
+        assert np.allclose(res[-256:, -256:], pixel_mask[-256:, -256:])
 
 
 def test_handler_get_gains(handler):

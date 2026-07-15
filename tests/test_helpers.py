@@ -7,14 +7,14 @@ from jungfrau_utils.helpers import reverse_pixel_mask
 DETECTOR_NAME = "JF01T03V01"
 DATA_SHAPE = (3 * 512, 1024)
 
-pixel_mask_orig = np.random.randint(2, size=DATA_SHAPE, dtype=np.uint32)
+pixel_mask_orig = np.random.randint(2, size=DATA_SHAPE, dtype=np.int64)
 pixel_mask = pixel_mask_orig.astype(bool, copy=True)
 
 STRIPSEL_DETECTOR_NAME = "JF12T04V01"
 STRIPSEL_DATA_SHAPE = (4 * 512, 1024)
 
 # TODO: a better test, as only the top half of the stripsel module is used
-stripsel_pixel_mask_orig = np.ones(STRIPSEL_DATA_SHAPE, dtype=np.uint32)
+stripsel_pixel_mask_orig = np.ones(STRIPSEL_DATA_SHAPE, dtype=np.int64)
 stripsel_pixel_mask = stripsel_pixel_mask_orig.astype(bool, copy=True)
 
 

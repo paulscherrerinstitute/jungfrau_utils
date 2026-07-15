@@ -243,6 +243,11 @@ class JFDataHandler:
     @pixel_mask.setter
     def pixel_mask(self, value: NDArray | None) -> None:
         if value is not None:
+            if value.dtype not in (np.int64, np.bool):
+                raise ValueError(
+                    f"Expected pixel_mask dtype np.int64 or np.bool, provided {value.dtype}."
+                )
+
             if value.ndim != 2:
                 raise ValueError(f"Expected pixel_mask dimensions 2, provided {value.ndim}.")
 

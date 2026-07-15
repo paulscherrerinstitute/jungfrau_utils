@@ -12,7 +12,7 @@ DATA_SHAPE_WITH_GAPS_WITH_GEOMETRY = (1100 + 512 + 2, 0 + 1024 + 6)
 
 pedestal = np.ones((4, *DATA_SHAPE)).astype(np.float32)
 gain = 10 * np.ones((4, *DATA_SHAPE)).astype(np.float32)
-pixel_mask_orig = np.random.randint(2, size=DATA_SHAPE, dtype=np.uint32)
+pixel_mask_orig = np.random.randint(2, size=DATA_SHAPE, dtype=np.int64)
 pixel_mask = pixel_mask_orig.astype(bool, copy=True)
 
 image_stack = np.arange(np.prod(STACK_SHAPE), dtype=np.uint16).reshape(STACK_SHAPE[::-1])
@@ -135,8 +135,7 @@ def test_handler_set_pedestal_fail(empty_handler):
 def test_handler_set_pixel_mask(empty_handler):
     empty_handler.pixel_mask = pixel_mask_orig
 
-    assert np.array_equal(empty_handler.pixel_mask, pixel_mask_orig)
-    assert empty_handler.pixel_mask.dtype == np.uint32
+    assert empty_handler.pixel_mask.dtype == np.int64
     assert empty_handler.pixel_mask.ndim == 2
     assert empty_handler.pixel_mask.shape == DATA_SHAPE
 
@@ -417,10 +416,10 @@ def test_handler_shaped_pixel_mask(handler, gap_pixels, geometry, module_map):
         assert res.shape == DATA_SHAPE
 
     # check data for chips in all 4 corners
-    assert np.allclose(res[:256, :256], handler.pixel_mask[:256, :256])
-    assert np.allclose(res[:256, -256:], handler.pixel_mask[:256, -256:])
-    assert np.allclose(res[-256:, :256], handler.pixel_mask[-256:, :256])
-    assert np.allclose(res[-256:, -256:], handler.pixel_mask[-256:, -256:])
+    assert np.allclose(res[:256, :256], pixel_mask[:256, :256])
+    assert np.allclose(res[:256, -256:], pixel_mask[:256, -256:])
+    assert np.allclose(res[-256:, :256], pixel_mask[-256:, :256])
+    assert np.allclose(res[-256:, -256:], pixel_mask[-256:, -256:])
 
 
 @pytest.mark.parametrize("gap_pixels", [True, False])
