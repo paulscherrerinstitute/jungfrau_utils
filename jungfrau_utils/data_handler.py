@@ -601,7 +601,7 @@ class JFDataHandler:
         if double_pixels not in ("keep", "mask", "interp"):
             raise ValueError("'double_pixels' can only be 'keep', 'mask', or 'interp'")
 
-        if not mask and double_pixels == "mask":
+        if not mask and double_pixels == "mask" and images.dtype != np.bool:
             warnings.warn(
                 '\'double_pixels="mask"\' has no effect when "mask"=False', RuntimeWarning
             )
@@ -625,7 +625,7 @@ class JFDataHandler:
         if module_edge_pixels not in ("keep", "mask"):
             raise ValueError("'module_edge_pixels' can only be 'keep' or 'mask'")
 
-        if not mask and module_edge_pixels == "mask":
+        if not mask and module_edge_pixels == "mask" and images.dtype != np.bool:
             warnings.warn(
                 '\'module_edge_pixels="mask"\' has no effect when "mask"=False', RuntimeWarning
             )
@@ -645,14 +645,20 @@ class JFDataHandler:
                 reshape_stripsel = _reshape_stripsel_jf18_par_jit
             else:
                 reshape_stripsel = _reshape_stripsel_par_jit
-            inplace_interp_dp = _inplace_interp_dp_par_jit
+            if images.dtype == np.bool:  # check if it's a mask
+                inplace_interp_dp = _inplace_mask_dp_jit  # (there's no parallel version)
+            else:
+                inplace_interp_dp = _inplace_interp_dp_par_jit
         else:
             adc_to_energy = _adc_to_energy_jit
             if self.detector_name.startswith("JF18"):
                 reshape_stripsel = _reshape_stripsel_jf18_jit
             else:
                 reshape_stripsel = _reshape_stripsel_jit
-            inplace_interp_dp = _inplace_interp_dp_jit
+            if images.dtype == np.bool:  # check if it's a mask
+                inplace_interp_dp = _inplace_mask_dp_jit
+            else:
+                inplace_interp_dp = _inplace_interp_dp_jit
 
         if mask:
             _mask = self._mask(double_pixels, module_edge_pixels)
@@ -735,63 +741,21 @@ class JFDataHandler:
         Returns:
             ndarray: Resulting pixel mask, where True values correspond to valid pixels.
         """
-        if double_pixels not in ("keep", "mask", "interp"):
-            raise ValueError("'double_pixels' can only be 'keep', 'mask', or 'interp'")
-
-        if double_pixels == "interp" and not gap_pixels:
-            raise RuntimeError("Double pixel interpolation requires 'gap_pixels' to be True.")
-
-        if self.detector_geometry.is_stripsel and gap_pixels:
-            warnings.warn("'gap_pixels' flag has no effect on stripsel detectors", RuntimeWarning)
-            gap_pixels = False
-
-        if self.detector_geometry.is_stripsel and double_pixels != "keep":
-            warnings.warn(
-                "Handling double pixels has no effect on stripsel detectors", RuntimeWarning
-            )
-            double_pixels = "keep"
-
-        if module_edge_pixels not in ("keep", "mask"):
-            raise ValueError("'module_edge_pixels' can only be 'keep' or 'mask'")
-
         if self._pixel_mask is None:
             return None
 
-        if self.detector_name.startswith("JF18"):
-            reshape_stripsel = _reshape_stripsel_jf18_jit
-        else:
-            reshape_stripsel = _reshape_stripsel_jit
+        mask = self._mask(double_pixels, module_edge_pixels)
+        mask = self.process(
+            mask,
+            conversion=False,
+            mask=False,
+            gap_pixels=gap_pixels,
+            double_pixels=double_pixels,
+            module_edge_pixels=module_edge_pixels,
+            geometry=geometry,
+        )
 
-        _mask = self._mask(double_pixels, module_edge_pixels)[np.newaxis]
-
-        res_shape = self.get_shape_out(gap_pixels=gap_pixels, geometry=geometry)
-        res = np.zeros((1, *res_shape), dtype=bool)
-
-        ry = np.arange(MODULE_SIZE_Y, dtype=np.uint32)
-        ry += ry // CHIP_SIZE_Y * CHIP_GAP_Y * gap_pixels
-        rx = np.arange(MODULE_SIZE_X, dtype=np.uint32)
-        rx += rx // CHIP_SIZE_X * CHIP_GAP_X * gap_pixels
-
-        for i, m in enumerate(self.module_map):
-            if m == -1:
-                continue
-
-            mod = self._get_module_slice(_mask, i)
-
-            oy, oy_end, ox, ox_end, rot90 = self._get_module_coords(m, i, geometry, gap_pixels)
-            mod_res = res[:, oy:oy_end, ox:ox_end]
-            if self.detector_geometry.is_stripsel and geometry:
-                reshape_stripsel(mod_res, mod)
-            else:
-                mod_res = np.rot90(mod_res, k=-rot90, axes=(1, 2))
-                # this will just copy data to the correct place
-                _adc_to_energy_jit(mod_res, mod, None, None, None, None, ry, rx)
-                if double_pixels == "interp":
-                    _inplace_mask_dp_jit(mod_res)
-
-        res = res[0]
-
-        return res
+        return mask
 
     def get_pixel_coordinates(self) -> tuple:
         """Return arrays (x, y, z) of final coordinates for pixels in raw data.
