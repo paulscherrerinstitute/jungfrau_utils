@@ -654,7 +654,8 @@ class JFDataHandler:
                 reshape_stripsel = _reshape_stripsel_jit
             inplace_interp_dp = _inplace_interp_dp_jit
 
-        _mask = self._mask(double_pixels, module_edge_pixels)
+        if mask:
+            _mask = self._mask(double_pixels, module_edge_pixels)
 
         ry = np.arange(MODULE_SIZE_Y, dtype=np.uint32)
         ry += ry // CHIP_SIZE_Y * CHIP_GAP_Y * gap_pixels
