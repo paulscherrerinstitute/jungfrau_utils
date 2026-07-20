@@ -636,8 +636,13 @@ class JFDataHandler:
         if out is None:
             out = np.zeros(stack_out_shape, dtype=out_dtype)
         else:
-            if out.shape != stack_out_shape:
-                raise ValueError(f"Expected out shape {stack_out_shape}, provided {out.shape}.")
+            if is_2darray:
+                if out.shape != out_shape:
+                    raise ValueError(f"Expected out shape {out_shape}, provided {out.shape}.")
+                out = out[np.newaxis]
+            else:
+                if out.shape != stack_out_shape:
+                    raise ValueError(f"Expected out shape {stack_out_shape}, provided {out.shape}.")
 
         if parallel:
             adc_to_energy = _adc_to_energy_par_jit
