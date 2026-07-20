@@ -632,8 +632,8 @@ class JFDataHandler:
 
         out_shape = self.get_shape_out(gap_pixels=gap_pixels, geometry=geometry)
         stack_out_shape = (n_images, *out_shape)
+        out_dtype = self.get_dtype_out(images.dtype, conversion=conversion)
         if out is None:
-            out_dtype = self.get_dtype_out(images.dtype, conversion=conversion)
             out = np.zeros(stack_out_shape, dtype=out_dtype)
         else:
             if out.shape != stack_out_shape:
@@ -694,8 +694,7 @@ class JFDataHandler:
 
             if self.detector_geometry.is_stripsel and geometry:
                 mod_tmp_shape = (n_images, MODULE_SIZE_Y, MODULE_SIZE_X)
-                mod_tmp_dtype = self.get_dtype_out(images.dtype, conversion=conversion)
-                mod_tmp = np.zeros(shape=mod_tmp_shape, dtype=mod_tmp_dtype)
+                mod_tmp = np.zeros(shape=mod_tmp_shape, dtype=out_dtype)
 
                 adc_to_energy(mod_tmp, mod, mod_g, mod_p, mod_mask, self.factor, ry, rx)
                 reshape_stripsel(mod_out, mod_tmp)
