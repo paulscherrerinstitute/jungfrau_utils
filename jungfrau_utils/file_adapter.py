@@ -535,10 +535,8 @@ class File:
                 ds_buffer = np.zeros((batch_size, *out_shape), dtype=out_dtype)
 
             # prepare utility vars
-            if downsample and self.parallel:
-                downsample_image = _downsample_image_par_jit
-            else:
-                downsample_image = _downsample_image_jit
+            if downsample:
+                downsample_image = _downsample_image_jit[self.parallel]
 
             if compression:
                 dtype_size = out_dtype.itemsize
@@ -736,5 +734,7 @@ def _downsample_image(
                     res[i1, i2, i3] = round(tmp_res / factor)
 
 
-_downsample_image_jit = njit(_downsample_image)
-_downsample_image_par_jit = njit(parallel=True)(_downsample_image)
+_downsample_image_jit = {
+    False: njit(_downsample_image),
+    True: njit(parallel=True)(_downsample_image),
+}

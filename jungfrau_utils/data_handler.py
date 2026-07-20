@@ -644,26 +644,15 @@ class JFDataHandler:
                 if out.shape != stack_out_shape:
                     raise ValueError(f"Expected out shape {stack_out_shape}, provided {out.shape}.")
 
-        if parallel:
-            adc_to_energy = _adc_to_energy_par_jit
-            if self.detector_name.startswith("JF18"):
-                reshape_stripsel = _reshape_stripsel_jf18_par_jit
-            else:
-                reshape_stripsel = _reshape_stripsel_par_jit
-            if images.dtype == np.bool:  # check if it's a mask
-                inplace_interp_dp = _inplace_mask_dp_jit  # (there's no parallel version)
-            else:
-                inplace_interp_dp = _inplace_interp_dp_par_jit
+        adc_to_energy = _adc_to_energy_jit[parallel]
+        if self.detector_name.startswith("JF18"):
+            reshape_stripsel = _reshape_stripsel_jf18_jit[parallel]
         else:
-            adc_to_energy = _adc_to_energy_jit
-            if self.detector_name.startswith("JF18"):
-                reshape_stripsel = _reshape_stripsel_jf18_jit
-            else:
-                reshape_stripsel = _reshape_stripsel_jit
-            if images.dtype == np.bool:  # check if it's a mask
-                inplace_interp_dp = _inplace_mask_dp_jit
-            else:
-                inplace_interp_dp = _inplace_interp_dp_jit
+            reshape_stripsel = _reshape_stripsel_jit[parallel]
+        if images.dtype == np.bool:
+            inplace_interp_dp = _inplace_mask_dp_jit  # no parallel version
+        else:
+            inplace_interp_dp = _inplace_interp_dp_jit[parallel]
 
         if mask:
             _mask = self._mask(double_pixels, module_edge_pixels)
@@ -954,8 +943,7 @@ def _adc_to_energy(
                         res[i1, ri2, ri3] = round(tmp_res)
 
 
-_adc_to_energy_jit = njit()(_adc_to_energy)
-_adc_to_energy_par_jit = njit(parallel=True)(_adc_to_energy)
+_adc_to_energy_jit = {False: njit()(_adc_to_energy), True: njit(parallel=True)(_adc_to_energy)}
 
 
 def _reshape_stripsel(res: NDArray, image: NDArray) -> None:
@@ -991,8 +979,10 @@ def _reshape_stripsel(res: NDArray, image: NDArray) -> None:
                 res[ind, yout + 1, xout] = image[ind, yin, xin] / 2
 
 
-_reshape_stripsel_jit = njit()(_reshape_stripsel)
-_reshape_stripsel_par_jit = njit(parallel=True)(_reshape_stripsel)
+_reshape_stripsel_jit = {
+    False: njit()(_reshape_stripsel),
+    True: njit(parallel=True)(_reshape_stripsel),
+}
 
 
 def _reshape_stripsel_jf18(res: NDArray, image: NDArray) -> None:
@@ -1019,8 +1009,10 @@ def _reshape_stripsel_jf18(res: NDArray, image: NDArray) -> None:
         res[ind] = np.rot90(res[ind], k=2)
 
 
-_reshape_stripsel_jf18_jit = njit()(_reshape_stripsel_jf18)
-_reshape_stripsel_jf18_par_jit = njit(parallel=True)(_reshape_stripsel_jf18)
+_reshape_stripsel_jf18_jit = {
+    False: njit()(_reshape_stripsel_jf18),
+    True: njit(parallel=True)(_reshape_stripsel_jf18),
+}
 
 
 def _inplace_interp_dp(res: NDArray) -> None:
@@ -1092,8 +1084,10 @@ def _inplace_interp_dp(res: NDArray) -> None:
                         res[i1, ri2, ri3 + 2] = v3 - res[i1, ri2, ri3 + 3]
 
 
-_inplace_interp_dp_jit = njit()(_inplace_interp_dp)
-_inplace_interp_dp_par_jit = njit(parallel=True)(_inplace_interp_dp)
+_inplace_interp_dp_jit = {
+    False: njit()(_inplace_interp_dp),
+    True: njit(parallel=True)(_inplace_interp_dp),
+}
 
 
 @njit
