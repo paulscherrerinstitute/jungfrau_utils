@@ -295,6 +295,19 @@ class File:
             geometry=self.geometry,
         )
 
+    def get_pixel_mask_reasons(self) -> NDArray | None:
+        """Return pixel mask reasons, shaped according to gap_pixel and geometry flags.
+
+        Returns:
+            ndarray: Resulting pixel mask reasons.
+        """
+        if self._processed:
+            return self._meta_group["pixel_mask_reasons"][:]
+
+        return self.handler.get_pixel_mask_reasons(
+            gap_pixels=self.gap_pixels, geometry=self.geometry
+        )
+
     def export(
         self,
         dest: str,
@@ -471,6 +484,7 @@ class File:
             n_images = dset.shape[0] if index is None else len(index)
 
             pixel_mask = self.get_pixel_mask()
+            pixel_mask_reasons = self.get_pixel_mask_reasons()
             out_shape = self.get_shape_out()
             out_dtype = self.get_dtype_out()
 
@@ -492,6 +506,7 @@ class File:
             if roi is None:
                 meta_group["pixel_mask"] = pixel_mask
                 meta_group["good_pixels_fraction"] = good_pixels_fraction
+                meta_group["pixel_mask_reasons"] = pixel_mask_reasons
 
                 args["shape"] = (n_images, *out_shape)
                 args["chunks"] = (1, *out_shape)
@@ -512,6 +527,9 @@ class File:
 
                     roi_meta_group["roi"] = [(roi_y1, roi_y2), (roi_x1, roi_x2)]
                     roi_meta_group["pixel_mask"] = pixel_mask[
+                        slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)
+                    ]
+                    roi_meta_group["pixel_mask_reasons"] = pixel_mask_reasons[
                         slice(roi_y1, roi_y2), slice(roi_x1, roi_x2)
                     ]
 
