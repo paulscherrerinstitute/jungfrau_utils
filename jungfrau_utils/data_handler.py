@@ -38,6 +38,7 @@ STRIPSEL_SIZE_Y: int = 84
 STRIPSEL_JF18_SIZE_X: int = 165
 STRIPSEL_JF18_SIZE_Y: int = 1488
 
+EMPTY_SPACE_BIT: np.int64 = np.int64(1 << 20)
 DOUBLE_PIXELS_BIT: np.int64 = np.int64(1 << 21)
 MODULE_EDGE_PIXELS_BIT: np.int64 = np.int64(1 << 22)
 
@@ -275,8 +276,9 @@ class JFDataHandler:
                     module_slice[:, -1] |= MODULE_EDGE_PIXELS_BIT
 
         self._pixel_mask = value
-        self.get_pixel_mask.cache_clear()
         self._mask.cache_clear()
+        self.get_pixel_mask.cache_clear()
+        self.get_pixel_mask_reasons.cache_clear()
 
     @lru_cache(maxsize=8)
     def _mask(self, double_pixels: str, module_edge_pixels: str) -> NDArray | None:
@@ -349,6 +351,7 @@ class JFDataHandler:
 
         self._module_map = value
         self.get_pixel_mask.cache_clear()
+        self.get_pixel_mask_reasons.cache_clear()
 
     def _get_shape_in_n_modules(self, n: int) -> tuple[int, int]:
         if self.detector_name == "JF02T09V01":  # a special case
@@ -749,6 +752,39 @@ class JFDataHandler:
         )
 
         return mask
+
+    @lru_cache(maxsize=8)
+    def get_pixel_mask_reasons(
+        self, *, gap_pixels: bool = True, geometry: bool = True
+    ) -> NDArray | None:
+        """Return pixel mask reasons.
+
+        Args:
+            gap_pixels (bool, optional): Add gap pixels between detector chips. Defaults to True.
+            geometry (bool, optional): Apply detector geometry corrections. Defaults to True.
+
+        Returns:
+            ndarray: Resulting pixel mask reasons array.
+        """
+        if self._pixel_mask is None:
+            return None
+
+        mask_reasons = np.full(
+            shape=self.get_shape_out(gap_pixels=gap_pixels, geometry=geometry),
+            fill_value=EMPTY_SPACE_BIT,
+        )
+        self.process(
+            self._pixel_mask,
+            conversion=False,
+            mask=False,
+            gap_pixels=gap_pixels,
+            double_pixels="keep",
+            module_edge_pixels="keep",
+            geometry=geometry,
+            out=mask_reasons,
+        )
+
+        return mask_reasons
 
     def get_pixel_coordinates(self) -> tuple:
         """Return arrays (x, y, z) of final coordinates for pixels in raw data.
