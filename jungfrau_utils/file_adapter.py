@@ -378,6 +378,13 @@ class File:
         if roi is not None and downsample:
             raise ValueError("Unsupported mode: roi with downsample.")
 
+        if downsample and not self.mask:
+            # When downsample is True `good_pixels_fraction` should be exported. Currently, it's
+            # calculated in _downsample_mask_jit, which runs only if self.mask is True. It's
+            # possible to implement a workaround, but it doesn't make much sense to downsample
+            # unmasked data anyways, because the result will be highly disturbed by bad pixels.
+            raise ValueError("Only masked data can be downsampled, set `mask` to True")
+
         if roi is not None:
             if isinstance(roi, tuple) and len(roi) == 4 and all(isinstance(v, int) for v in roi):
                 # this is a single tuple with coordinates, so wrap it in another tuple
@@ -398,11 +405,6 @@ class File:
 
         if index is not None:
             index = np.array(index)  # convert iterable into numpy array
-
-        _mask = self.mask
-        if downsample and not _mask:
-            warnings.warn("Only masked data can be downsampled, `mask` is set to True")
-            self.mask = True
 
         _factor = self.handler.factor
         if downsample:
@@ -614,7 +616,6 @@ class File:
                         h5_dest[f"/data/{self.detector_name}:ROI_{l}/data"][batch_range] = roi_data
 
         # restore original values
-        self.mask = _mask
         self.handler.factor = _factor
         self.handler.module_map = _module_map
 
