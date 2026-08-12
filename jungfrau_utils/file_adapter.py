@@ -12,7 +12,7 @@ from numba import njit, prange
 from numpy.typing import NDArray
 
 import jungfrau_utils
-from jungfrau_utils.data_handler import JFDataHandler
+from jungfrau_utils.data_handler import EMPTY_SPACE_BIT, JFDataHandler
 from jungfrau_utils.swissfel_helpers import (
     get_single_detector_name,
     locate_gain_file,
@@ -489,7 +489,9 @@ class File:
             out_dtype = self.get_dtype_out()
 
             if downsample:
-                pixel_mask, good_pixels_fraction = _downsample_mask_jit(pixel_mask, downsample)
+                pixel_mask, pixel_mask_reasons, good_pixels_fraction = _downsample_mask_jit(
+                    pixel_mask, pixel_mask_reasons, downsample
+                )
                 out_shape = tuple(
                     (shape + ds - 1) // ds for shape, ds in zip(out_shape, downsample)
                 )
@@ -702,14 +704,17 @@ class File:
 
 
 @njit
-def _downsample_mask_jit(mask: NDArray, downsample: tuple[int, int]) -> tuple[NDArray, NDArray]:
+def _downsample_mask_jit(
+    mask: NDArray, mask_reasons: NDArray, downsample: tuple[int, int]
+) -> tuple[NDArray, NDArray]:
     size_y, size_x = mask.shape
     ds_y, ds_x = downsample
     downsample_pix_num = ds_y * ds_x
     out_shape_y = (size_y + ds_y - 1) // ds_y
     out_shape_x = (size_x + ds_x - 1) // ds_x
 
-    downsampled_mask = np.zeros(shape=(out_shape_y, out_shape_x), dtype=np.bool_)
+    downsampled_mask = np.zeros(shape=(out_shape_y, out_shape_x), dtype=np.bool)
+    downsampled_mask_reasons = np.zeros(shape=(out_shape_y, out_shape_x), dtype=np.int64)
     good_pixels_fraction = np.zeros(shape=(out_shape_y, out_shape_x), dtype=np.float64)
 
     for i1 in range(out_shape_y):
@@ -717,14 +722,18 @@ def _downsample_mask_jit(mask: NDArray, downsample: tuple[int, int]) -> tuple[ND
         for i2 in range(out_shape_x):
             i_x = ds_x * i2
             _mask = mask[i_y : i_y + ds_y, i_x : i_x + ds_x]
+            _mask_reasons = mask_reasons[i_y : i_y + ds_y, i_x : i_x + ds_x]
+            for elem in _mask_reasons.flat:
+                downsampled_mask_reasons[i1, i2] |= elem
             if i_y + ds_y > size_y or i_x + ds_x > size_x:
                 # set mask to False for pixels including remainder pixels
                 downsampled_mask[i1, i2] = False
+                downsampled_mask_reasons[i1, i2] |= EMPTY_SPACE_BIT
             else:
                 downsampled_mask[i1, i2] = np.all(_mask)
             good_pixels_fraction[i1, i2] = np.count_nonzero(_mask) / downsample_pix_num
 
-    return downsampled_mask, good_pixels_fraction
+    return downsampled_mask, downsampled_mask_reasons, good_pixels_fraction
 
 
 def _downsample_image(
