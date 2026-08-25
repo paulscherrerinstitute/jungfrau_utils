@@ -259,6 +259,7 @@ class JFDataHandler:
             if value.shape != pm_shape:
                 raise ValueError(f"Expected pixel_mask shape {pm_shape}, provided {value.shape}.")
 
+            value = value.copy()
             if value.dtype == np.int64:
                 for m in range(self.detector.n_modules):
                     module_slice = self._get_module_slice(value, m)
