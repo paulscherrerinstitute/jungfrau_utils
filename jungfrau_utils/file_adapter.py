@@ -69,7 +69,7 @@ class File:
             detector_name = get_single_detector_name(file_path)
 
         # placeholders for processed files
-        self.handler: JFDataHandler = JFDataHandler(detector_name)
+        self.handler: JFDataHandler | None = None
         self._detector_name: str = detector_name
 
         self._conversion = conversion
@@ -86,6 +86,8 @@ class File:
                 print("The file is already converted, setting processing parameters has no effect.")
                 print("No gain/pedestal files are loaded.")
             return
+
+        self.handler = JFDataHandler(detector_name)
 
         # Gain file
         if not gain_file:
@@ -141,11 +143,15 @@ class File:
     @property
     def gain_file(self) -> str:
         """Gain file path (readonly)."""
+        if self._processed:
+            return ""
         return self.handler.gain_file
 
     @property
     def pedestal_file(self) -> str:
         """Pedestal file path (readonly)."""
+        if self._processed:
+            return ""
         return self.handler.pedestal_file
 
     @property
@@ -695,7 +701,7 @@ class File:
         """Close Jungfrau file."""
         if self.file.id:
             self.file.close()
-        del self.handler  # dereference handler since it holds pedestal/gain data
+        self.handler = None  # dereference handler since it holds pedestal/gain data
 
     def __len__(self) -> int:
         return len(self.file)
